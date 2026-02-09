@@ -1,0 +1,30 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module"
+  },
+  "globals": {
+    "gameData": "readonly",
+    "draggedItem": "writable",
+    "currentWorkshop": "writable",
+    "BANK_SLOTS": "readonly",
+    "GRID_SIZE": "readonly",
+    "GRID_ROWS": "readonly",
+    "FOCUS_DURATION": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": [
+      "warn",
+      {
+        "args": "none"
+      }
+    ],
+    "no-console": "off"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "loadout-legends",
+  "version": "0.1.0",
+  "description": "Grid-based idle progression + loadout combat game",
+  "main": "electron-main.js",
+  "author": "You",
+  "license": "TBD",
+  "scripts": {
+    "start": "npx http-server . -p 8080 --cors",
+    "lint": "eslint . --ext .js --ignore-path .gitignore",
+    "lint:fix": "eslint . --ext .js --fix --ignore-path .gitignore",
+    "test": "echo \"No tests configured\"",
+    "electron:dev": "electron .",
+    "electron:pack": "electron-builder --dir",
+    "electron:build": "electron-builder"
+  },
+  "devDependencies": {
+    "eslint": "^8.50.0",
+    "electron": "^26.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.loadoutlegends.app",
+    "productName": "Loadout Legends",
+    "files": [
+      "*.js",
+      "*.html",
+      "*.css",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

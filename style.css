@@ -1,0 +1,265 @@
+/* =========================================
+   1. GLOBAL & VARIABLEN
+   ========================================= */
+:root {
+    --bg-dark: #0a0a0a;
+    --bg-panel: #161616;
+    --sidebar-width: 250px;
+    --accent-gold: #ffd700;
+    --accent-blue: #2196F3;
+    --accent-red: #ff3b3b;
+    --border-color: #333;
+    --slot-size: 64px;
+}
+
+body { 
+    background-color: var(--bg-dark); 
+    color: #eee; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    margin: 0; 
+    overflow: hidden; 
+    height: 100vh;
+}
+
+#app-container { display: flex; height: 100vh; width: 100vw; position: relative; }
+
+/* =========================================
+   2. SIDEBAR
+   ========================================= */
+#sidebar { 
+    width: var(--sidebar-width); 
+    min-width: var(--sidebar-width);
+    background: var(--bg-panel); 
+    border-right: 2px solid var(--border-color); 
+    display: flex; flex-direction: column; padding: 25px; box-sizing: border-box; 
+}
+.logo h2 { color: var(--accent-gold); margin: 0; font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 15px rgba(255, 215, 0, 0.3); }
+.logo span { color: #666; font-size: 0.8rem; letter-spacing: 2px; }
+#main-nav { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; margin-top: 30px; }
+
+.nav-btn { 
+    background: #1d1d1d; border: 1px solid #333; color: #888; 
+    padding: 16px; text-align: left; border-radius: 12px; 
+    cursor: pointer; transition: 0.3s; font-weight: bold;
+}
+.nav-btn:hover { transform: translateX(10px); color: white; border-color: var(--accent-gold); }
+.nav-btn.active { background: #2a2a2a; border-color: var(--accent-gold); color: var(--accent-gold); }
+
+.sidebar-footer { margin-top: auto; }
+#save-btn { width: 100%; padding: 12px; background: #333; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+#save-btn:hover { background: #444; }
+
+/* =========================================
+   3. HEADER & STATS
+   ========================================= */
+#main-view { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+#top-bar { 
+    height: 90px; background: var(--bg-panel); border-bottom: 2px solid var(--border-color); 
+    display: flex; align-items: center; padding: 0 40px; gap: 30px; box-sizing: border-box; 
+}
+
+.stat-item { display: flex; flex-direction: column; min-width: 80px; }
+.label { font-size: 0.7rem; color: #888; font-weight: bold; }
+.value { font-size: 1.2rem; font-weight: 800; color: white; }
+
+.bonus-display { display: flex; flex-direction: column; min-width: 100px; align-items: center; padding: 5px 15px; background: rgba(255, 215, 0, 0.1); border-radius: 8px; border: 1px solid rgba(255, 215, 0, 0.3); }
+.bonus-value { font-size: 1rem; font-weight: bold; color: var(--accent-gold); }
+
+.hp-header-container, .xp-header-container { 
+    flex-grow: 1; max-width: 300px; height: 26px; background: #111; 
+    border: 1px solid #444; border-radius: 6px; position: relative; 
+    overflow: hidden; display: flex; align-items: center; justify-content: center; 
+}
+#hp-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-red); width: 100%; transition: width 0.3s; z-index: 1; }
+#xp-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-blue); width: 0%; transition: width 0.3s; z-index: 1; }
+#hp-text-header, #xp-text-header { position: relative; z-index: 5; font-size: 11px; font-weight: bold; text-shadow: 1px 1px 2px black; color: white; }
+
+/* =========================================
+   4. CONTENT & GRIND
+   ========================================= */
+#content-area { padding: 40px; overflow-y: auto; flex-grow: 1; }
+.tab-content { display: none; opacity: 0; transform: translateY(15px); transition: all 0.4s ease; }
+.tab-content.active { display: block; opacity: 1; transform: translateY(0); }
+
+.battle-area { display: flex; flex-direction: column; align-items: center; gap: 30px; }
+.monster-card { background: #1a1a1a; padding: 30px; border-radius: 20px; border: 2px solid #333; text-align: center; min-width: 300px; }
+.monster-icon { font-size: 4rem; margin-bottom: 15px; display: block; }
+.monster-hp-bar { width: 100%; height: 20px; background: #333; border-radius: 10px; overflow: hidden; margin: 15px 0; position: relative; }
+#monster-hp-fill { height: 100%; background: var(--accent-red); width: 100%; transition: width 0.2s; }
+
+.monster-selection { display: flex; align-items: center; gap: 15px; width: 100%; max-width: 400px; margin-bottom: 20px; }
+.monster-selection button { padding: 10px 20px; background: #333; border: 1px solid #555; color: #ccc; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+.monster-selection button:hover { background: #444; border-color: var(--accent-gold); color: white; }
+.monster-selection button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.work-container-large { 
+    width: 100%; max-width: 600px; height: 45px; background: #111; 
+    border: 2px solid #333; border-radius: 25px; position: relative; 
+    overflow: hidden; margin: 20px 0; display: flex; align-items: center; justify-content: center; 
+}
+#work-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-gold); width: 0%; z-index: 1; }
+#work-text { position: relative; z-index: 5; font-weight: bold; text-shadow: 1px 1px 2px black; color: white; font-size: 1.1rem; }
+
+#action-button { 
+    width: 100%; max-width: 600px; padding: 15px; border-radius: 12px; border: none; 
+    background: #4CAF50; color: white; font-weight: bold; cursor: pointer; font-size: 1.1rem;
+}
+
+/* =========================================
+   5. EQUIPMENT HUB
+   ========================================= */
+.equipment-hub { display: flex; gap: 30px; margin-top: 30px; flex-wrap: wrap; }
+.loadout-preview-card { 
+    background: #1a1a1a; padding: 25px; border-radius: 20px; border: 2px solid #333; 
+    flex: 1; min-width: 220px; cursor: pointer; transition: 0.3s; text-align: center; 
+}
+.loadout-preview-card:hover { border-color: var(--accent-gold); transform: translateY(-5px); background: #222; }
+.loadout-preview-card h4 { color: #ffffff; font-size: 1.2rem; font-weight: 700; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
+.loadout-preview-card.disabled { opacity: 0.5; cursor: not-allowed; }
+.preview-grid { display: grid; grid-template-columns: repeat(5, 30px); gap: 4px; justify-content: center; margin-top: 15px; pointer-events: none; }
+.preview-grid .grid-slot { width: 30px; height: 30px; background: #111; border: 1px solid #222; position: relative; }
+.preview-grid .item { width: 24px; height: 24px; top: 2px; left: 2px; font-size: 1.1rem; border: none; box-shadow: none; }
+
+/* =========================================
+   6. WORKSHOP & GRIDS
+   ========================================= */
+#workshop-overlay {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(5, 5, 5, 0.98); z-index: 1000;
+    backdrop-filter: blur(10px); display: flex; flex-direction: column;
+}
+.workshop-header { padding: 25px 50px; background: #111; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; }
+.workshop-content { display: flex; gap: 60px; justify-content: center; padding: 60px; overflow-y: auto; }
+
+.workshop-content.storage-mode .active-grid-section { display: none !important; }
+.workshop-content.storage-mode #bank-grid { grid-template-columns: repeat(10, var(--slot-size)); max-width: 800px; }
+
+.inventory-grid { 
+    display: grid; gap: 8px; background: #000; padding: 15px; 
+    border: 2px solid #333; border-radius: 12px; width: fit-content; margin: 0 auto; 
+}
+#bank-grid { grid-template-columns: repeat(6, var(--slot-size)); max-height: 500px; overflow-y: auto; }
+#active-setup-grid { grid-template-columns: repeat(5, var(--slot-size)); }
+
+.grid-slot { width: var(--slot-size); height: var(--slot-size); background: #1a1a1a; border: 1px solid #222; border-radius: 6px; position: relative; }
+.grid-slot:hover { border-color: #666; }
+
+/* Preview blocks shown while dragging */
+.preview-block {
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 250;
+}
+.preview-block.invalid { background: rgba(255, 0, 0, 0.45); }
+.preview-block.preview-common { background: rgba(255,255,255,0.15); }
+.preview-block.preview-magic { background: rgba(33,150,243,0.35); }
+.preview-block.preview-rare { background: rgba(255,215,0,0.35); }
+.preview-block.preview-unique { background: rgba(249,115,22,0.35); }
+.preview-block.preview-legendary { background: rgba(168,85,247,0.35); }
+
+/* =========================================
+   7. ITEM SHAPES & VISUALS (GRID)
+   ========================================= */
+.item { 
+    position: absolute; top: 1px; left: 1px; 
+    cursor: grab; 
+    /* Verhindert Ghosting-Probleme */
+    pointer-events: auto;
+}
+
+/* Die einzelnen Pixel der Form */
+.shape-block {
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-sizing: border-box;
+}
+
+.shape-empty {
+    width: 100%;
+    height: 100%;
+    visibility: hidden;
+}
+
+/* 75% Transparente Füllungen für das Grid */
+/* FIX: Verstärkter Glow für Common Items */
+.shape-block.common { 
+    background: rgba(255, 255, 255, 0.20); 
+    border: 1px solid rgba(255, 255, 255, 0.4); 
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1), 0 0 5px rgba(255, 255, 255, 0.1); 
+}
+.shape-block.magic { background: rgba(33, 150, 243, 0.75); border-color: var(--accent-blue); }
+.shape-block.rare { background: rgba(255, 215, 0, 0.75); border-color: var(--accent-gold); }
+.shape-block.unique { background: rgba(249, 115, 22, 0.75); border-color: #f97316; }
+.shape-block.legendary { background: rgba(168, 85, 247, 0.75); border-color: #a855f7; }
+
+/* Das Icon-Overlay (Absolute Zentrierung über die Form) */
+.item-icon-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    pointer-events: none; /* Icon blockiert den Klick auf die Blöcke nicht */
+    z-index: 110;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+/* =========================================
+   8. SHOP & STATS
+   ========================================= */
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+.shop-item-card { background: var(--bg-panel); padding: 20px; border-radius: 12px; border: 1px solid #333; text-align: center; transition: 0.2s; }
+.shop-item-card:hover { border-color: var(--accent-gold); transform: scale(1.02); }
+.shop-item-icon { font-size: 2.5rem; display: block; margin-bottom: 15px; }
+.buy-btn { width: 100%; background: var(--accent-gold); border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; color: black; transition: 0.2s; }
+.buy-btn:hover:not(:disabled) { background: #ffed4e; transform: scale(1.02); }
+.buy-btn:disabled { background: #666; color: #999; cursor: not-allowed; opacity: 0.7; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+.stat-card { background: var(--bg-panel); padding: 25px; border-radius: 15px; border: 1px solid #333; text-align: center; }
+.stat-value { font-size: 1.8rem; font-weight: bold; color: var(--accent-gold); }
+
+/* SHOP GLOWS (Bleiben unverändert für den Leuchteffekt im Menü) */
+.shop-item-card.magic { border-color: var(--accent-blue); box-shadow: 0 0 15px rgba(33, 150, 243, 0.3); }
+.shop-item-card.rare { border-color: var(--accent-gold); box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); }
+.shop-item-card.unique { border-color: #f97316; box-shadow: 0 0 25px rgba(249, 115, 22, 0.5); }
+.shop-item-card.legendary { border-color: #a855f7; animation: legendaryGlow 2s infinite alternate; }
+
+@keyframes legendaryGlow { from { box-shadow: 0 0 15px rgba(168, 85, 247, 0.5); } to { box-shadow: 0 0 35px rgba(168, 85, 247, 0.9); } }
+
+/* =========================================
+   9. SELL ZONE
+   ========================================= */
+#sell-zone {
+    margin-top: 20px;
+    padding: 15px;
+    border: 2px dashed #444;
+    border-radius: 8px;
+    color: #888;
+    text-align: center;
+    font-weight: bold;
+    transition: 0.3s;
+    background: rgba(255, 0, 0, 0.05);
+}
+#sell-zone:hover, #sell-zone.drag-over {
+    background: rgba(255, 0, 0, 0.2);
+    border-color: var(--accent-red);
+    color: white;
+    cursor: copy;
+}
+
+/* 10. UTILS */
+.hidden { display: none !important; }
+#tooltip { position: fixed; z-index: 9999; background: rgba(0,0,0,0.95); padding: 15px; border: 1px solid #555; pointer-events: none; backdrop-filter: blur(5px); color: white; }
+
+/* Drag cursor helpers to reduce browser flicker of not-allowed */
+body.dragging { cursor: grabbing !important; }
+body.dragging.drop-allowed { cursor: grab !important; }
+body.dragging.drop-invalid { cursor: not-allowed !important; }
