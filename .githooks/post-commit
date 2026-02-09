@@ -1,0 +1,12 @@
+#!/bin/sh
+# post-commit hook: append an automated worklog entry without committing
+# This hook runs after successful commits. It appends a timestamped entry
+# and avoids committing to prevent recursive hooks.
+
+LAST_MSG=$(git log -1 --pretty=%B)
+# Skip if the last commit was a worklog commit
+echo "$LAST_MSG" | grep -q "Worklog:" && exit 0
+
+SHORT=$(git rev-parse --short HEAD)
+MSG="Auto: commit ${SHORT}"
+node "$(git rev-parse --show-toplevel)/update_worklog.js" "$MSG" --no-commit || true
