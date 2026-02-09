@@ -1,0 +1,7 @@
+#!/bin/sh
+# post-merge hook: append an automated worklog entry after merges (no commit)
+# This helps the assistant track merges without changing commit history.
+
+SHORT=$(git rev-parse --short HEAD)
+MSG="Auto: merge ${SHORT}"
+node "$(git rev-parse --show-toplevel)/update_worklog.js" "$MSG" --no-commit || true
