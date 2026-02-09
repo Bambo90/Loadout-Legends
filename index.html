@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loadout Legends</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app-container">
+        <aside id="sidebar">
+            <div class="logo">
+                <h2>LL</h2>
+                <span>v0.1</span>
+            </div>
+            <nav id="main-nav">
+                <button class="nav-btn active" onclick="switchTab('grind')">⛏️ Grind</button>
+                <button class="nav-btn" onclick="switchTab('equipment')">🛡️ Ausrüstung</button>
+                <button class="nav-btn" onclick="switchTab('shop')">💰 Shop</button>
+                <button class="nav-btn" onclick="switchTab('stats')">📊 Stats</button>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="save-btn" onclick="saveGame()">💾 Speichern</button>
+            </div>
+        </aside>
+
+        <main id="main-view">
+            <header id="top-bar">
+                <div class="stat-item"><span class="label">GOLD</span><span id="gold-display" class="value">0</span></div>
+                <div class="stat-item"><span class="label">LEVEL</span><span id="level-display" class="value">1</span></div>
+                <div class="hp-header-container"><div id="hp-fill-header"></div><span id="hp-text-header">HP: 100 / 100</span></div>
+                <div class="xp-header-container"><div id="xp-fill-header"></div><span id="xp-text-header">XP: 0 / 500</span></div>
+            </header>
+
+            <section id="content-area">
+                <div id="tab-grind" class="tab-content active">
+                    <div class="battle-area">
+                        <div id="monster-card" class="monster-card">
+                            <div id="monster-icon" class="monster-icon">🟢</div>
+                            <h3 id="monster-name">Wald-Schleim</h3>
+                            <div class="monster-hp-bar"><div id="monster-hp-fill"></div></div>
+                            <p id="monster-hp-text">HP: 50 / 50</p>
+                        </div>
+                        <div class="grind-controls">
+                            <div class="work-container-large">
+                                <div id="work-fill"></div>
+                                <span id="work-text">+0 Gold</span>
+                            </div>
+                            <button id="action-button" onclick="handleWorkClick()">Fokus auffrischen (Boost!)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-equipment" class="tab-content">
+                    <div class="hub-header">
+                        <h3>Ausrüstungs-Zentrum</h3>
+                        <p>Klicke auf ein Set oder das Lager zum Verwalten.</p>
+                    </div>
+                    <div class="equipment-hub">
+                        <div class="loadout-preview-card" onclick="openWorkshop('farm')">
+                            <h4>🚜 Farm Setup</h4>
+                            <div id="preview-farm" class="preview-grid"></div>
+                        </div>
+                        <div class="loadout-preview-card" onclick="openWorkshop('pve')">
+                            <h4>⚔️ PvE Setup</h4>
+                            <div id="preview-pve" class="preview-grid"></div>
+                        </div>
+                        <div class="loadout-preview-card disabled">
+                            <h4>🏆 PvP (Ranked)</h4>
+                            <div id="preview-pvp" class="preview-grid"></div>
+                        </div>
+                        <div class="loadout-preview-card" onclick="openWorkshop('storage')">
+                             <h4>📦 Storage</h4> <div id="preview-bank-small" class="preview-grid"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-shop" class="tab-content">
+                    <h3>Marktplatz</h3>
+                    <div id="shop-container" class="shop-grid"></div>
+                </div>
+
+                <div id="tab-stats" class="tab-content">
+                    <h3>Statistiken</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card"><span class="stat-label">Gold / Sek</span><span id="stat-gps" class="stat-value">0</span></div>
+                        <div class="stat-card"><span class="stat-label">Gold gesamt</span><span id="stat-total-gold" class="stat-value">0</span></div>
+                        <div class="stat-card"><span class="stat-label">XP gesamt</span><span id="stat-total-xp" class="stat-value">0</span></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <div id="workshop-overlay" class="hidden">
+            <div class="workshop-header">
+                <h2 id="workshop-title">Workshop</h2>
+                <h2 id="grid-name">Grid</h2> <button class="close-workshop" onclick="closeWorkshop()">Fertig & Speichern</button>
+            </div>
+            <div class="workshop-content">
+                <div class="bank-section">
+                    <h3 id="bank-header">Storage</h3> 
+                    <div id="bank-grid" class="inventory-grid scrollable-grid"></div>
+                    <div id="sell-zone">💰 Hierher ziehen zum Verkaufen</div>
+                </div>
+                <div class="active-grid-section">
+                    <h3>Ausrüstung</h3>
+                    <div id="active-setup-grid" class="inventory-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="tooltip" class="hidden"></div>
+    
+<!-- ITEMS -->
+ <script src="itemsEngine.js"></script>
+<script src="tools.js"></script>
+<script src="weapons.js"></script>
+<script src="jewelry.js"></script>
+<script src="monsters.js"></script>
+
+<script src="gridengine.js"></script>
+<script src="dragengine.js"></script>
+<script src="gridrenderer.js"></script>
+
+<script src="saveengine.js"></script>
+
+<script src="script.js"></script>
+
+</body>
+</html>
