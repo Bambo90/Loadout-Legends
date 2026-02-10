@@ -22,8 +22,14 @@ function handleDropInSlot(e) {
     if (!grid) {
         console.error("Grid not found for location:", location);
         // Restore item if drop location doesn't exist
-        placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, draggedItem.previewShape, 
-                         draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE);
+        placeItemIntoGrid(
+            gameData[draggedItem.fromLocation],
+            draggedItem.fromIndex,
+            draggedItem.item,
+            draggedItem.previewShape,
+            draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE,
+            draggedItem.instanceId
+        );
         draggedItem = null;
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
         return;
@@ -71,6 +77,9 @@ function handleDropInSlot(e) {
 
     console.log('drop attempt ->', { location, targetIndex, cols, originX, originY, finalOriginIndex });
     let canPlace = false;
+    if (finalOriginIndex >= 0) {
+        canPlace = canPlaceItem(grid, finalOriginIndex, shape, cols, maxRows);
+    }
     console.log('canPlace check ->', canPlace, 'originIndex', finalOriginIndex);
 
     // If not directly placeable, try to find a nearby valid spot (radius 2)
@@ -91,7 +100,14 @@ function handleDropInSlot(e) {
         console.log("Invalid placement, restoring item to original location");
         // Put item back where it came from
         const fromCols = draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE;
-        placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, draggedItem.previewShape, fromCols);
+        placeItemIntoGrid(
+            gameData[draggedItem.fromLocation],
+            draggedItem.fromIndex,
+            draggedItem.item,
+            draggedItem.previewShape,
+            fromCols,
+            draggedItem.instanceId
+        );
         draggedItem = null;
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
         return;
