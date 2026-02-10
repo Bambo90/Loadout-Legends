@@ -60,8 +60,21 @@ function handleDropInSlot(e) {
     }
 
     console.log('drop attempt ->', { location, targetIndex, cols, mouseX, mouseY, originX, originY, finalOriginIndex });
+    console.log('shape dims ->', { w: shape[0].length, h: shape.length });
     let canPlace = false;
     if (finalOriginIndex >= 0) {
+        // quick occupancy snapshot for debugging
+        const occ = [];
+        for (let r = 0; r < shape.length; r++) {
+            for (let c = 0; c < shape[0].length; c++) {
+                if (!shape[r][c]) continue;
+                const px = originX + c;
+                const py = originY + r;
+                const pidx = py * cols + px;
+                occ.push({ r, c, px, py, idx: pidx, occupied: !!grid[pidx] });
+            }
+        }
+        console.log('placement occupancy check', occ);
         canPlace = canPlaceItem(grid, finalOriginIndex, shape, cols, maxRows );
     }
     console.log('canPlace check ->', canPlace, 'originIndex', finalOriginIndex);
