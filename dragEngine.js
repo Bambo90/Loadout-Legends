@@ -8,6 +8,8 @@ let _lastClientX = 0;
 let _lastClientY = 0;
 let _lastDropState = null; // 'allowed' | 'invalid' | null
 let _lastWheelRotate = 0;
+let _lastKeyRotate = 0;
+let _rotationCount = 0;
 
 function rotateMatrixCW(matrix) {
     const h = matrix.length;
@@ -45,6 +47,7 @@ function normalizeShape(shape) {
         }
     }
     if (maxR === -1 || maxC === -1) {
+        console.error('  ⚠️ EMPTY SHAPE! All cells zero:', JSON.stringify(shape));
         return { shape, minR: 0, minC: 0 };
     }
     const trimmed = [];
@@ -55,12 +58,15 @@ function normalizeShape(shape) {
         }
         trimmed.push(row);
     }
+    console.log('  normalizeShape bounds minR=' + minR + ' minC=' + minC + ' maxR=' + maxR + ' maxC=' + maxC + ' | output:', JSON.stringify(trimmed));
     return { shape: trimmed, minR, minC };
 }
 
 function applyRotation(dir) {
     // dir: +1 = CW 90deg, -1 = CCW 90deg
     if (!draggedItem) return;
+    
+    _rotationCount++;
     
     // capture OLD shape dimensions BEFORE rotation
     const oldShape = draggedItem.previewShape;
@@ -69,38 +75,36 @@ function applyRotation(dir) {
     const oldX = draggedItem.offsetX;
     const oldY = draggedItem.offsetY;
     
-    console.log('🔄 ROTATION START', { dir: dir === 1 ? 'CW' : 'CCW', oldH, oldW, oldOffset: { x: oldX, y: oldY }, oldShape });
+    console.log('🔄 ROTATION #' + _rotationCount + ' START', { dir: dir === 1 ? 'CW' : 'CCW', oldH, oldW, oldOffset: { x: oldX, y: oldY }, oldShape });
     
     if (dir === 1) {
         // CW rotation: offset formula uses OLD dimensions
         const rotated = rotateMatrixCW(oldShape);
-        console.log('  Pre-normalize rotated:', rotated);
+        console.log('  Pre-normalize rotated:', JSON.stringify(rotated));
         let newOffsetX = (oldH - 1) - oldY;
         let newOffsetY = oldX;
         const norm = normalizeShape(rotated);
         draggedItem.previewShape = norm.shape;
-        console.log('  Post-normalize shape:', norm.shape, '| trim:', { minR: norm.minR, minC: norm.minC });
         // adjust offsets after trimming
         newOffsetX -= norm.minC;
         newOffsetY -= norm.minR;
         draggedItem.offsetX = Math.max(0, newOffsetX);
         draggedItem.offsetY = Math.max(0, newOffsetY);
-        console.log('🔄 CW ROTATION DONE', { newShape: norm.shape, newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY }, trim: { minR: norm.minR, minC: norm.minC } });
+        console.log('🔄 CW ROTATION #' + _rotationCount + ' DONE', { newShape: JSON.stringify(norm.shape), newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY }, trim: { minR: norm.minR, minC: norm.minC } });
     } else if (dir === -1) {
         // CCW rotation: offset formula uses OLD dimensions
         const rotated = rotateMatrixCCW(oldShape);
-        console.log('  Pre-normalize rotated:', rotated);
+        console.log('  Pre-normalize rotated:', JSON.stringify(rotated));
         let newOffsetX = oldY;
         let newOffsetY = (oldW - 1) - oldX;
         const norm = normalizeShape(rotated);
         draggedItem.previewShape = norm.shape;
-        console.log('  Post-normalize shape:', norm.shape, '| trim:', { minR: norm.minR, minC: norm.minC });
         // adjust offsets after trimming
         newOffsetX -= norm.minC;
         newOffsetY -= norm.minR;
         draggedItem.offsetX = Math.max(0, newOffsetX);
         draggedItem.offsetY = Math.max(0, newOffsetY);
-        console.log('🔄 CCW ROTATION DONE', { newShape: norm.shape, newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY }, trim: { minR: norm.minR, minC: norm.minC } });
+        console.log('🔄 CCW ROTATION #' + _rotationCount + ' DONE', { newShape: JSON.stringify(norm.shape), newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY }, trim: { minR: norm.minR, minC: norm.minC } });
     }
     // Note: Skip visual follow-element update to avoid DOM jitter
     // The shape and offsets are updated correctly at drop time
@@ -112,6 +116,9 @@ function initGlobalDragListeners() {
     window.addEventListener('keydown', (e) => {
         if (!draggedItem) return;
         if (e.key.toLowerCase() !== 'r') return;
+        const now = Date.now();
+        if (now - _lastKeyRotate < 150) return; // debounce: ignore rapid repeats
+        _lastKeyRotate = now;
         e.preventDefault();
         const dir = e.shiftKey ? -1 : 1;
         applyRotation(dir);
