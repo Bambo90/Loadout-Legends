@@ -27,7 +27,8 @@ function normalizeGridInstances(grid, cols) {
         const shape = item.body || [[1]];
         const shapeCopy = shape.map(r => [...r]);
         const instanceId = cell.instanceId;
-        placeItemIntoGrid(newGrid, k, item, shapeCopy, cols, instanceId);
+        const rotatedAura = cell.rotatedAura || null; // Preserve rotated aura if it was stored
+        placeItemIntoGrid(newGrid, k, item, shapeCopy, cols, instanceId, null, rotatedAura);
     });
 
     return newGrid;

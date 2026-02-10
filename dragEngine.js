@@ -98,6 +98,15 @@ function applyRotation(dir) {
         // Clamp offsets inside new shape bounds
         draggedItem.offsetX = Math.min(Math.max(0, newOffsetX), newW - 1);
         draggedItem.offsetY = Math.min(Math.max(0, newOffsetY), newH - 1);
+        
+        // ROTATE AURA as well!
+        if (draggedItem.item && draggedItem.item.aura) {
+            const oldAura = draggedItem.rotatedAura || draggedItem.item.aura;
+            const rotatedAura = rotateMatrixCW(oldAura);
+            const normAura = normalizeShape(rotatedAura);
+            draggedItem.rotatedAura = normAura.shape;
+            console.log('  🔄 Aura rotated CW:', JSON.stringify(draggedItem.rotatedAura));
+        }
         console.log('🔄 CW ROTATION #' + _rotationCount + ' DONE', { 
             newShape: JSON.stringify(norm.shape),
             newDim: { h: newH, w: newW },
@@ -129,6 +138,15 @@ function applyRotation(dir) {
         // Clamp offsets inside new shape bounds
         draggedItem.offsetX = Math.min(Math.max(0, newOffsetX), newW - 1);
         draggedItem.offsetY = Math.min(Math.max(0, newOffsetY), newH - 1);
+        
+        // ROTATE AURA as well!
+        if (draggedItem.item && draggedItem.item.aura) {
+            const oldAura = draggedItem.rotatedAura || draggedItem.item.aura;
+            const rotatedAura = rotateMatrixCCW(oldAura);
+            const normAura = normalizeShape(rotatedAura);
+            draggedItem.rotatedAura = normAura.shape;
+            console.log('  🔄 Aura rotated CCW:', JSON.stringify(draggedItem.rotatedAura));
+        }
         console.log('🔄 CCW ROTATION #' + _rotationCount + ' DONE', { 
             newShape: JSON.stringify(norm.shape),
             newDim: { h: newH, w: newW },

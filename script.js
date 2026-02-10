@@ -101,6 +101,9 @@ function renderPreviewGrid(containerId, gridKey) {
     if (!container) return;
     container.innerHTML = '';
     
+    // Prevent aura overflow from creating scrollbars - clip aura at grid edges
+    container.style.overflow = 'hidden';
+    
     // Vorschau-Grids sind immer 5x5 in der Anzeige
     for (let i = 0; i < 25; i++) {
         const slot = document.createElement('div');
@@ -488,6 +491,10 @@ function renderWorkshopGrids() {
         console.error("Bank oder Active Grid nicht gefunden!");
         return;
     }
+    
+    // Prevent aura overflow from creating scrollbars - clip aura at grid edges
+    bankGrid.style.overflow = 'hidden';
+    activeGrid.style.overflow = 'hidden';
     
     // Stelle sicher, dass Grids existieren
     if (!gameData.bank) gameData.bank = {};

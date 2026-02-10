@@ -65,7 +65,7 @@ function hideAllAuras() {
 }
 window.hideAllAuras = hideAllAuras;
 
-function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previewShape, sourceElem, startEvent, instanceId) {
+function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previewShape, sourceElem, startEvent, instanceId, rotatedAura) {
     if (!item) return;
     // Ensure any existing drag cleaned
     if (draggedItem) return;
@@ -83,6 +83,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         offsetX: offsetX || 0,
         offsetY: offsetY || 0,
         previewShape: baseShape.map(r => [...r]),
+        rotatedAura: rotatedAura || null, // Preserve rotation from grid if exists
         instanceId: instanceId // Store instance ID for tracking
     };
 
@@ -108,12 +109,20 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     const cols = shape[0] ? shape[0].length : 1;
     _customFollowEl.style.width = ((cols * 64) + ((cols - 1) * 8)) + 'px';
     _customFollowEl.style.height = ((rows * 64) + ((rows - 1) * 8)) + 'px';
-    _customFollowEl.style.display = 'grid';
-    _customFollowEl.style.gridTemplateColumns = `repeat(${cols}, 64px)`;
-    _customFollowEl.style.gridTemplateRows = `repeat(${rows}, 64px)`;
-    _customFollowEl.style.gap = '8px';
+    
+    // CRITICAL: Use relative positioning to allow absolute children (aura, icon)
+    _customFollowEl.style.position = 'fixed'; 
+    _customFollowEl.style.display = 'block'; // Not grid! We'll use a wrapper for grid
     _customFollowEl.style.opacity = '0.9';
-    _customFollowEl.style.transition = 'none'; // Disable transitions on follow element for smooth tracking
+    _customFollowEl.style.transition = 'none';
+    
+    // Create grid wrapper for shape blocks
+    const gridWrapper = document.createElement('div');
+    gridWrapper.style.display = 'grid';
+    gridWrapper.style.gridTemplateColumns = `repeat(${cols}, 64px)`;
+    gridWrapper.style.gridTemplateRows = `repeat(${rows}, 64px)`;
+    gridWrapper.style.gap = '8px';
+    gridWrapper.style.position = 'relative';
 
     // fill visual squares similar to item
     shape.forEach((row, r) => {
@@ -124,11 +133,70 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             } else {
                 pixel.className = 'shape-empty';
             }
-            _customFollowEl.appendChild(pixel);
+            gridWrapper.appendChild(pixel);
         });
     });
+    
+    _customFollowEl.appendChild(gridWrapper);
+    
+    // ADD AURA OVERLAY FIRST (behind icon)
+    // Use rotated aura if available (when picking up rotated item)
+    const aura = draggedItem.rotatedAura || item.aura;
+    if (aura) {
+        const auraOverlay = document.createElement('div');
+        auraOverlay.className = 'aura-overlay';
+        auraOverlay.style.position = 'absolute';
+        auraOverlay.style.top = '0';
+        auraOverlay.style.left = '0';
+        auraOverlay.style.opacity = '1';
+        auraOverlay.style.pointerEvents = 'none';
+        auraOverlay.style.zIndex = '1'; // Below icon
+        auraOverlay.style.display = 'grid';
+        
+        const auraRows = aura.length;
+        const auraCols = aura[0] ? aura[0].length : 1;
+        auraOverlay.style.width = ((auraCols * 64) + ((auraCols - 1) * 8)) + 'px';
+        auraOverlay.style.height = ((auraRows * 64) + ((auraRows - 1) * 8)) + 'px';
+        auraOverlay.style.gridTemplateColumns = `repeat(${auraCols}, 64px)`;
+        auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
+        auraOverlay.style.gap = '8px';
+        
+        // Center aura around body
+        const offsetX = (cols - auraCols) / 2 * (64 + 8);
+        const offsetY = (rows - auraRows) / 2 * (64 + 8);
+        auraOverlay.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+        
+        aura.forEach((row, r) => {
+            if (!Array.isArray(row)) return;
+            row.forEach((cellValue, c) => {
+                const auraCell = document.createElement('div');
+                auraCell.style.width = '64px';
+                auraCell.style.height = '64px';
+                if (cellValue === 1) {
+                    auraCell.style.backgroundColor = 'rgba(100, 200, 255, 0.4)';
+                    auraCell.style.border = '2px solid rgba(100, 200, 255, 0.7)';
+                } else {
+                    auraCell.style.backgroundColor = 'transparent';
+                    auraCell.style.border = 'none';
+                }
+                auraCell.style.borderRadius = '4px';
+                auraOverlay.appendChild(auraCell);
+            });
+        });
+        
+        _customFollowEl.appendChild(auraOverlay);
+    }
+    
+    // ADD ICON LAST (on top)
     const icon = document.createElement('div');
     icon.className = 'item-icon-overlay';
+    icon.style.position = 'absolute';
+    icon.style.top = '50%';
+    icon.style.left = '50%';
+    icon.style.transform = 'translate(-50%, -50%)';
+    icon.style.zIndex = '100'; // Above everything
+    icon.style.pointerEvents = 'none';
+    icon.style.fontSize = '2rem';
     icon.innerText = item.icon;
     _customFollowEl.appendChild(icon);
 
@@ -140,13 +208,23 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         const shape = draggedItem.previewShape || [[1]];
         const rows = shape.length;
         const cols = shape[0] ? shape[0].length : 1;
+        
+        // Update dimensions
         _customFollowEl.style.width = ((cols * 64) + ((cols - 1) * 8)) + 'px';
         _customFollowEl.style.height = ((rows * 64) + ((rows - 1) * 8)) + 'px';
-        _customFollowEl.style.gridTemplateColumns = `repeat(${cols}, 64px)`;
-        _customFollowEl.style.gridTemplateRows = `repeat(${rows}, 64px)`;
-        // clear old shapes
+        
+        // Clear all children
         while (_customFollowEl.firstChild) _customFollowEl.removeChild(_customFollowEl.firstChild);
-        // redraw shapes
+        
+        // Create grid wrapper
+        const gridWrapper = document.createElement('div');
+        gridWrapper.style.display = 'grid';
+        gridWrapper.style.gridTemplateColumns = `repeat(${cols}, 64px)`;
+        gridWrapper.style.gridTemplateRows = `repeat(${rows}, 64px)`;
+        gridWrapper.style.gap = '8px';
+        gridWrapper.style.position = 'relative';
+        
+        // Redraw shape blocks
         shape.forEach((row, r) => {
             row.forEach((cell, c) => {
                 const pixel = document.createElement('div');
@@ -155,11 +233,69 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 } else {
                     pixel.className = 'shape-empty';
                 }
-                _customFollowEl.appendChild(pixel);
+                gridWrapper.appendChild(pixel);
             });
         });
+        
+        _customFollowEl.appendChild(gridWrapper);
+        
+        // ADD AURA OVERLAY (using rotated aura if available)
+        const aura = draggedItem.rotatedAura || draggedItem.item.aura;
+        if (aura) {
+            const auraOverlay = document.createElement('div');
+            auraOverlay.className = 'aura-overlay';
+            auraOverlay.style.position = 'absolute';
+            auraOverlay.style.top = '0';
+            auraOverlay.style.left = '0';
+            auraOverlay.style.opacity = '1';
+            auraOverlay.style.pointerEvents = 'none';
+            auraOverlay.style.zIndex = '1';
+            auraOverlay.style.display = 'grid';
+            
+            const auraRows = aura.length;
+            const auraCols = aura[0] ? aura[0].length : 1;
+            auraOverlay.style.width = ((auraCols * 64) + ((auraCols - 1) * 8)) + 'px';
+            auraOverlay.style.height = ((auraRows * 64) + ((auraRows - 1) * 8)) + 'px';
+            auraOverlay.style.gridTemplateColumns = `repeat(${auraCols}, 64px)`;
+            auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
+            auraOverlay.style.gap = '8px';
+            
+            // Center aura around body
+            const offsetX = (cols - auraCols) / 2 * (64 + 8);
+            const offsetY = (rows - auraRows) / 2 * (64 + 8);
+            auraOverlay.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+            
+            aura.forEach((row, r) => {
+                if (!Array.isArray(row)) return;
+                row.forEach((cellValue, c) => {
+                    const auraCell = document.createElement('div');
+                    auraCell.style.width = '64px';
+                    auraCell.style.height = '64px';
+                    if (cellValue === 1) {
+                        auraCell.style.backgroundColor = 'rgba(100, 200, 255, 0.4)';
+                        auraCell.style.border = '2px solid rgba(100, 200, 255, 0.7)';
+                    } else {
+                        auraCell.style.backgroundColor = 'transparent';
+                        auraCell.style.border = 'none';
+                    }
+                    auraCell.style.borderRadius = '4px';
+                    auraOverlay.appendChild(auraCell);
+                });
+            });
+            
+            _customFollowEl.appendChild(auraOverlay);
+        }
+        
+        // ADD ICON (on top)
         const icon = document.createElement('div');
         icon.className = 'item-icon-overlay';
+        icon.style.position = 'absolute';
+        icon.style.top = '50%';
+        icon.style.left = '50%';
+        icon.style.transform = 'translate(-50%, -50%)';
+        icon.style.zIndex = '100';
+        icon.style.pointerEvents = 'none';
+        icon.style.fontSize = '2rem';
         icon.innerText = draggedItem.item.icon;
         _customFollowEl.appendChild(icon);
     };
@@ -307,7 +443,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 if (gameData[draggedItem.fromLocation]) {
                     const fromCols = draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE;
                     const restoreShape = draggedItem.item?.body || draggedItem.previewShape;
-                    placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, restoreShape, fromCols, draggedItem.instanceId);
+                    placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, restoreShape, fromCols, draggedItem.instanceId, null, draggedItem.rotatedAura || null);
                 }
                 draggedItem = null;
                 try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }

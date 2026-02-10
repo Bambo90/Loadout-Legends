@@ -123,8 +123,20 @@ function createSlot(container, location, index, cols) {
     auraOverlay.style.pointerEvents = 'none';
     auraOverlay.style.zIndex = '50';
     
-    // Render die Aura-Zellen (item.aura oder standard 3x3)
-    const aura = item.aura || [[1,1,1], [1,0,1], [1,1,1]]; // Default aura wenn nicht definiert
+    // Priority: 1) Stored rotatedAura in cell (persistent), 2) draggedItem rotatedAura (during drag), 3) original item.aura
+    let aura = item.aura || [[1,1,1], [1,0,1], [1,1,1]];
+    
+    // Check if cell has stored rotated aura (from previous placement)
+    if (cell.rotatedAura) {
+        aura = cell.rotatedAura;
+        console.log('  🔄 Using stored rotated aura from grid:', JSON.stringify(aura));
+    }
+    // Override if this item is being dragged and has a rotated aura
+    else if (draggedItem && draggedItem.instanceId === cell.instanceId && draggedItem.rotatedAura) {
+        aura = draggedItem.rotatedAura;
+        console.log('  🔄 Using rotated aura for drag preview:', JSON.stringify(aura));
+    }
+    
     const auraRows = aura.length;
     const auraColsShape = aura[0] ? aura[0].length : 1;
     
@@ -141,17 +153,36 @@ function createSlot(container, location, index, cols) {
     auraOverlay.style.left = offsetX + "px";
     auraOverlay.style.top = offsetY + "px";
     
+    // Calculate item position in grid to check aura bounds
+    const itemGridX = index % cols;
+    const itemGridY = Math.floor(index / cols);
+    
+    // Calculate max rows for boundary checking
+    let maxRows = GRID_ROWS; // Default
+    if (location === 'bank') {
+        maxRows = Math.ceil(BANK_SLOTS / cols);
+    }
+    
     aura.forEach((row, r) => {
         if (!Array.isArray(row)) return;
         row.forEach((cellValue, c) => {
             const auraCell = document.createElement('div');
             auraCell.style.width = '64px';
             auraCell.style.height = '64px';
-            if (cellValue === 1) {
+            
+            // Calculate absolute grid position of this aura cell
+            const auraGridX = itemGridX + c - Math.floor(auraColsShape / 2);
+            const auraGridY = itemGridY + r - Math.floor(auraRows / 2);
+            
+            // Check if aura cell is outside grid boundaries
+            const isOutOfBounds = (auraGridX < 0 || auraGridX >= cols || auraGridY < 0 || auraGridY >= maxRows);
+            
+            if (cellValue === 1 && !isOutOfBounds) {
                 auraCell.classList.add('aura-cell', 'active');
                 auraCell.style.backgroundColor = 'rgba(100, 200, 255, 0.3)';
                 auraCell.style.border = '2px solid rgba(100, 200, 255, 0.6)';
             } else {
+                // Either empty cell or out of bounds - make it transparent/invisible
                 auraCell.classList.add('aura-cell', 'empty');
                 auraCell.style.backgroundColor = 'transparent';
                 auraCell.style.border = 'none';
@@ -204,7 +235,8 @@ function createSlot(container, location, index, cols) {
                 showAllAuras();
             }
             
-            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shapeCopy, itemEl, e, cell.instanceId);
+            // Pass cell.rotatedAura to preserve rotation when picking up item
+            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shapeCopy, itemEl, e, cell.instanceId, cell.rotatedAura);
         }
     });
 

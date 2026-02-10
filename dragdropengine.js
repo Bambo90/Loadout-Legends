@@ -29,7 +29,9 @@ function handleDropInSlot(e) {
             draggedItem.item,
             restoreShape,
             draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE,
-            draggedItem.instanceId
+            draggedItem.instanceId,
+            null,
+            draggedItem.rotatedAura || null
         );
         draggedItem = null;
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
@@ -133,7 +135,9 @@ function handleDropInSlot(e) {
             draggedItem.item,
             bodyShape,
             fromCols,
-            draggedItem.instanceId
+            draggedItem.instanceId,
+            null,
+            draggedItem.rotatedAura || null
         );
         draggedItem = null;
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
@@ -209,7 +213,9 @@ function handleDropInSlot(e) {
             draggedItem.item,
             bodyShape,
             fromCols,
-            draggedItem.instanceId
+            draggedItem.instanceId,
+            null,
+            draggedItem.rotatedAura || null
         );
         draggedItem = null;
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
@@ -218,7 +224,7 @@ function handleDropInSlot(e) {
 
     // Platzieren
     // Store ONLY the body in grid to avoid aura blocking placements/edges
-    placeItemIntoGrid(grid, chosenIndex, draggedItem.item, bodyShape, cols, draggedItem.instanceId);
+    placeItemIntoGrid(grid, chosenIndex, draggedItem.item, bodyShape, cols, draggedItem.instanceId, null, draggedItem.rotatedAura || null);
     console.log('✅ PLACED ITEM', { itemId: draggedItem.item.id, instance: draggedItem.instanceId, location, index: chosenIndex });
     draggedItem = null;
     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
