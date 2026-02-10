@@ -5,7 +5,7 @@ let _customFollowEl = null;
 let _customPointerMove = null;
 let _customPointerUp = null;
 
-function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previewShape, sourceElem, startEvent) {
+function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previewShape, sourceElem, startEvent, instanceId) {
     if (!item) return;
     // Ensure any existing drag cleaned
     if (draggedItem) return;
@@ -16,11 +16,12 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         fromIndex: fromIndex,
         offsetX: offsetX || 0,
         offsetY: offsetY || 0,
-        previewShape: previewShape.map(r => [...r])
+        previewShape: previewShape.map(r => [...r]),
+        instanceId: instanceId // Store instance ID for tracking
     };
 
     // remove item from grid for preview
-    clearItemFromGrid(gameData[fromLocation], item.id);
+    clearItemFromGrid(gameData[fromLocation], instanceId);
     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
 
     // create follow element
@@ -183,7 +184,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             if (draggedItem) {
                 if (gameData[draggedItem.fromLocation]) {
                     const fromCols = draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE;
-                    placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, draggedItem.previewShape, fromCols);
+                    placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, draggedItem.previewShape, fromCols, draggedItem.instanceId);
                 }
                 draggedItem = null;
                 try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }

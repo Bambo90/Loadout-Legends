@@ -105,8 +105,8 @@ function handleDropInSlot(e) {
     }
 
     // Platzieren
-    placeItemIntoGrid(grid, chosenIndex, draggedItem.item, shape, cols);
-    console.log('placed item ->', draggedItem.item.id, 'at', location, 'index', chosenIndex);
+    placeItemIntoGrid(grid, chosenIndex, draggedItem.item, shape, cols, draggedItem.instanceId);
+    console.log('placed item ->', draggedItem.item.id, 'instance', draggedItem.instanceId, 'at', location, 'index', chosenIndex);
     draggedItem = null;
     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
     

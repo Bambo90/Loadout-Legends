@@ -3,9 +3,16 @@
 // Verwaltet echte Slot-Belegung
 // ================================
 
-function clearItemFromGrid(grid, itemId) {
+// Global instance ID counter for unique item instances
+let _instanceIdCounter = 1000;
+
+function generateInstanceId() {
+    return `inst_${++_instanceIdCounter}`;
+}
+
+function clearItemFromGrid(grid, instanceId) {
     Object.keys(grid).forEach(k => {
-        if (grid[k]?.itemId === itemId) {
+        if (grid[k]?.instanceId === instanceId) {
             delete grid[k];
         }
     });
@@ -33,7 +40,12 @@ function canPlaceItem(grid, originIndex, shape, cols, maxRows) {
     return true;
 }
 
-function placeItemIntoGrid(grid, originIndex, item, shape, cols) {
+function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId) {
+    // If no instanceId provided, generate a new one
+    if (!instanceId) {
+        instanceId = generateInstanceId();
+    }
+    
     const originX = originIndex % cols;
     const originY = Math.floor(originIndex / cols);
 
@@ -46,9 +58,12 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols) {
 
             grid[idx] = {
                 itemId: item.id,
+                instanceId: instanceId, // Unique instance identifier
                 shape: shape.map(r => [...r]), // Store a copy of the actual placed shape (may be rotated)
                 root: (r === 0 && c === 0) // Nur das erste Feld ist der Anker
             };
         });
     });
+    
+    return instanceId; // Return the instanceId for tracking
 }

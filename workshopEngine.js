@@ -125,9 +125,9 @@ function createSlot(container, location, index, cols) {
         calcOffsetX = Math.min(calcOffsetX, colsShape - 1);
         calcOffsetY = Math.min(calcOffsetY, rows - 1);
 
-        // Start the custom pointer drag
+        // Start the custom pointer drag with instanceId from grid cell
         if (typeof window.startCustomDrag === 'function') {
-            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shape, itemEl, e);
+            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shape, itemEl, e, cell.instanceId);
         }
     });
 
