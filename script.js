@@ -501,14 +501,21 @@ function renderWorkshopGrids() {
             e.preventDefault();
             sellZone.classList.remove('drag-over');
             if (draggedItem) {
+                console.log('💰 SELL ATTEMPT', { itemId: draggedItem.item.id, instanceId: draggedItem.instanceId, fromLocation: draggedItem.fromLocation, item: draggedItem.item });
                 const item = draggedItem.item;
                 const sellPrice = Math.floor(item.price * 0.5);
+                console.log('  Price:', item.price, '→ Sell for:', sellPrice);
                 gameData.gold += sellPrice;
+                console.log('  Gold now:', gameData.gold);
+                console.log('  Clearing from grid:', gameData[draggedItem.fromLocation]);
                 clearItemFromGrid(gameData[draggedItem.fromLocation], draggedItem.instanceId);
                 draggedItem = null;
                     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
                 updateUI();
                 saveGame();
+                console.log('  ✅ SELL COMPLETE');
+            } else {
+                console.log('⚠️ SELL DROP but no draggedItem!');
             }
         });
     }

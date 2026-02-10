@@ -75,7 +75,7 @@ function handleDropInSlot(e) {
         return null;
     }
 
-    console.log('🔷 DROP ATTEMPT ->', { location, targetIndex, cols, originXY: { x: originX, y: originY }, finalOriginIndex, shapeDim: { h: shape.length, w: shape[0].length } });
+    console.log('🔷 DROP ATTEMPT ->', { location, targetIndex, cols, originXY: { x: originX, y: originY }, finalOriginIndex, shapeDim: { h: shape.length, w: shape[0].length }, shape: JSON.stringify(shape), offset: {x: adjustedOffsetX, y: adjustedOffsetY} });
     let canPlace = false;
     if (finalOriginIndex >= 0) {
         canPlace = canPlaceItem(grid, finalOriginIndex, shape, cols, maxRows);
