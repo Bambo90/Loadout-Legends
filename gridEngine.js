@@ -10,12 +10,37 @@ function generateInstanceId() {
     return `inst_${++_instanceIdCounter}`;
 }
 
-function clearItemFromGrid(grid, instanceId) {
+function clearItemFromGrid(grid, idOrInstance) {
+    if (!grid) return;
+    const isInstance = typeof idOrInstance === 'string' && idOrInstance.startsWith('inst_');
     Object.keys(grid).forEach(k => {
-        if (grid[k]?.instanceId === instanceId) {
+        const cell = grid[k];
+        if (!cell) return;
+        if (isInstance && cell.instanceId === idOrInstance) {
+            delete grid[k];
+            return;
+        }
+        if (!isInstance && cell.itemId === idOrInstance) {
             delete grid[k];
         }
     });
+}
+
+function syncInstanceIdCounterFromGrids(grids) {
+    let maxId = _instanceIdCounter;
+    grids.forEach(grid => {
+        if (!grid) return;
+        Object.keys(grid).forEach(k => {
+            const cell = grid[k];
+            if (!cell || !cell.instanceId) return;
+            const m = String(cell.instanceId).match(/inst_(\d+)/);
+            if (m) {
+                const num = parseInt(m[1], 10);
+                if (!isNaN(num) && num > maxId) maxId = num;
+            }
+        });
+    });
+    _instanceIdCounter = maxId;
 }
 
 function canPlaceItem(grid, originIndex, shape, cols, maxRows) {
