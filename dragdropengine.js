@@ -32,11 +32,21 @@ function handleDropInSlot(e) {
     const shape = draggedItem.previewShape;
 
     // Grid-to-Grid Snapping: Berechne den echten Ursprungsslot (Top-Left)
+    // If moving to a different grid, reset offset to safe default
+    let adjustedOffsetX = draggedItem.offsetX;
+    let adjustedOffsetY = draggedItem.offsetY;
+    
+    if (location !== draggedItem.fromLocation) {
+        // Cross-grid move: use center of item as anchor
+        adjustedOffsetX = Math.floor(shape[0].length / 2);
+        adjustedOffsetY = Math.floor(shape.length / 2);
+    }
+    
     const mouseX = targetIndex % cols;
     const mouseY = Math.floor(targetIndex / cols);
     
-    const originX = mouseX - draggedItem.offsetX;
-    const originY = mouseY - draggedItem.offsetY;
+    const originX = mouseX - adjustedOffsetX;
+    const originY = mouseY - adjustedOffsetY;
     const finalOriginIndex = originY * cols + originX;
 
     // If placement invalid, try to find nearest valid origin within a small radius
@@ -59,25 +69,8 @@ function handleDropInSlot(e) {
         return null;
     }
 
-    console.log('drop attempt ->', { location, targetIndex, cols, mouseX, mouseY, originX, originY, finalOriginIndex });
-    console.log('shape dims ->', { w: shape[0].length, h: shape.length });
-    console.log('grid state at drop', Object.keys(grid).length, 'occupied slots:', Object.keys(grid).sort((a,b)=>a-b));
+    console.log('drop attempt ->', { location, targetIndex, cols, originX, originY, finalOriginIndex });
     let canPlace = false;
-    if (finalOriginIndex >= 0) {
-        // quick occupancy snapshot for debugging
-        const occ = [];
-        for (let r = 0; r < shape.length; r++) {
-            for (let c = 0; c < shape[0].length; c++) {
-                if (!shape[r][c]) continue;
-                const px = originX + c;
-                const py = originY + r;
-                const pidx = py * cols + px;
-                occ.push({ r, c, px, py, idx: pidx, occupied: !!grid[pidx] });
-            }
-        }
-        console.log('placement occupancy check', occ);
-        canPlace = canPlaceItem(grid, finalOriginIndex, shape, cols, maxRows );
-    }
     console.log('canPlace check ->', canPlace, 'originIndex', finalOriginIndex);
 
     // If not directly placeable, try to find a nearby valid spot (radius 2)

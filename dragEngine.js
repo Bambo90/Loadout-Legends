@@ -52,10 +52,8 @@ function applyRotation(dir) {
         draggedItem.offsetX = oldY;
         draggedItem.offsetY = (oldW - 1) - oldX;
     }
-    // Update follow element visuals if in drag mode
-    if (typeof window._updateFollowElement === 'function') {
-        window._updateFollowElement();
-    }
+    // Note: Skip visual follow-element update to avoid DOM jitter
+    // The shape and offsets are updated correctly at drop time
     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
 }
 
