@@ -48,6 +48,8 @@ body {
 .sidebar-footer { margin-top: auto; }
 #save-btn { width: 100%; padding: 12px; background: #333; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
 #save-btn:hover { background: #444; }
+#reset-btn { width: 100%; padding: 12px; margin-top: 8px; background: #3a1b1b; color: #ffb3b3; border: 1px solid #552; border-radius: 8px; cursor: pointer; font-weight: bold; }
+#reset-btn:hover { background: #4a1f1f; }
 
 /* =========================================
    3. HEADER & STATS
