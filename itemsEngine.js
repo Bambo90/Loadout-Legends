@@ -1,26 +1,28 @@
 // ================================
 // ITEMS ENGINE (Itemsengine.js)
-// Zentrale Zugriffsstelle auf ALLE Items
+// Legacy compatibility layer - uses itemRegistry.js
 // ================================
 
-// Wir erstellen eine statische Liste beim Laden, 
-// damit wir nicht bei jedem Zugriff ein neues Array erzeugen müssen.
-const ALL_ITEMS = [
-    ...TOOL_ITEMS,
-    ...WEAPON_ITEMS,
-    ...JEWELRY_ITEMS,
-];
+// NOTE: ALL_ITEMS is now declared in itemRegistry.js
+// This file provides backward-compatible functions
 
 /**
  * Findet ein Item-Template anhand seiner ID
+ * (Uses itemRegistry.js if available, falls back to legacy arrays)
  */
 function getItemById(id) {
-    const item = ALL_ITEMS.find(i => i.id === id);
-    if (!item) {
-        console.warn(`Item mit ID ${id} nicht gefunden!`);
-        return null;
+    // Prefer itemRegistry if available
+    if (typeof ALL_ITEMS !== 'undefined') {
+        const item = ALL_ITEMS[id];
+        if (!item) {
+            console.warn(`Item mit ID ${id} nicht gefunden!`);
+            return null;
+        }
+        return item;
     }
-    return item;
+    // Legacy fallback
+    const legacyItems = [...(TOOL_ITEMS || []), ...(WEAPON_ITEMS || []), ...(JEWELRY_ITEMS || [])];
+    return legacyItems.find(i => i.id === id) || null;
 }
 
 /**
@@ -29,12 +31,19 @@ function getItemById(id) {
  */
 function getItemShape(item) {
     if (!item) return [[1]]; // Fallback 1x1
-    return item.body || item.shape || [[1]];
+    // Always return body (aura is for synergies only, not placement)
+    return item.body || [[1]];
 }
 
 /**
  * Filtert alle Items, die im Shop kaufbar sein sollen.
+ * (Uses itemRegistry.js if available)
  */
 function getShopItems() {
-    return ALL_ITEMS.filter(item => item.inShop !== false);
+    if (typeof ALL_ITEMS !== 'undefined' && typeof ALL_ITEMS === 'object') {
+        return Object.values(ALL_ITEMS).filter(item => item.inShop === true);
+    }
+    // Legacy fallback
+    const legacyItems = [...(TOOL_ITEMS || []), ...(WEAPON_ITEMS || []), ...(JEWELRY_ITEMS || [])];
+    return legacyItems.filter(item => item.inShop !== false);
 }

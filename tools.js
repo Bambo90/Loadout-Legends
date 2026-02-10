@@ -13,18 +13,13 @@ const TOOL_ITEMS = [
         speedBonus: 1.05, 
         desc: "Besser als mit den Händen zu graben.",
 
-        body: [
+        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
+
+        aura: [
             [1, 1, 1],
             [0, 1, 0],
             [0, 1, 0]
-        ],
-
-        aura: [
-            [1,1,1,1,1],
-            [1,0,0,0,1],
-            [1,0,0,0,1],
-            [1,1,1,1,1]
-        ]
+        ]  // Pickaxt-Form (visuelle Synergy-Zone)
     },
 
     { 
@@ -39,18 +34,13 @@ const TOOL_ITEMS = [
         speedBonus: 1.20, 
         desc: "Solider Stahl für ehrliche Arbeit.",
 
-        body: [
+        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
+
+        aura: [
             [1, 1, 1],
             [0, 1, 0],
             [0, 1, 0]
-        ],
-
-        aura: [
-            [1,1,1,1,1],
-            [1,0,0,0,1],
-            [1,0,0,0,1],
-            [1,1,1,1,1]
-        ]
+        ]  // Pickaxt-Form (visuelle Synergy-Zone)
     },
 
     { 
@@ -65,18 +55,13 @@ const TOOL_ITEMS = [
         speedBonus: 1.45, 
         desc: "Damit knackst du jeden Fels.",
 
-        body: [
+        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
+
+        aura: [
             [1, 1, 1],
             [0, 1, 0],
             [0, 1, 0]
-        ],
-
-        aura: [
-            [1,1,1,1,1],
-            [1,0,0,0,1],
-            [1,0,0,0,1],
-            [1,1,1,1,1]
-        ]
+        ]  // Pickaxt-Form (visuelle Synergy-Zone)
     },
 
     { 
@@ -93,18 +78,13 @@ const TOOL_ITEMS = [
         speedBonus: 1.80, 
         desc: "Glänzt und arbeitet fast von allein.",
 
-        body: [
+        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
+
+        aura: [
             [1, 1, 1],
             [0, 1, 0],
             [0, 1, 0]
-        ],
-
-        aura: [
-            [1,1,1,1,1],
-            [1,0,0,0,1],
-            [1,0,0,0,1],
-            [1,1,1,1,1]
-        ]
+        ]  // Pickaxt-Form (visuelle Synergy-Zone)
     },
 
     { 
@@ -121,17 +101,12 @@ const TOOL_ITEMS = [
         speedBonus: 2.50, 
         desc: "Ein Relikt aus alter Zeit.",
 
-        body: [
+        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
+
+        aura: [
             [1, 1, 1],
             [0, 1, 0],
             [0, 1, 0]
-        ],
-
-        aura: [
-            [1,1,1,1,1],
-            [1,0,0,0,1],
-            [1,0,0,0,1],
-            [1,1,1,1,1]
-        ]
+        ]  // Pickaxt-Form (visuelle Synergy-Zone)
     }
 ];

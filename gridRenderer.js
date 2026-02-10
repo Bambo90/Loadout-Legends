@@ -67,6 +67,66 @@ function createSlot(container, location, index, cols) {
     icon.style.pointerEvents = "none"; // Damit das Icon den Drag nicht blockiert
     itemEl.appendChild(icon);
 
+    // ===== AURA OVERLAY (Hidden by default) =====
+    const auraOverlay = document.createElement('div');
+    auraOverlay.classList.add('aura-overlay', item.rarity);
+    auraOverlay.style.position = 'absolute';
+    auraOverlay.style.opacity = '0';
+    auraOverlay.style.transition = 'opacity 0.15s ease';
+    auraOverlay.style.pointerEvents = 'none';
+    auraOverlay.style.zIndex = '50';
+    
+    // Render die Aura-Zellen (item.aura oder standard 3x3)
+    const aura = item.aura || [[1,1,1], [1,0,1], [1,1,1]]; // Default aura wenn nicht definiert
+    const auraRows = aura.length;
+    const auraColsShape = aura[0].length;
+    
+    auraOverlay.style.width = ((auraColsShape * 64) + ((auraColsShape - 1) * 8)) + "px";
+    auraOverlay.style.height = ((auraRows * 64) + ((auraRows - 1) * 8)) + "px";
+    auraOverlay.style.display = "grid";
+    auraOverlay.style.gridTemplateColumns = `repeat(${auraColsShape}, 64px)`;
+    auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
+    auraOverlay.style.gap = "8px";
+    
+    // Offset die Aura so dass sie um die Body zentriert ist
+    // Wenn body 1x1 und aura 3x3 => offset um -1 (10px + 10px gap = 20px, aber mit gap ist es komplexer)
+    const offsetX = (colsShape - auraColsShape) / 2 * (64 + 8);
+    const offsetY = (rows - auraRows) / 2 * (64 + 8);
+    auraOverlay.style.left = offsetX + "px";
+    auraOverlay.style.top = offsetY + "px";
+    
+    aura.forEach((row, r) => {
+        row.forEach((cellValue, c) => {
+            const auraCell = document.createElement('div');
+            if (cellValue === 1) {
+                auraCell.classList.add('aura-cell', 'active');
+                auraCell.style.backgroundColor = 'rgba(100, 200, 255, 0.3)';
+                auraCell.style.border = '2px solid rgba(100, 200, 255, 0.6)';
+            } else {
+                auraCell.classList.add('aura-cell', 'empty');
+                auraCell.style.backgroundColor = 'transparent';
+            }
+            auraCell.style.borderRadius = '4px';
+            auraOverlay.appendChild(auraCell);
+        });
+    });
+    
+    itemEl.appendChild(auraOverlay);
+    itemEl.style.position = 'relative';
+
+    // ===== EVENT LISTENER FÜR AURA DISPLAY =====
+    itemEl.addEventListener('mouseenter', () => {
+        if (!window.altKeyPressed) { // Nur bei Hover wenn Alt nicht bereits aktiv
+            auraOverlay.style.opacity = '1';
+        }
+    });
+    
+    itemEl.addEventListener('mouseleave', () => {
+        if (!window.altKeyPressed) { // Ausblenden nur wenn Alt nicht aktiv
+            auraOverlay.style.opacity = '0';
+        }
+    });
+
     itemEl.addEventListener('dragstart', (e) => {
         // Welchen Teil des Items haben wir gegriffen?
         const p = e.target.closest('.shape-block, .shape-empty');
@@ -77,11 +137,15 @@ function createSlot(container, location, index, cols) {
             fromIndex: index,
             offsetX: p ? parseInt(p.dataset.offsetX) : 0,
             offsetY: p ? parseInt(p.dataset.offsetY) : 0,
-            previewShape: item.body.map(r => [...r]) // Kopie der Matrix für Rotation
+            previewShape: item.body.map(r => [...r]), // Kopie der Matrix für Rotation
+            auraOverlay: auraOverlay  // Store reference für späteren Drag-Access
         };
 
         // Item während des Drags aus dem Grid "löschen", damit es nicht mit sich selbst kollidiert
         clearItemFromGrid(gameData[location], item.id);
+        
+        // Aura während Drag sichtbar machen
+        auraOverlay.style.opacity = '1';
         
         // Timeout damit das Element nicht sofort verschwindet bevor der Browser den Drag-Ghost erstellt
         setTimeout(() => renderWorkshopGrids(), 10);

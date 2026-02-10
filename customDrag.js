@@ -5,20 +5,92 @@ let _customFollowEl = null;
 let _customPointerMove = null;
 let _customPointerUp = null;
 
+function _getGridSlotFromPoint(clientX, clientY) {
+    const bankGrid = document.getElementById('bank-grid');
+    const activeGrid = document.getElementById('active-setup-grid');
+    if (!bankGrid || !activeGrid) return null;
+
+    const cellW = 64 + 8;
+    const cellH = 64 + 8;
+
+    // Active grid (farm/pve)
+    const activeRect = activeGrid.getBoundingClientRect();
+    if (clientX >= activeRect.left && clientX <= activeRect.right && clientY >= activeRect.top && clientY <= activeRect.bottom) {
+        const relX = clientX - activeRect.left;
+        const relY = clientY - activeRect.top;
+        const col = Math.floor(relX / cellW);
+        const row = Math.floor(relY / cellH);
+        const maxRows = GRID_ROWS;
+        const clampedCol = Math.max(0, Math.min(GRID_SIZE - 1, col));
+        const clampedRow = Math.max(0, Math.min(maxRows - 1, row));
+        const index = clampedRow * GRID_SIZE + clampedCol;
+        const location = currentWorkshop === 'pve' ? 'pveGrid' : 'farmGrid';
+        const selector = `.grid-slot[data-location="${location}"][data-index="${index}"]`;
+        const el = document.querySelector(selector);
+        return el ? { element: el, location, index, cols: GRID_SIZE } : null;
+    }
+
+    // Bank grid
+    const bankRect = bankGrid.getBoundingClientRect();
+    if (clientX >= bankRect.left && clientX <= bankRect.right && clientY >= bankRect.top && clientY <= bankRect.bottom) {
+        const relX = clientX - bankRect.left;
+        const relY = clientY - bankRect.top;
+        const col = Math.floor(relX / cellW);
+        const row = Math.floor(relY / cellH);
+        const maxRows = Math.ceil(BANK_SLOTS / 6);
+        const clampedCol = Math.max(0, Math.min(6 - 1, col));
+        const clampedRow = Math.max(0, Math.min(maxRows - 1, row));
+        const index = clampedRow * 6 + clampedCol;
+        const selector = `.grid-slot[data-location="bank"][data-index="${index}"]`;
+        const el = document.querySelector(selector);
+        return el ? { element: el, location: 'bank', index, cols: 6 } : null;
+    }
+
+    return null;
+}
+
+// ===== HELPER: Show/Hide all aura overlays =====
+function showAllAuras() {
+    document.querySelectorAll('.aura-overlay').forEach(aura => {
+        aura.style.opacity = '1';
+    });
+}
+window.showAllAuras = showAllAuras;
+
+function hideAllAuras() {
+    if (window.altKeyPressed) return; // Don't hide if Alt is pressed
+    document.querySelectorAll('.aura-overlay').forEach(aura => {
+        aura.style.opacity = '0';
+    });
+}
+window.hideAllAuras = hideAllAuras;
+
 function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previewShape, sourceElem, startEvent, instanceId) {
     if (!item) return;
     // Ensure any existing drag cleaned
     if (draggedItem) return;
 
+    // CRITICAL: Always use item.body, NEVER previewShape (which might contain aura)
+    const baseShape = item.body;
+    if (!baseShape) {
+        console.error('❌ Item has no body shape!', item.id);
+        return;
+    }
     draggedItem = {
         item: item,
         fromLocation: fromLocation,
         fromIndex: fromIndex,
         offsetX: offsetX || 0,
         offsetY: offsetY || 0,
-        previewShape: previewShape.map(r => [...r]),
+        previewShape: baseShape.map(r => [...r]),
         instanceId: instanceId // Store instance ID for tracking
     };
+
+    // Show all auras during drag
+    showAllAuras();
+
+    // Hide cursor during drag for cleaner feel
+    document.body.style.cursor = 'none';
 
     // remove item from grid for preview
     clearItemFromGrid(gameData[fromLocation], instanceId);
@@ -40,7 +112,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     _customFollowEl.style.gridTemplateColumns = `repeat(${cols}, 64px)`;
     _customFollowEl.style.gridTemplateRows = `repeat(${rows}, 64px)`;
     _customFollowEl.style.gap = '8px';
-    _customFollowEl.style.opacity = '0.95';
+    _customFollowEl.style.opacity = '0.9';
+    _customFollowEl.style.transition = 'none'; // Disable transitions on follow element for smooth tracking
 
     // fill visual squares similar to item
     shape.forEach((row, r) => {
@@ -106,6 +179,9 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             _customFollowEl.style.top = py + 'px';
         }
     };
+    
+    // Expose updatePos globally so rotation can update position after offset changes
+    window._updateFollowElementPosition = updatePos;
 
     // initial position
     const initX = (startEvent && startEvent.clientX) || (window._dragLastPos && window._dragLastPos.x) || (window.innerWidth/2);
@@ -144,6 +220,39 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             // debug: log current offsets and shape at drop
             console.log('drop - draggedItem offsets/shape', draggedItem && { offsetX: draggedItem.offsetX, offsetY: draggedItem.offsetY, shape: (draggedItem.previewShape || []).map(r=>r.length) });
             
+            // Check if dropped on SELL ZONE first
+            const elemsForSell = document.elementsFromPoint(ev.clientX, ev.clientY);
+            const sellZone = elemsForSell && elemsForSell.find(el => el.id === 'sell-zone');
+            
+            if (sellZone && draggedItem) {
+                console.log('💰 SELL ATTEMPT (custom drag)', { itemId: draggedItem.item.id, instanceId: draggedItem.instanceId, fromLocation: draggedItem.fromLocation, item: draggedItem.item });
+                const item = draggedItem.item;
+                const sellPrice = Math.floor(item.price * 0.5);
+                console.log('  Price:', item.price, '→ Sell for:', sellPrice);
+                gameData.gold += sellPrice;
+                console.log('  Gold now:', gameData.gold);
+                // Item already cleared from grid when drag started, so just null draggedItem
+                hideAllAuras(); // Hide aura when drag ends
+                draggedItem = null;
+                updateUI();
+                saveGame();
+                console.log('  ✅ SELL COMPLETE');
+                
+                // Cleanup and exit
+                setTimeout(() => {
+                    if (_customFollowEl && _customFollowEl.parentNode) _customFollowEl.parentNode.removeChild(_customFollowEl);
+                    _customFollowEl = null;
+                    window.removeEventListener('pointermove', _customPointerMove);
+                    window.removeEventListener('pointerup', _customPointerUp);
+                    _customPointerMove = null;
+                    _customPointerUp = null;
+                    document.body.style.cursor = '';
+                    document.body.classList.remove('dragging','drop-allowed','drop-invalid');
+                    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+                }, 10);
+                return;
+            }
+            
             // Try to find slot BEFORE hiding the follow element
             const elemsBefore = document.elementsFromPoint(ev.clientX, ev.clientY);
             const slotBefore = elemsBefore && elemsBefore.find(el => el.classList && el.classList.contains('grid-slot')) || null;
@@ -158,6 +267,14 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             console.log('custom drop coords', ev.clientX, ev.clientY, 'found slot', !!slot, 'hoverTarget', draggedItem && draggedItem.hoverTarget);
             
             let dropSlot = slot || draggedItem._dropSlot || draggedItem._lastValidSlot || null;
+            if (!dropSlot) {
+                const fallback = _getGridSlotFromPoint(ev.clientX, ev.clientY);
+                if (fallback && fallback.element) dropSlot = fallback.element;
+            }
+            if (!dropSlot && window._dragLastPos) {
+                const fallback = _getGridSlotFromPoint(window._dragLastPos.x, window._dragLastPos.y);
+                if (fallback && fallback.element) dropSlot = fallback.element;
+            }
             
             if (dropSlot) {
                 handleDropInSlot({ preventDefault: () => {}, currentTarget: dropSlot });
@@ -172,6 +289,9 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             console.warn('custom drop failed', err);
         }
 
+        // Hide aura overlays when drag ends
+        hideAllAuras();
+
         // cleanup follow element after a short timeout to allow placement to clear draggedItem
         setTimeout(() => {
             if (_customFollowEl && _customFollowEl.parentNode) _customFollowEl.parentNode.removeChild(_customFollowEl);
@@ -180,11 +300,14 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             window.removeEventListener('pointerup', _customPointerUp);
             _customPointerMove = null;
             _customPointerUp = null;
+            // Restore cursor
+            document.body.style.cursor = '';
             // if draggedItem still exists (drop failed), restore
             if (draggedItem) {
                 if (gameData[draggedItem.fromLocation]) {
                     const fromCols = draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE;
-                    placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, draggedItem.previewShape, fromCols, draggedItem.instanceId);
+                    const restoreShape = draggedItem.item?.body || draggedItem.previewShape;
+                    placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, restoreShape, fromCols, draggedItem.instanceId);
                 }
                 draggedItem = null;
                 try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }

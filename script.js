@@ -35,6 +35,33 @@ let currentWorkshop = null;
 let lastMonsterAttack = Date.now();
 let tooltip = null;
 
+// ===== ALT-KEY TRACKING FOR AURA VISIBILITY =====
+window.altKeyPressed = false;
+
+document.addEventListener('keydown', (e) => {
+    if (e.altKey) {
+        window.altKeyPressed = true;
+        // Zeige alle aura-overlays wenn Alt gedrückt wird
+        document.querySelectorAll('.aura-overlay').forEach(aura => {
+            aura.style.opacity = '1';
+        });
+    }
+    // R-Taste für Rotation (bereits in anderen Engines implementiert)
+});
+
+document.addEventListener('keyup', (e) => {
+    if (!e.altKey) {
+        window.altKeyPressed = false;
+        // Verstecke aura-overlays wenn Alt losgelassen wird (wenn nicht gehover)
+        document.querySelectorAll('.aura-overlay').forEach(aura => {
+            const itemEl = aura.closest('.item');
+            if (itemEl && !itemEl.matches(':hover')) {
+                aura.style.opacity = '0';
+            }
+        });
+    }
+});
+
 // ==========================================
 // NAVIGATION & EQUIPMENT HUB (VORSCHAU-FIX)
 // ==========================================
@@ -379,7 +406,7 @@ function renderShop() {
 
 /**
  * Renders visual preview of dragged item on a specific grid container.
- * Only body cells (previewShape) are validated for placement; aura may extend.
+ * Preview shows BODY only; aura is shown on hover elsewhere.
  */
 function renderDragPreviewForGrid(container, location, cols, totalSlots) {
     if (!draggedItem) return;
@@ -416,22 +443,26 @@ function renderDragPreviewForGrid(container, location, cols, totalSlots) {
     const originY = hoverY - draggedItem.offsetY;
     const originIndex = originY * cols + originX;
 
-    const shape = draggedItem.previewShape || [[1]];
-    // For each cell in shape, compute target slot and append preview element
-    for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[0].length; c++) {
-            if (!shape[r][c]) continue;
+    // Use the rotated preview shape for body placement/preview
+    const bodyShape = draggedItem.previewShape || draggedItem.item?.body || [[1]];
+    const maxRows = Math.ceil(totalSlots / cols);
+
+    // Placement validity is computed once using BODY ONLY (aura can extend outside)
+    const placementValid = canPlaceItem(gameData[location], originIndex, bodyShape, cols, maxRows);
+
+    // Render preview for body only
+    for (let r = 0; r < bodyShape.length; r++) {
+        for (let c = 0; c < bodyShape[0].length; c++) {
+            if (!bodyShape[r][c]) continue;
             const tx = originX + c;
             const ty = originY + r;
             const tidx = ty * cols + tx;
 
             const slotEl = container.querySelector(`.grid-slot[data-index="${tidx}"]`);
-            const valid = (tx >= 0 && tx < cols && ty >= 0 && tidx >= 0 && tidx < totalSlots && canPlaceItem(gameData[location], originIndex, shape, cols, Math.ceil(totalSlots/cols)));
-
             if (slotEl) {
                 const prev = document.createElement('div');
                 prev.classList.add('preview-block');
-                if (!valid) prev.classList.add('invalid');
+                if (!placementValid) prev.classList.add('invalid');
                 // color by rarity if available
                 const rarity = draggedItem.item?.rarity || 'common';
                 prev.classList.add(`preview-${rarity}`);
@@ -625,25 +656,25 @@ window.onload = () => {
         console.warn("loadGame not found - using default game state");
     }
     
-    // 2. Initiales UI Rendering
+    // 2. Initialize item registry BEFORE rendering shop (supports tools, swords, bows, armor, shields, accessories)
+    if (typeof initializeItemRegistry === 'function') {
+        initializeItemRegistry();
+    }
+    
+    // 3. Initiales UI Rendering
     spawnMonster(0);
     renderShop();
     renderEquipmentHub();
     
-    // 3. Global event listeners
+    // 4. Global event listeners
     if (typeof initGlobalDragListeners === 'function') {
         initGlobalDragListeners();
     }
     
     initTooltipListeners();
     
-    // 4. Start-Tab setzen
+    // 5. Start-Tab setzen
     switchTab('grind');
-    
-    // 5. Initialize item registry (supports tools, swords, bows, armor, shields, accessories)
-    if (typeof initializeItemRegistry === 'function') {
-        initializeItemRegistry();
-    }
     
     // 6. Final UI update
     updateUI();

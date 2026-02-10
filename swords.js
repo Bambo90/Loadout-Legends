@@ -124,7 +124,7 @@ const SWORD_ITEMS = [
     },
 
     { 
-        id: "sword_new_5" 
+        id: "sword_new_5",
         name: "Weltensegler", 
         type: "sword",
         rarity: "legendary", 

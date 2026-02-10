@@ -64,7 +64,8 @@ function createSlot(container, location, index, cols) {
     }
 
     // Use the stored shape from the grid cell (which may be rotated), fallback to item.body
-    const shape = cell.shape || item.body || item.shape || [[1]];
+    // Always use body shape for placement (never aura)
+    const shape = item.body || [[1]];
     if (!shape || !Array.isArray(shape) || shape.length === 0) {
         container.appendChild(slot);
         return;
@@ -113,6 +114,69 @@ function createSlot(container, location, index, cols) {
     icon.style.pointerEvents = "none";
     itemEl.appendChild(icon);
 
+    // ===== AURA OVERLAY (Hidden by default) =====
+    const auraOverlay = document.createElement('div');
+    auraOverlay.classList.add('aura-overlay', item.rarity);
+    auraOverlay.style.position = 'absolute';
+    auraOverlay.style.opacity = '0';
+    auraOverlay.style.transition = 'opacity 0.15s ease';
+    auraOverlay.style.pointerEvents = 'none';
+    auraOverlay.style.zIndex = '50';
+    
+    // Render die Aura-Zellen (item.aura oder standard 3x3)
+    const aura = item.aura || [[1,1,1], [1,0,1], [1,1,1]]; // Default aura wenn nicht definiert
+    const auraRows = aura.length;
+    const auraColsShape = aura[0] ? aura[0].length : 1;
+    
+    auraOverlay.style.width = ((auraColsShape * 64) + ((auraColsShape - 1) * 8)) + "px";
+    auraOverlay.style.height = ((auraRows * 64) + ((auraRows - 1) * 8)) + "px";
+    auraOverlay.style.display = "grid";
+    auraOverlay.style.gridTemplateColumns = `repeat(${auraColsShape}, 64px)`;
+    auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
+    auraOverlay.style.gap = "8px";
+    
+    // Offset die Aura so dass sie um die Body zentriert ist
+    const offsetX = (colsShape - auraColsShape) / 2 * (64 + 8);
+    const offsetY = (rows - auraRows) / 2 * (64 + 8);
+    auraOverlay.style.left = offsetX + "px";
+    auraOverlay.style.top = offsetY + "px";
+    
+    aura.forEach((row, r) => {
+        if (!Array.isArray(row)) return;
+        row.forEach((cellValue, c) => {
+            const auraCell = document.createElement('div');
+            auraCell.style.width = '64px';
+            auraCell.style.height = '64px';
+            if (cellValue === 1) {
+                auraCell.classList.add('aura-cell', 'active');
+                auraCell.style.backgroundColor = 'rgba(100, 200, 255, 0.3)';
+                auraCell.style.border = '2px solid rgba(100, 200, 255, 0.6)';
+            } else {
+                auraCell.classList.add('aura-cell', 'empty');
+                auraCell.style.backgroundColor = 'transparent';
+                auraCell.style.border = 'none';
+            }
+            auraCell.style.borderRadius = '4px';
+            auraOverlay.appendChild(auraCell);
+        });
+    });
+    
+    itemEl.appendChild(auraOverlay);
+    itemEl.style.position = 'relative';
+
+    // ===== EVENT LISTENER FÜR AURA DISPLAY =====
+    itemEl.addEventListener('mouseenter', () => {
+        if (!window.altKeyPressed) { // Nur bei Hover wenn Alt nicht bereits aktiv
+            auraOverlay.style.opacity = '1';
+        }
+    });
+    
+    itemEl.addEventListener('mouseleave', () => {
+        if (!window.altKeyPressed) { // Ausblenden nur wenn Alt nicht aktiv
+            auraOverlay.style.opacity = '0';
+        }
+    });
+
     // Pointer-based drag start (uses customDrag.startCustomDrag)
     itemEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -134,6 +198,12 @@ function createSlot(container, location, index, cols) {
         if (typeof window.startCustomDrag === 'function') {
             // Pass a COPY of the shape to avoid modifying the grid cell during rotation
             const shapeCopy = shape.map(r => [...r]);
+            
+            // Show auras during drag
+            if (typeof showAllAuras === 'function') {
+                showAllAuras();
+            }
+            
             window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shapeCopy, itemEl, e, cell.instanceId);
         }
     });

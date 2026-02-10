@@ -44,9 +44,13 @@ function syncInstanceIdCounterFromGrids(grids) {
 }
 
 function canPlaceItem(grid, originIndex, shape, cols, maxRows) {
+    // CRITICAL: shape parameter MUST be body only, never aura
+    // Aura does NOT participate in collision/placement checks
     const originX = originIndex % cols;
     const originY = Math.floor(originIndex / cols);
 
+    // Backpack Battles: Body must fit FULLY inside grid (no partial placement)
+    // This ensures items are rendered completely within bounds
     for (let r = 0; r < shape.length; r++) {
         for (let c = 0; c < shape[0].length; c++) {
             if (!shape[r][c]) continue; // Leeres Feld im Shape ignorieren
@@ -54,26 +58,48 @@ function canPlaceItem(grid, originIndex, shape, cols, maxRows) {
             const x = originX + c;
             const y = originY + r;
 
-            // Check: Außerhalb der Grid-Grenzen?
-            if (x < 0 || x >= cols || y < 0 || y >= maxRows) return false;
+            // Check: Außerhalb der Grid-Grenzen? (must be fully inside)
+            if (x < 0 || x >= cols || y < 0 || y >= maxRows) {
+                if (window.DEBUG_PLACEMENT === true) {
+                    console.log('      🚫 Cell [', r, ',', c, '] at grid pos (', x, ',', y, ') is OUT OF BOUNDS (cols=', cols, 'maxRows=', maxRows, ')');
+                }
+                return false;
+            }
 
             // Check: Slot bereits belegt?
             const idx = y * cols + x;
-            if (grid[idx]) return false;
+            if (grid[idx]) {
+                if (window.DEBUG_PLACEMENT === true) {
+                    console.log('      🚫 Cell [', r, ',', c, '] at grid pos (', x, ',', y, ') is OCCUPIED by', grid[idx].itemId);
+                }
+                return false;
+            }
         }
     }
     return true;
 }
 
-function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId) {
+function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId, maxRowsOverride) {
     // If no instanceId provided, generate a new one
     if (!instanceId) {
         instanceId = generateInstanceId();
     }
 
+    // Determine max rows (needed for partial placement checks)
+    let maxRows = maxRowsOverride;
+    if (typeof maxRows === 'undefined' || maxRows === null) {
+        // Bank has dynamic rows based on BANK_SLOTS and 6 columns
+        if (cols === 6) {
+            maxRows = Math.ceil(BANK_SLOTS / cols);
+        } else {
+            // Default grids use fixed GRID_ROWS
+            maxRows = GRID_ROWS;
+        }
+    }
+
     const originX = originIndex % cols;
     const originY = Math.floor(originIndex / cols);
-    const shapeCopy = shape.map(r => [...r]);
+    const shapeCopy = shape.map(r => [...r]); // shape is body-only when placed
 
     // Find the first occupied cell to mark as root (handles leading empty rows/cols)
     let minR = Infinity;
@@ -93,21 +119,34 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId) {
         return instanceId;
     }
 
-    let hasRoot = false;
+    // Root cell: first occupied cell (should always be in-bounds now)
+    let rootPlaced = false;
+    let rootSetTo = -1;
+
     shapeCopy.forEach((row, r) => {
         row.forEach((cell, c) => {
             if (!cell) return;
             const x = originX + c;
             const y = originY + r;
             const idx = y * cols + x;
-            const isRoot = !hasRoot; // First occupied cell is root
-            if (isRoot) hasRoot = true;
+
+            // Sanity check: should never be out of bounds if canPlaceItem passed
+            if (x < 0 || x >= cols || y < 0 || y >= maxRows) {
+                console.error('⚠️ Attempted to place cell outside grid! x=' + x + ' y=' + y + ' (this should not happen)');
+                return;
+            }
+
+            const isRoot = !rootPlaced; // first occupied cell becomes root
+            if (isRoot) {
+                rootPlaced = true;
+                rootSetTo = idx;
+            }
 
             grid[idx] = {
                 itemId: item.id,
-                instanceId: instanceId, // Unique instance identifier
-                shape: shapeCopy, // Store a copy of the actual placed shape (may be rotated)
-                root: isRoot // First occupied cell is the anchor
+                instanceId: instanceId,
+                shape: shapeCopy,
+                root: isRoot
             };
 
             if (isRoot) {

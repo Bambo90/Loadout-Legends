@@ -71,11 +71,16 @@ function applyRotation(dir) {
     // capture OLD shape dimensions BEFORE rotation
     const oldShape = draggedItem.previewShape;
     const oldH = oldShape.length;
-    const oldW = oldShape[0].length;
+    const oldW = oldShape[0] ? oldShape[0].length : 1;
     const oldX = draggedItem.offsetX;
     const oldY = draggedItem.offsetY;
     
-    console.log('🔄 ROTATION #' + _rotationCount + ' START', { dir: dir === 1 ? 'CW' : 'CCW', oldH, oldW, oldOffset: { x: oldX, y: oldY }, oldShape });
+    console.log('🔄 ROTATION #' + _rotationCount + ' START', { 
+        dir: dir === 1 ? 'CW' : 'CCW', 
+        oldShape: JSON.stringify(oldShape),
+        oldDim: { h: oldH, w: oldW },
+        oldOffset: { x: oldX, y: oldY }
+    });
     
     if (dir === 1) {
         // CW rotation: offset formula uses OLD dimensions
@@ -88,9 +93,26 @@ function applyRotation(dir) {
         // adjust offsets after trimming
         newOffsetX -= norm.minC;
         newOffsetY -= norm.minR;
-        draggedItem.offsetX = Math.max(0, newOffsetX);
-        draggedItem.offsetY = Math.max(0, newOffsetY);
-        console.log('🔄 CW ROTATION #' + _rotationCount + ' DONE', { newShape: JSON.stringify(norm.shape), newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY }, trim: { minR: norm.minR, minC: norm.minC } });
+        const newW = norm.shape[0] ? norm.shape[0].length : 1;
+        const newH = norm.shape.length;
+        // Clamp offsets inside new shape bounds
+        draggedItem.offsetX = Math.min(Math.max(0, newOffsetX), newW - 1);
+        draggedItem.offsetY = Math.min(Math.max(0, newOffsetY), newH - 1);
+        console.log('🔄 CW ROTATION #' + _rotationCount + ' DONE', { 
+            newShape: JSON.stringify(norm.shape),
+            newDim: { h: newH, w: newW },
+            newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY },
+            normTrim: { minR: norm.minR, minC: norm.minC },
+            offsetCalc: { preNormX: (oldH - 1) - oldY, preNormY: oldX }
+        });
+        
+        // Update follow element visuals and position
+        if (typeof window._updateFollowElement === 'function') {
+            window._updateFollowElement();
+        }
+        if (typeof window._updateFollowElementPosition === 'function' && window._dragLastPos) {
+            window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
+        }
     } else if (dir === -1) {
         // CCW rotation: offset formula uses OLD dimensions
         const rotated = rotateMatrixCCW(oldShape);
@@ -102,12 +124,28 @@ function applyRotation(dir) {
         // adjust offsets after trimming
         newOffsetX -= norm.minC;
         newOffsetY -= norm.minR;
-        draggedItem.offsetX = Math.max(0, newOffsetX);
-        draggedItem.offsetY = Math.max(0, newOffsetY);
-        console.log('🔄 CCW ROTATION #' + _rotationCount + ' DONE', { newShape: JSON.stringify(norm.shape), newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY }, trim: { minR: norm.minR, minC: norm.minC } });
+        const newW = norm.shape[0] ? norm.shape[0].length : 1;
+        const newH = norm.shape.length;
+        // Clamp offsets inside new shape bounds
+        draggedItem.offsetX = Math.min(Math.max(0, newOffsetX), newW - 1);
+        draggedItem.offsetY = Math.min(Math.max(0, newOffsetY), newH - 1);
+        console.log('🔄 CCW ROTATION #' + _rotationCount + ' DONE', { 
+            newShape: JSON.stringify(norm.shape),
+            newDim: { h: newH, w: newW },
+            newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY },
+            normTrim: { minR: norm.minR, minC: norm.minC },
+            offsetCalc: { preNormX: oldY, preNormY: (oldW - 1) - oldX }
+        });
+        
+        // Update follow element visuals and position
+        if (typeof window._updateFollowElement === 'function') {
+            window._updateFollowElement();
+        }
+        if (typeof window._updateFollowElementPosition === 'function' && window._dragLastPos) {
+            window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
+        }
     }
-    // Note: Skip visual follow-element update to avoid DOM jitter
-    // The shape and offsets are updated correctly at drop time
+    // Update grid preview to show new rotation
     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
 }
 

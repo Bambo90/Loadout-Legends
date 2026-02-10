@@ -10,7 +10,10 @@ function normalizeGridInstances(grid, cols) {
     if (typeof getItemById !== 'function' || typeof placeItemIntoGrid !== 'function') {
         return grid;
     }
+    
+    // Start with clean slate - no orphaned aura cells
     const newGrid = {};
+    
     const keys = Object.keys(grid).map(k => parseInt(k, 10)).filter(n => !isNaN(n)).sort((a, b) => a - b);
     const roots = keys.filter(k => grid[k] && grid[k].root);
     const rootKeys = roots.length > 0 ? roots : keys;
@@ -20,7 +23,8 @@ function normalizeGridInstances(grid, cols) {
         if (!cell || !cell.itemId) return;
         const item = getItemById(cell.itemId);
         if (!item) return;
-        const shape = cell.shape || item.body || item.shape || [[1]];
+        // Always use body shape (never aura) to ensure placement is valid
+        const shape = item.body || [[1]];
         const shapeCopy = shape.map(r => [...r]);
         const instanceId = cell.instanceId;
         placeItemIntoGrid(newGrid, k, item, shapeCopy, cols, instanceId);
