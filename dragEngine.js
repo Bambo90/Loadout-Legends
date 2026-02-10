@@ -7,6 +7,7 @@ let draggedItem = null;
 let _lastClientX = 0;
 let _lastClientY = 0;
 let _lastDropState = null; // 'allowed' | 'invalid' | null
+let _lastWheelRotate = 0;
 
 function rotateMatrixCW(matrix) {
     const h = matrix.length;
@@ -20,32 +21,62 @@ function rotateMatrixCW(matrix) {
     return res;
 }
 
-function initGlobalDragListeners() {
-    // Rotation via 'R' Taste
-    window.addEventListener('keydown', (e) => {
-        if (!draggedItem || e.key.toLowerCase() !== 'r') return;
-        
-        e.preventDefault();
-        draggedItem.previewShape = rotateMatrixCW(draggedItem.previewShape);
-        
-        // Offset mathematisch mitdrehen
-        const oldX = draggedItem.offsetX;
-        draggedItem.offsetX = (draggedItem.previewShape[0].length - 1) - draggedItem.offsetY;
+function rotateMatrixCCW(matrix) {
+    // rotate CCW by applying CW three times (simple and robust)
+    let m = matrix;
+    m = rotateMatrixCW(m);
+    m = rotateMatrixCW(m);
+    m = rotateMatrixCW(m);
+    return m;
+}
+
+function applyRotation(dir) {
+    // dir: +1 = CW 90deg, -1 = CCW 90deg
+    if (!draggedItem) return;
+    // capture original shape dims and offsets before changing shape
+    const oldShape = draggedItem.previewShape;
+    const oldX = draggedItem.offsetX;
+    const oldY = draggedItem.offsetY;
+    const oldH = oldShape.length; // rows
+    const oldW = oldShape[0].length; // cols
+    if (dir === 1) {
+        // CW rotation
+        draggedItem.previewShape = rotateMatrixCW(oldShape);
+        // newOffsetX = (oldH - 1) - oldY
+        // newOffsetY = oldX
+        draggedItem.offsetX = (oldH - 1) - oldY;
         draggedItem.offsetY = oldX;
-        
-        // UI aktualisieren
-        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+    } else if (dir === -1) {
+        // CCW rotation
+        draggedItem.previewShape = rotateMatrixCCW(oldShape);
+        // newOffsetX = oldY
+        // newOffsetY = (oldW - 1) - oldX
+        draggedItem.offsetX = oldY;
+        draggedItem.offsetY = (oldW - 1) - oldX;
+    }
+    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+}
+
+function initGlobalDragListeners() {
+    // Rotation via 'R' Taste (R = CW, Shift+R = CCW)
+    window.addEventListener('keydown', (e) => {
+        if (!draggedItem) return;
+        if (e.key.toLowerCase() !== 'r') return;
+        e.preventDefault();
+        const dir = e.shiftKey ? -1 : 1;
+        applyRotation(dir);
     });
 
-    // Mausrad-Rotation
+    // Mausrad-Rotation (wheel up/down -> CCW/CW). Debounced to avoid repeated rotations.
     window.addEventListener('wheel', (e) => {
         if (!draggedItem) return;
+        const now = Date.now();
+        if (now - _lastWheelRotate < 120) return; // ignore rapid repeats
+        _lastWheelRotate = now;
+        // deltaY < 0 => wheel up; map wheel up to CCW (-1), wheel down to CW (+1)
+        const dir = (e.deltaY < 0) ? -1 : 1;
         e.preventDefault();
-        draggedItem.previewShape = rotateMatrixCW(draggedItem.previewShape);
-        const oldX = draggedItem.offsetX;
-        draggedItem.offsetX = (draggedItem.previewShape[0].length - 1) - draggedItem.offsetY;
-        draggedItem.offsetY = oldX;
-        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+        applyRotation(dir);
     }, { passive: false });
 
     // Track last mouse position as a fallback when drag events provide 0 coords
