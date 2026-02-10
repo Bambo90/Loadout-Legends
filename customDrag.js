@@ -142,21 +142,26 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         try {
             // debug: log current offsets and shape at drop
             console.log('drop - draggedItem offsets/shape', draggedItem && { offsetX: draggedItem.offsetX, offsetY: draggedItem.offsetY, shape: (draggedItem.previewShape || []).map(r=>r.length) });
+            
+            // Try to find slot BEFORE hiding the follow element
+            const elemsBefore = document.elementsFromPoint(ev.clientX, ev.clientY);
+            const slotBefore = elemsBefore && elemsBefore.find(el => el.classList && el.classList.contains('grid-slot')) || null;
+            if (slotBefore && draggedItem) {
+                draggedItem._dropSlot = slotBefore; // Store the drop slot for fallback
+            }
+            
             // hide follow element briefly so elementsFromPoint hits underlying slots
             if (_customFollowEl) _customFollowEl.style.display = 'none';
             const elems = document.elementsFromPoint(ev.clientX, ev.clientY);
             const slot = elems && elems.find(el => el.classList && el.classList.contains('grid-slot')) || null;
             console.log('custom drop coords', ev.clientX, ev.clientY, 'found slot', !!slot, 'hoverTarget', draggedItem && draggedItem.hoverTarget);
             
-            if (slot) {
-                // call drop handler
-                handleDropInSlot({ preventDefault: () => {}, currentTarget: slot });
-            } else if (draggedItem && draggedItem._lastValidSlot) {
-                // fallback: use last valid slot stored during pointermove
-                console.log('custom drop using lastValidSlot fallback');
-                handleDropInSlot({ preventDefault: () => {}, currentTarget: draggedItem._lastValidSlot });
+            let dropSlot = slot || draggedItem._dropSlot || draggedItem._lastValidSlot || null;
+            
+            if (dropSlot) {
+                handleDropInSlot({ preventDefault: () => {}, currentTarget: dropSlot });
             } else if (draggedItem && draggedItem.hoverTarget) {
-                // secondary fallback: try hoverTarget selector
+                // final fallback: try hoverTarget selector
                 const selector = `.grid-slot[data-location="${draggedItem.hoverTarget.location}"][data-index="${draggedItem.hoverTarget.index}"]`;
                 const slot2 = document.querySelector(selector);
                 console.log('custom drop fallback selector', selector, 'found', !!slot2);
