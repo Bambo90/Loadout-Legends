@@ -30,6 +30,34 @@ function rotateMatrixCCW(matrix) {
     return m;
 }
 
+function normalizeShape(shape) {
+    let minR = Infinity;
+    let minC = Infinity;
+    let maxR = -1;
+    let maxC = -1;
+    for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[0].length; c++) {
+            if (!shape[r][c]) continue;
+            if (r < minR) minR = r;
+            if (c < minC) minC = c;
+            if (r > maxR) maxR = r;
+            if (c > maxC) maxC = c;
+        }
+    }
+    if (maxR === -1 || maxC === -1) {
+        return { shape, minR: 0, minC: 0 };
+    }
+    const trimmed = [];
+    for (let r = minR; r <= maxR; r++) {
+        const row = [];
+        for (let c = minC; c <= maxC; c++) {
+            row.push(shape[r][c] ? 1 : 0);
+        }
+        trimmed.push(row);
+    }
+    return { shape: trimmed, minR, minC };
+}
+
 function applyRotation(dir) {
     // dir: +1 = CW 90deg, -1 = CCW 90deg
     if (!draggedItem) return;
@@ -43,14 +71,28 @@ function applyRotation(dir) {
     
     if (dir === 1) {
         // CW rotation: offset formula uses OLD dimensions
-        draggedItem.previewShape = rotateMatrixCW(oldShape);
-        draggedItem.offsetX = (oldH - 1) - oldY;
-        draggedItem.offsetY = oldX;
+        const rotated = rotateMatrixCW(oldShape);
+        let newOffsetX = (oldH - 1) - oldY;
+        let newOffsetY = oldX;
+        const norm = normalizeShape(rotated);
+        draggedItem.previewShape = norm.shape;
+        // adjust offsets after trimming
+        newOffsetX -= norm.minC;
+        newOffsetY -= norm.minR;
+        draggedItem.offsetX = Math.max(0, newOffsetX);
+        draggedItem.offsetY = Math.max(0, newOffsetY);
     } else if (dir === -1) {
         // CCW rotation: offset formula uses OLD dimensions
-        draggedItem.previewShape = rotateMatrixCCW(oldShape);
-        draggedItem.offsetX = oldY;
-        draggedItem.offsetY = (oldW - 1) - oldX;
+        const rotated = rotateMatrixCCW(oldShape);
+        let newOffsetX = oldY;
+        let newOffsetY = (oldW - 1) - oldX;
+        const norm = normalizeShape(rotated);
+        draggedItem.previewShape = norm.shape;
+        // adjust offsets after trimming
+        newOffsetX -= norm.minC;
+        newOffsetY -= norm.minR;
+        draggedItem.offsetX = Math.max(0, newOffsetX);
+        draggedItem.offsetY = Math.max(0, newOffsetY);
     }
     // Note: Skip visual follow-element update to avoid DOM jitter
     // The shape and offsets are updated correctly at drop time
