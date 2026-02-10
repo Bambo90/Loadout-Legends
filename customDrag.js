@@ -60,6 +60,36 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
     document.body.appendChild(_customFollowEl);
 
+    // Function to rebuild follow element visuals when shape changes (e.g., rotation)
+    window._updateFollowElement = function() {
+        if (!draggedItem || !_customFollowEl) return;
+        const shape = draggedItem.previewShape || [[1]];
+        const rows = shape.length;
+        const cols = shape[0] ? shape[0].length : 1;
+        _customFollowEl.style.width = ((cols * 64) + ((cols - 1) * 8)) + 'px';
+        _customFollowEl.style.height = ((rows * 64) + ((rows - 1) * 8)) + 'px';
+        _customFollowEl.style.gridTemplateColumns = `repeat(${cols}, 64px)`;
+        _customFollowEl.style.gridTemplateRows = `repeat(${rows}, 64px)`;
+        // clear old shapes
+        while (_customFollowEl.firstChild) _customFollowEl.removeChild(_customFollowEl.firstChild);
+        // redraw shapes
+        shape.forEach((row, r) => {
+            row.forEach((cell, c) => {
+                const pixel = document.createElement('div');
+                if (cell) {
+                    pixel.className = 'shape-block ' + (draggedItem.item.rarity || 'common');
+                } else {
+                    pixel.className = 'shape-empty';
+                }
+                _customFollowEl.appendChild(pixel);
+            });
+        });
+        const icon = document.createElement('div');
+        icon.className = 'item-icon-overlay';
+        icon.innerText = draggedItem.item.icon;
+        _customFollowEl.appendChild(icon);
+    };
+
     // capture initial offsets locally to avoid race when draggedItem becomes null during cleanup
     const _localOffsetX = draggedItem.offsetX;
     const _localOffsetY = draggedItem.offsetY;
