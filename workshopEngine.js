@@ -58,7 +58,8 @@ function createSlot(container, location, index, cols) {
         return;
     }
 
-    const shape = item.body || item.shape || [[1]];
+    // Use the stored shape from the grid cell (which may be rotated), fallback to item.body
+    const shape = cell.shape || item.body || item.shape || [[1]];
     if (!shape || !Array.isArray(shape) || shape.length === 0) {
         container.appendChild(slot);
         return;

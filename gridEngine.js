@@ -46,6 +46,7 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols) {
 
             grid[idx] = {
                 itemId: item.id,
+                shape: shape.map(r => [...r]), // Store a copy of the actual placed shape (may be rotated)
                 root: (r === 0 && c === 0) // Nur das erste Feld ist der Anker
             };
         });
