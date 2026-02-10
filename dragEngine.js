@@ -69,6 +69,8 @@ function applyRotation(dir) {
     const oldX = draggedItem.offsetX;
     const oldY = draggedItem.offsetY;
     
+    console.log('🔄 ROTATION START', { dir: dir === 1 ? 'CW' : 'CCW', oldH, oldW, oldOffset: { x: oldX, y: oldY }, oldShape });
+    
     if (dir === 1) {
         // CW rotation: offset formula uses OLD dimensions
         const rotated = rotateMatrixCW(oldShape);
@@ -81,6 +83,7 @@ function applyRotation(dir) {
         newOffsetY -= norm.minR;
         draggedItem.offsetX = Math.max(0, newOffsetX);
         draggedItem.offsetY = Math.max(0, newOffsetY);
+        console.log('🔄 CW ROTATION DONE', { newShape: norm.shape, newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY }, trim: { minR: norm.minR, minC: norm.minC } });
     } else if (dir === -1) {
         // CCW rotation: offset formula uses OLD dimensions
         const rotated = rotateMatrixCCW(oldShape);
@@ -93,6 +96,7 @@ function applyRotation(dir) {
         newOffsetY -= norm.minR;
         draggedItem.offsetX = Math.max(0, newOffsetX);
         draggedItem.offsetY = Math.max(0, newOffsetY);
+        console.log('🔄 CCW ROTATION DONE', { newShape: norm.shape, newOffset: { x: draggedItem.offsetX, y: draggedItem.offsetY }, trim: { minR: norm.minR, minC: norm.minC } });
     }
     // Note: Skip visual follow-element update to avoid DOM jitter
     // The shape and offsets are updated correctly at drop time

@@ -86,21 +86,29 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId) {
         }
     }
 
+    console.log('📦 PLACE INTO GRID', { item: item.id, instance: instanceId, originIndex, originXY: { x: originX, y: originY }, shapeDim: { h: shapeCopy.length, w: shapeCopy[0].length }, minRC: { minR, minC } });
+
     shapeCopy.forEach((row, r) => {
         row.forEach((cell, c) => {
             if (!cell) return;
             const x = originX + c;
             const y = originY + r;
             const idx = y * cols + x;
+            const isRoot = (r === minR && c === minC);
 
             grid[idx] = {
                 itemId: item.id,
                 instanceId: instanceId, // Unique instance identifier
                 shape: shapeCopy, // Store a copy of the actual placed shape (may be rotated)
-                root: (r === minR && c === minC) // First occupied cell is the anchor
+                root: isRoot // First occupied cell is the anchor
             };
+
+            if (isRoot) {
+                console.log('  🟢 ROOT CELL at idx=' + idx + ' (r=' + r + ', c=' + c + ')');
+            }
         });
     });
 
+    console.log('📦 PLACE COMPLETE for instance ' + instanceId);
     return instanceId; // Return the instanceId for tracking
 }

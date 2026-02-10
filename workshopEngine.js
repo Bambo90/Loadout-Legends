@@ -47,7 +47,12 @@ function createSlot(container, location, index, cols) {
     const cell = grid[index];
 
     // Falls Slot leer oder kein Anker (Root), nur leeren Slot rendern
-    if (!cell || !cell.root) {
+    if (!cell) {
+        container.appendChild(slot);
+        return;
+    }
+    if (!cell.root) {
+        console.log('⏭️  SKIP RENDER (no root) at index=' + index + ', cell has itemId=' + cell.itemId + ', instanceId=' + cell.instanceId);
         container.appendChild(slot);
         return;
     }

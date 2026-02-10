@@ -75,12 +75,12 @@ function handleDropInSlot(e) {
         return null;
     }
 
-    console.log('drop attempt ->', { location, targetIndex, cols, originX, originY, finalOriginIndex });
+    console.log('🔷 DROP ATTEMPT ->', { location, targetIndex, cols, originXY: { x: originX, y: originY }, finalOriginIndex, shapeDim: { h: shape.length, w: shape[0].length } });
     let canPlace = false;
     if (finalOriginIndex >= 0) {
         canPlace = canPlaceItem(grid, finalOriginIndex, shape, cols, maxRows);
     }
-    console.log('canPlace check ->', canPlace, 'originIndex', finalOriginIndex);
+    console.log('  📍 CAN PLACE:', canPlace, '| fromInstance:', draggedItem.instanceId, '| to:', location, 'index:', finalOriginIndex);
 
     // If not directly placeable, try to find a nearby valid spot (radius 2)
     let chosenIndex = finalOriginIndex;
@@ -115,7 +115,7 @@ function handleDropInSlot(e) {
 
     // Platzieren
     placeItemIntoGrid(grid, chosenIndex, draggedItem.item, shape, cols, draggedItem.instanceId);
-    console.log('placed item ->', draggedItem.item.id, 'instance', draggedItem.instanceId, 'at', location, 'index', chosenIndex);
+    console.log('✅ PLACED ITEM', { itemId: draggedItem.item.id, instance: draggedItem.instanceId, location, index: chosenIndex });
     draggedItem = null;
     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
     
