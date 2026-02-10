@@ -61,6 +61,7 @@ function handleDropInSlot(e) {
 
     console.log('drop attempt ->', { location, targetIndex, cols, mouseX, mouseY, originX, originY, finalOriginIndex });
     console.log('shape dims ->', { w: shape[0].length, h: shape.length });
+    console.log('grid state at drop', Object.keys(grid).length, 'occupied slots:', Object.keys(grid).sort((a,b)=>a-b));
     let canPlace = false;
     if (finalOriginIndex >= 0) {
         // quick occupancy snapshot for debugging
