@@ -60,14 +60,16 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
     document.body.appendChild(_customFollowEl);
 
-    // capture offsets locally to avoid race when draggedItem becomes null during cleanup
+    // capture initial offsets locally to avoid race when draggedItem becomes null during cleanup
     const _localOffsetX = draggedItem.offsetX;
     const _localOffsetY = draggedItem.offsetY;
-    // position
+    // position (use current draggedItem offsets if available so rotations update follow position)
     const updatePos = (clientX, clientY) => {
         window._dragLastPos = { x: clientX, y: clientY };
-        const px = clientX - (_localOffsetX * (64 + 8));
-        const py = clientY - (_localOffsetY * (64 + 8));
+        const curOffsetX = (draggedItem && typeof draggedItem.offsetX === 'number') ? draggedItem.offsetX : _localOffsetX;
+        const curOffsetY = (draggedItem && typeof draggedItem.offsetY === 'number') ? draggedItem.offsetY : _localOffsetY;
+        const px = clientX - (curOffsetX * (64 + 8));
+        const py = clientY - (curOffsetY * (64 + 8));
         if (_customFollowEl) {
             _customFollowEl.style.left = px + 'px';
             _customFollowEl.style.top = py + 'px';
@@ -107,6 +109,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     _customPointerUp = (ev) => {
         ev.preventDefault();
         try {
+            // debug: log current offsets and shape at drop
+            console.log('drop - draggedItem offsets/shape', draggedItem && { offsetX: draggedItem.offsetX, offsetY: draggedItem.offsetY, shape: (draggedItem.previewShape || []).map(r=>r.length) });
             // hide follow element briefly so elementsFromPoint hits underlying slots
             if (_customFollowEl) _customFollowEl.style.display = 'none';
             const elems = document.elementsFromPoint(ev.clientX, ev.clientY);
