@@ -125,6 +125,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 const idx = parseInt(slot.dataset.index);
                 if (!draggedItem.hoverTarget || draggedItem.hoverTarget.location !== loc || draggedItem.hoverTarget.index !== idx) {
                     draggedItem.hoverTarget = { location: loc, index: idx };
+                    draggedItem._lastValidSlot = slot; // store the actual slot for fallback at drop
                     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
                 }
             } else if (draggedItem.hoverTarget) {
@@ -146,17 +147,20 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             const elems = document.elementsFromPoint(ev.clientX, ev.clientY);
             const slot = elems && elems.find(el => el.classList && el.classList.contains('grid-slot')) || null;
             console.log('custom drop coords', ev.clientX, ev.clientY, 'found slot', !!slot, 'hoverTarget', draggedItem && draggedItem.hoverTarget);
+            
             if (slot) {
                 // call drop handler
                 handleDropInSlot({ preventDefault: () => {}, currentTarget: slot });
-            } else {
-                // try fallback: if hoverTarget exists, use it
-                if (draggedItem && draggedItem.hoverTarget) {
-                    const selector = `.grid-slot[data-location="${draggedItem.hoverTarget.location}"][data-index="${draggedItem.hoverTarget.index}"]`;
-                    const slot2 = document.querySelector(selector);
-                    console.log('custom drop fallback selector', selector, 'found', !!slot2);
-                    if (slot2) handleDropInSlot({ preventDefault: () => {}, currentTarget: slot2 });
-                }
+            } else if (draggedItem && draggedItem._lastValidSlot) {
+                // fallback: use last valid slot stored during pointermove
+                console.log('custom drop using lastValidSlot fallback');
+                handleDropInSlot({ preventDefault: () => {}, currentTarget: draggedItem._lastValidSlot });
+            } else if (draggedItem && draggedItem.hoverTarget) {
+                // secondary fallback: try hoverTarget selector
+                const selector = `.grid-slot[data-location="${draggedItem.hoverTarget.location}"][data-index="${draggedItem.hoverTarget.index}"]`;
+                const slot2 = document.querySelector(selector);
+                console.log('custom drop fallback selector', selector, 'found', !!slot2);
+                if (slot2) handleDropInSlot({ preventDefault: () => {}, currentTarget: slot2 });
             }
         } catch (err) {
             console.warn('custom drop failed', err);
