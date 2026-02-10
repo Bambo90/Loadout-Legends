@@ -2,7 +2,7 @@
 
 const SWORD_ITEMS = [
     { 
-        id: "sword_1", 
+        id: "sword_new_1", 
         name: "Kurzschert", 
         type: "sword",
         rarity: "common", 
@@ -29,7 +29,7 @@ const SWORD_ITEMS = [
     },
 
     { 
-        id: "sword_2", 
+        id: "sword_new_2", 
         name: "Stahlschwert", 
         type: "sword",
         rarity: "magic", 
@@ -59,7 +59,7 @@ const SWORD_ITEMS = [
     },
 
     { 
-        id: "sword_3", 
+        id: "sword_new_3", 
         name: "Großschwert des Kriegers", 
         type: "sword",
         rarity: "rare", 
@@ -91,7 +91,7 @@ const SWORD_ITEMS = [
     },
 
     { 
-        id: "sword_4", 
+        id: "sword_new_4", 
         name: "Flammenzunge", 
         type: "sword",
         rarity: "unique", 
@@ -124,7 +124,7 @@ const SWORD_ITEMS = [
     },
 
     { 
-        id: "sword_5", 
+        id: "sword_new_5" 
         name: "Weltensegler", 
         type: "sword",
         rarity: "legendary", 

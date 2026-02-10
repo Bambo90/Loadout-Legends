@@ -2,7 +2,7 @@
 
 const ARMOR_ITEMS = [
     { 
-        id: "armor_1", 
+        id: "armor_new_1" 
         name: "Leinenpanzer", 
         type: "armor",
         rarity: "common", 
@@ -30,7 +30,7 @@ const ARMOR_ITEMS = [
     },
 
     { 
-        id: "armor_2", 
+        id: "armor_new_2" 
         name: "Lederwams", 
         type: "armor",
         rarity: "magic", 
@@ -61,7 +61,7 @@ const ARMOR_ITEMS = [
     },
 
     { 
-        id: "armor_3", 
+        id: "armor_new_3" 
         name: "Stahlplatten-Brünne", 
         type: "armor",
         rarity: "rare", 
@@ -94,7 +94,7 @@ const ARMOR_ITEMS = [
     },
 
     { 
-        id: "armor_4", 
+        id: "armor_new_4" 
         name: "Feenrobe der Undurchdringlichkeit", 
         type: "armor",
         rarity: "unique", 
@@ -129,7 +129,7 @@ const ARMOR_ITEMS = [
     },
 
     { 
-        id: "armor_5", 
+        id: "armor_new_5" 
         name: "Titanium-Gottpanzer", 
         type: "armor",
         rarity: "legendary", 

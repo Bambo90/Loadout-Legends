@@ -2,7 +2,7 @@
 
 const ACCESSORY_ITEMS = [
     { 
-        id: "acc_ring_1", 
+        id: "acc_new_ring_1" 
         name: "Kupferring des Vertrauens", 
         type: "accessory",
         rarity: "common", 
@@ -26,7 +26,7 @@ const ACCESSORY_ITEMS = [
     },
 
     { 
-        id: "acc_ring_2", 
+        id: "acc_new_ring_2" 
         name: "Silberring der Weisheit", 
         type: "accessory",
         rarity: "magic", 
@@ -52,7 +52,7 @@ const ACCESSORY_ITEMS = [
     },
 
     { 
-        id: "acc_necklace_1", 
+        id: "acc_new_necklace_1" 
         name: "Amberkette", 
         type: "accessory",
         rarity: "rare", 
@@ -80,7 +80,7 @@ const ACCESSORY_ITEMS = [
     },
 
     { 
-        id: "acc_amulet_1", 
+        id: "acc_new_amulet_1" 
         name: "Amulett der Sternenhüter", 
         type: "accessory",
         rarity: "unique", 
@@ -114,7 +114,7 @@ const ACCESSORY_ITEMS = [
     },
 
     { 
-        id: "acc_crown_1", 
+        id: "acc_new_crown_1" 
         name: "Krone der Ewigkeit", 
         type: "accessory",
         rarity: "legendary", 

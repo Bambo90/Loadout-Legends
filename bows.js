@@ -2,7 +2,7 @@
 
 const BOW_ITEMS = [
     { 
-        id: "bow_1", 
+        id: "bow_new_1" 
         name: "Langbogen", 
         type: "bow",
         rarity: "common", 
@@ -30,7 +30,7 @@ const BOW_ITEMS = [
     },
 
     { 
-        id: "bow_2", 
+        id: "bow_new_2" 
         name: "Kompositbogen", 
         type: "bow",
         rarity: "magic", 
@@ -61,7 +61,7 @@ const BOW_ITEMS = [
     },
 
     { 
-        id: "bow_3", 
+        id: "bow_new_3" 
         name: "Drachenarmbruster", 
         type: "bow",
         rarity: "rare", 
@@ -94,7 +94,7 @@ const BOW_ITEMS = [
     },
 
     { 
-        id: "bow_4", 
+        id: "bow_new_4" 
         name: "Eissturmbogen", 
         type: "bow",
         rarity: "unique", 
@@ -127,7 +127,7 @@ const BOW_ITEMS = [
     },
 
     { 
-        id: "bow_5", 
+        id: "bow_new_5" 
         name: "Zeitloses Präzisions-Langbogen", 
         type: "bow",
         rarity: "legendary", 

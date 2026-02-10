@@ -2,7 +2,7 @@
 
 const SHIELD_ITEMS = [
     { 
-        id: "shield_1", 
+        id: "shield_new_1" 
         name: "Holzschild", 
         type: "shield",
         rarity: "common", 
@@ -30,7 +30,7 @@ const SHIELD_ITEMS = [
     },
 
     { 
-        id: "shield_2", 
+        id: "shield_new_2" 
         name: "Eisenschild", 
         type: "shield",
         rarity: "magic", 
@@ -61,7 +61,7 @@ const SHIELD_ITEMS = [
     },
 
     { 
-        id: "shield_3", 
+        id: "shield_new_3" 
         name: "Kriegsschild des Erbauers", 
         type: "shield",
         rarity: "rare", 
@@ -94,7 +94,7 @@ const SHIELD_ITEMS = [
     },
 
     { 
-        id: "shield_4", 
+        id: "shield_new_4" 
         name: "Mondkristall-Schutzschild", 
         type: "shield",
         rarity: "unique", 
@@ -129,7 +129,7 @@ const SHIELD_ITEMS = [
     },
 
     { 
-        id: "shield_5", 
+        id: "shield_new_5" 
         name: "Unzerstörbarer Wall Guardian", 
         type: "shield",
         rarity: "legendary", 

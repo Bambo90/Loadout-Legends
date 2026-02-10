@@ -19,8 +19,11 @@ function initializeItemRegistry() {
         BOW_ITEMS,
         ARMOR_ITEMS,
         SHIELD_ITEMS,
-        ACCESSORY_ITEMS
-    ];
+        ACCESSORY_ITEMS,
+        // Legacy arrays for backward compatibility
+        typeof WEAPON_ITEMS !== 'undefined' ? WEAPON_ITEMS : null,
+        typeof JEWELRY_ITEMS !== 'undefined' ? JEWELRY_ITEMS : null
+    ].filter(arr => arr !== null && arr !== undefined);
     
     allArrays.forEach(itemArray => {
         if (!itemArray) {
@@ -29,7 +32,7 @@ function initializeItemRegistry() {
         }
         itemArray.forEach(item => {
             if (ALL_ITEMS[item.id]) {
-                console.error('Duplicate item ID:', item.id);
+                console.warn('Duplicate item ID:', item.id, '- skipping');
                 return;
             }
             ALL_ITEMS[item.id] = item;
