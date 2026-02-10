@@ -91,9 +91,11 @@ function handleDropInSlot(e) {
         const shapeW = shape[0].length;
         const shapeH = shape.length;
         
-        // More strict check: origin must be inside grid OR just barely outside (by 1 cell)
-        const insideOrNearby = (desiredX >= -1) && (desiredX < cols) &&
-                               (desiredY >= -1) && (desiredY < maxRows);
+        // Stricter check: Item bounds must be within 1 cell of grid
+        // Left: origin >= -1, Right: origin + width <= cols + 1
+        // Top: origin >= -1, Bottom: origin + height <= maxRows + 1
+        const insideOrNearby = (desiredX >= -1) && (desiredX + shapeW <= cols + 1) &&
+                               (desiredY >= -1) && (desiredY + shapeH <= maxRows + 1);
         
         if (insideOrNearby) {
             const found = tryFindNearestValid(grid, desiredX, desiredY, shape, cols, maxRows, 2);
@@ -103,7 +105,7 @@ function handleDropInSlot(e) {
                 canPlace = true;
             }
         } else {
-            console.log('✋ DROPPED TOO FAR OUTSIDE - no radius search. desiredXY:', {desiredX, desiredY}, 'bounds:', {cols, maxRows});
+            console.log('✋ DROPPED TOO FAR OUTSIDE - no radius search. desiredXY:', {desiredX, desiredY}, 'shapeDim:', {shapeW, shapeH}, 'bounds:', {cols, maxRows});
         }
     }
 

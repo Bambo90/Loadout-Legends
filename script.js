@@ -504,7 +504,7 @@ function renderWorkshopGrids() {
                 const item = draggedItem.item;
                 const sellPrice = Math.floor(item.price * 0.5);
                 gameData.gold += sellPrice;
-                clearItemFromGrid(gameData[draggedItem.fromLocation], item.id);
+                clearItemFromGrid(gameData[draggedItem.fromLocation], draggedItem.instanceId);
                 draggedItem = null;
                     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
                 updateUI();
