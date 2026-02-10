@@ -93,13 +93,15 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId) {
         return instanceId;
     }
 
+    let hasRoot = false;
     shapeCopy.forEach((row, r) => {
         row.forEach((cell, c) => {
             if (!cell) return;
             const x = originX + c;
             const y = originY + r;
             const idx = y * cols + x;
-            const isRoot = (r === minR && c === minC);
+            const isRoot = !hasRoot; // First occupied cell is root
+            if (isRoot) hasRoot = true;
 
             grid[idx] = {
                 itemId: item.id,
