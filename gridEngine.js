@@ -70,11 +70,23 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId) {
     if (!instanceId) {
         instanceId = generateInstanceId();
     }
-    
+
     const originX = originIndex % cols;
     const originY = Math.floor(originIndex / cols);
+    const shapeCopy = shape.map(r => [...r]);
 
-    shape.forEach((row, r) => {
+    // Find the first occupied cell to mark as root (handles leading empty rows/cols)
+    let minR = Infinity;
+    let minC = Infinity;
+    for (let r = 0; r < shapeCopy.length; r++) {
+        for (let c = 0; c < shapeCopy[0].length; c++) {
+            if (!shapeCopy[r][c]) continue;
+            if (r < minR) minR = r;
+            if (c < minC) minC = c;
+        }
+    }
+
+    shapeCopy.forEach((row, r) => {
         row.forEach((cell, c) => {
             if (!cell) return;
             const x = originX + c;
@@ -84,11 +96,11 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId) {
             grid[idx] = {
                 itemId: item.id,
                 instanceId: instanceId, // Unique instance identifier
-                shape: shape.map(r => [...r]), // Store a copy of the actual placed shape (may be rotated)
-                root: (r === 0 && c === 0) // Nur das erste Feld ist der Anker
+                shape: shapeCopy, // Store a copy of the actual placed shape (may be rotated)
+                root: (r === minR && c === minC) // First occupied cell is the anchor
             };
         });
     });
-    
+
     return instanceId; // Return the instanceId for tracking
 }
