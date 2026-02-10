@@ -74,10 +74,12 @@ function applyRotation(dir) {
     if (dir === 1) {
         // CW rotation: offset formula uses OLD dimensions
         const rotated = rotateMatrixCW(oldShape);
+        console.log('  Pre-normalize rotated:', rotated);
         let newOffsetX = (oldH - 1) - oldY;
         let newOffsetY = oldX;
         const norm = normalizeShape(rotated);
         draggedItem.previewShape = norm.shape;
+        console.log('  Post-normalize shape:', norm.shape, '| trim:', { minR: norm.minR, minC: norm.minC });
         // adjust offsets after trimming
         newOffsetX -= norm.minC;
         newOffsetY -= norm.minR;
@@ -87,10 +89,12 @@ function applyRotation(dir) {
     } else if (dir === -1) {
         // CCW rotation: offset formula uses OLD dimensions
         const rotated = rotateMatrixCCW(oldShape);
+        console.log('  Pre-normalize rotated:', rotated);
         let newOffsetX = oldY;
         let newOffsetY = (oldW - 1) - oldX;
         const norm = normalizeShape(rotated);
         draggedItem.previewShape = norm.shape;
+        console.log('  Post-normalize shape:', norm.shape, '| trim:', { minR: norm.minR, minC: norm.minC });
         // adjust offsets after trimming
         newOffsetX -= norm.minC;
         newOffsetY -= norm.minR;

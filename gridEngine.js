@@ -86,7 +86,12 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId) {
         }
     }
 
-    console.log('📦 PLACE INTO GRID', { item: item.id, instance: instanceId, originIndex, originXY: { x: originX, y: originY }, shapeDim: { h: shapeCopy.length, w: shapeCopy[0].length }, minRC: { minR, minC } });
+    console.log('📦 PLACE INTO GRID', { item: item.id, instance: instanceId, originIndex, originXY: { x: originX, y: originY }, shapeDim: { h: shapeCopy.length, w: shapeCopy[0].length }, shape: shapeCopy, minRC: { minR, minC } });
+
+    if (minR === Infinity || minC === Infinity) {
+        console.error('⚠️ WARNING: Shape is empty or all zeros! minR:', minR, 'minC:', minC);
+        return instanceId;
+    }
 
     shapeCopy.forEach((row, r) => {
         row.forEach((cell, c) => {
