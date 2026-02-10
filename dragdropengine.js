@@ -83,15 +83,27 @@ function handleDropInSlot(e) {
     console.log('  📍 CAN PLACE:', canPlace, '| fromInstance:', draggedItem.instanceId, '| to:', location, 'index:', finalOriginIndex);
 
     // If not directly placeable, try to find a nearby valid spot (radius 2)
+    // But ONLY if the origin itself is inside or VERY close to the grid
     let chosenIndex = finalOriginIndex;
     if (!canPlace) {
         const desiredX = originX;
         const desiredY = originY;
-        const found = tryFindNearestValid(grid, desiredX, desiredY, shape, cols, maxRows, 2);
-        if (found !== null) {
-            console.log('Found nearby valid placement at', found);
-            chosenIndex = found;
-            canPlace = true;
+        const shapeW = shape[0].length;
+        const shapeH = shape.length;
+        
+        // More strict check: origin must be inside grid OR just barely outside (by 1 cell)
+        const insideOrNearby = (desiredX >= -1) && (desiredX < cols) &&
+                               (desiredY >= -1) && (desiredY < maxRows);
+        
+        if (insideOrNearby) {
+            const found = tryFindNearestValid(grid, desiredX, desiredY, shape, cols, maxRows, 2);
+            if (found !== null) {
+                console.log('Found nearby valid placement at', found);
+                chosenIndex = found;
+                canPlace = true;
+            }
+        } else {
+            console.log('✋ DROPPED TOO FAR OUTSIDE - no radius search. desiredXY:', {desiredX, desiredY}, 'bounds:', {cols, maxRows});
         }
     }
 
