@@ -127,7 +127,9 @@ function createSlot(container, location, index, cols) {
 
         // Start the custom pointer drag with instanceId from grid cell
         if (typeof window.startCustomDrag === 'function') {
-            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shape, itemEl, e, cell.instanceId);
+            // Pass a COPY of the shape to avoid modifying the grid cell during rotation
+            const shapeCopy = shape.map(r => [...r]);
+            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shapeCopy, itemEl, e, cell.instanceId);
         }
     });
 

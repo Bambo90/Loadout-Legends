@@ -144,9 +144,10 @@ function buyItem(itemId) {
     for (let i = 0; i < BANK_SLOTS; i++) {
         if (!gameData.bank[i]) {
             gameData.gold -= item.price;
-            // Nutzt die Gridengine.js
+            // Nutzt die Gridengine.js (pass a copy of item.body)
             if (typeof placeItemIntoGrid === 'function') {
-                placeItemIntoGrid(gameData.bank, i, item, item.body, 6);
+                const bodyCopy = (item.body || [[1]]).map(r => [...r]);
+                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, 6);
             }
             if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
             updateUI();
@@ -324,7 +325,8 @@ function addItemToBank(itemId) {
     for (let i = 0; i < BANK_SLOTS; i++) {
         if (!gameData.bank[i]) {
             if (typeof placeItemIntoGrid === 'function') {
-                placeItemIntoGrid(gameData.bank, i, item, item.body || [[1]], 6);
+                const bodyCopy = (item.body || [[1]]).map(r => [...r]);
+                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, 6);
                 return true;
             }
         }
