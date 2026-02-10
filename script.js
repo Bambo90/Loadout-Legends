@@ -640,7 +640,12 @@ window.onload = () => {
     // 4. Start-Tab setzen
     switchTab('grind');
     
-    // 5. Final UI update
+    // 5. Initialize item registry (supports tools, swords, bows, armor, shields, accessories)
+    if (typeof initializeItemRegistry === 'function') {
+        initializeItemRegistry();
+    }
+    
+    // 6. Final UI update
     updateUI();
     
     console.log("Loadout Legends ready!");
