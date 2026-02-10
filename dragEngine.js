@@ -33,24 +33,22 @@ function rotateMatrixCCW(matrix) {
 function applyRotation(dir) {
     // dir: +1 = CW 90deg, -1 = CCW 90deg
     if (!draggedItem) return;
-    // capture original shape dims and offsets before changing shape
+    
+    // capture OLD shape dimensions BEFORE rotation
     const oldShape = draggedItem.previewShape;
+    const oldH = oldShape.length;
+    const oldW = oldShape[0].length;
     const oldX = draggedItem.offsetX;
     const oldY = draggedItem.offsetY;
-    const oldH = oldShape.length; // rows
-    const oldW = oldShape[0].length; // cols
+    
     if (dir === 1) {
-        // CW rotation
+        // CW rotation: offset formula uses OLD dimensions
         draggedItem.previewShape = rotateMatrixCW(oldShape);
-        // newOffsetX = (oldH - 1) - oldY
-        // newOffsetY = oldX
         draggedItem.offsetX = (oldH - 1) - oldY;
         draggedItem.offsetY = oldX;
     } else if (dir === -1) {
-        // CCW rotation
+        // CCW rotation: offset formula uses OLD dimensions
         draggedItem.previewShape = rotateMatrixCCW(oldShape);
-        // newOffsetX = oldY
-        // newOffsetY = (oldW - 1) - oldX
         draggedItem.offsetX = oldY;
         draggedItem.offsetY = (oldW - 1) - oldX;
     }
