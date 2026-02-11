@@ -104,13 +104,40 @@
         <div id="workshop-overlay" class="hidden">
             <div class="workshop-header">
                 <h2 id="workshop-title">Workshop</h2>
-                <h2 id="grid-name">Grid</h2> <button class="close-workshop" onclick="closeWorkshop()">💾 Speichern</button>
+                <div style="flex: 1;"></div>
+                <button class="close-workshop" onclick="closeWorkshop()">💾 Speichern</button>
             </div>
             <div class="workshop-content">
                 <div class="bank-section">
-                    <h3 id="bank-header">Storage</h3> 
-                    <div id="bank-grid" class="inventory-grid scrollable-grid"></div>
+                    <!-- Storage Header -->
+                    <div class="storage-header">
+                        <h3 id="bank-header">Storage</h3>
+                        <div class="storage-controls">
+                            <select id="category-filter" onchange="setStorageFilter(this.value)">
+                                <option value="all">📦 Alle Kategorien</option>
+                                <option value="weapon">⚔️ Waffen</option>
+                                <option value="armor">🛡️ Rüstung</option>
+                                <option value="accessory">💍 Schmuck</option>
+                                <option value="tool">⛏️ Werkzeuge</option>
+                                <option value="material">📦 Materialien</option>
+                            </select>
+                            <input type="text" id="storage-search" placeholder="🔎 Suchen..." oninput="setStorageSearch(this.value)" />
+                            <button id="auto-sort-btn" onclick="autoSortStorage(currentWorkshop === 'storage' ? 'bank' : currentWorkshop + 'Grid')" title="Automatisch sortieren">🔄</button>
+                            <button id="bulk-sell-btn" onclick="toggleBulkSellMode()" title="Massenverkauf">💰</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Storage Grid -->
+                    <div id="bank-grid" class="inventory-grid scrollable-grid storage-grid"></div>
+                        
+                    <!-- Sell Zone (hidden in bulk mode) -->
                     <div id="sell-zone">💰 Hierher ziehen zum Verkaufen</div>
+                    
+                    <!-- Bulk Sell Actions -->
+                    <div id="bulk-sell-actions" style="display: none;">
+                        <button id="execute-bulk-sell" onclick="executeBulkSell(currentWorkshop === 'storage' ? 'bank' : currentWorkshop + 'Grid')">💸 Ausgewählte verkaufen</button>
+                        <button onclick="toggleBulkSellMode()">❌ Abbrechen</button>
+                    </div>
                 </div>
                 <div class="active-grid-section">
                     <h3>Ausrüstung</h3>
@@ -141,6 +168,7 @@
 <script src="dragdropengine.js"></script>
 <script src="customDrag.js"></script>
 <script src="workshopEngine.js"></script>
+<script src="storageEngine.js"></script>
 
 <script src="saveengine.js"></script>
 <script src="pvp.js"></script>

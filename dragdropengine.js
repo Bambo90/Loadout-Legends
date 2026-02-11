@@ -13,7 +13,7 @@ function handleDropInSlot(e) {
     const cols = parseInt(slot.dataset.cols);
     
     // Calculate max rows based on location
-    let maxRows = 5;
+    let maxRows = GRID_ROWS;
     if (location === 'bank') {
         maxRows = Math.ceil(BANK_SLOTS / cols);
     }

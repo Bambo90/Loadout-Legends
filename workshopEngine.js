@@ -119,6 +119,51 @@ function createSlot(container, location, index, cols) {
     icon.style.pointerEvents = "none";
     itemEl.appendChild(icon);
 
+    // ===== STORAGE SYSTEM INTEGRATION =====
+    // Apply lock/selection visual states if storageEngine is initialized
+    if (typeof storageState !== 'undefined' && cell.instanceId) {
+        // Add lock icon if item is locked
+        if (storageState.lockedItems.has(cell.instanceId)) {
+            itemEl.classList.add('item-locked');
+        }
+        
+        // Add selection border if item is selected for bulk sell
+        if (storageState.selectedItems.has(cell.instanceId)) {
+            itemEl.classList.add('item-selected');
+        }
+    }
+    
+    // Right-click handler for item locking (works in all workshop modes)
+    itemEl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (typeof toggleItemLock === 'function' && cell.instanceId) {
+            toggleItemLock(cell.instanceId);
+            // Re-render to show lock icon immediately
+            if (typeof renderWorkshopGrids === 'function') {
+                renderWorkshopGrids();
+            }
+        }
+    });
+    
+    // Click handler for bulk-sell selection (only active when bulk sell mode enabled)
+    itemEl.addEventListener('click', (e) => {
+        // Only handle clicks when bulk sell mode is active
+        if (typeof storageState !== 'undefined' && storageState.bulkSellMode && cell.instanceId) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (typeof toggleItemSelection === 'function') {
+                toggleItemSelection(cell.instanceId);
+                // Re-render to show selection border immediately
+                if (typeof renderWorkshopGrids === 'function') {
+                    renderWorkshopGrids();
+                }
+            }
+        }
+    });
+
     // ===== AURA OVERLAY (Hidden by default) =====
     const auraOverlay = document.createElement('div');
     auraOverlay.classList.add('aura-overlay', item.rarity);

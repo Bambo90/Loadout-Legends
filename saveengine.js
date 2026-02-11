@@ -60,14 +60,7 @@ function loadGame() {
             if (!gameData.monsterDefeats) gameData.monsterDefeats = {};
             if (!gameData.currentMonsterIndex) gameData.currentMonsterIndex = 0;
 
-            // Normalize grids to ensure instanceIds exist and stale cells are cleaned
-            const bankCols = 6;
-            const gridCols = typeof GRID_SIZE === 'number' ? GRID_SIZE : 5;
-            gameData.bank = normalizeGridInstances(gameData.bank, bankCols);
-            gameData.farmGrid = normalizeGridInstances(gameData.farmGrid, gridCols);
-            gameData.pveGrid = normalizeGridInstances(gameData.pveGrid, gridCols);
-            gameData.pvpGrid = normalizeGridInstances(gameData.pvpGrid, gridCols);
-
+            // Sync instance ID counter from loaded grids
             if (typeof syncInstanceIdCounterFromGrids === 'function') {
                 syncInstanceIdCounterFromGrids([gameData.bank, gameData.farmGrid, gameData.pveGrid, gameData.pvpGrid]);
             }

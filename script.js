@@ -26,9 +26,9 @@ let gameData = {
     monsterDefeats: {}
 };
 
-const BANK_SLOTS = 30;
-const GRID_SIZE = 5;
-const GRID_ROWS = 5;
+const BANK_SLOTS = 200;
+const GRID_SIZE = 10;
+const GRID_ROWS = 10;
 const FOCUS_DURATION = 60 * 60 * 1000;
 
 let currentWorkshop = null;
@@ -104,8 +104,9 @@ function renderPreviewGrid(containerId, gridKey) {
     // Prevent aura overflow from creating scrollbars - clip aura at grid edges
     container.style.overflow = 'hidden';
     
-    // Vorschau-Grids sind immer 5x5 in der Anzeige
-    for (let i = 0; i < 25; i++) {
+    // Vorschau-Grids sind jetzt 10x10 in der Anzeige
+    const totalSlots = gridKey === 'bank' ? BANK_SLOTS : (GRID_SIZE * GRID_ROWS);
+    for (let i = 0; i < totalSlots; i++) {
         const slot = document.createElement('div');
         slot.classList.add('grid-slot');
         
@@ -146,6 +147,16 @@ function openWorkshop(type) {
         const gridName = document.getElementById('grid-name');
         if (gridName) {
             gridName.style.display = type === 'storage' ? 'none' : 'block';
+        }
+        
+        // Toggle storage mode class
+        const workshopContent = overlay.querySelector('.workshop-content');
+        if (workshopContent) {
+            if (type === 'storage') {
+                workshopContent.classList.add('storage-mode');
+            } else {
+                workshopContent.classList.remove('storage-mode');
+            }
         }
     }
     
@@ -190,6 +201,7 @@ function buyItem(itemId) {
             }
             if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
             updateUI();
+            if (typeof saveGame === 'function') saveGame();
             return;
         }
     }
@@ -515,13 +527,14 @@ function renderWorkshopGrids() {
     
     console.log("Rendering workshop grids for:", currentWorkshop);
     
-    // Bank Grid
+    // Bank Grid - use 10 columns in storage mode, 6 columns otherwise
+    const bankCols = currentWorkshop === 'storage' ? 10 : 6;
     bankGrid.innerHTML = '';
     for (let i = 0; i < BANK_SLOTS; i++) {
-        createSlot(bankGrid, 'bank', i, 6);
+        createSlot(bankGrid, 'bank', i, bankCols);
     }
     // Render drag preview for bank
-    renderDragPreviewForGrid(bankGrid, 'bank', 6, BANK_SLOTS);
+    renderDragPreviewForGrid(bankGrid, 'bank', bankCols, BANK_SLOTS);
     
     // Active Grid (Farm or PvE)
     activeGrid.innerHTML = '';
@@ -568,6 +581,11 @@ function renderWorkshopGrids() {
                 console.log('⚠️ SELL DROP but no draggedItem!');
             }
         });
+    }
+    
+    // Apply storage filters after rendering (if in storage mode)
+    if (typeof applyStorageFilters === 'function') {
+        applyStorageFilters();
     }
 }
 
