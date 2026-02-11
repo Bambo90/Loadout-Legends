@@ -64,6 +64,45 @@ function normalizeShape(shape) {
 
 function applyRotation(dir) {
     // dir: +1 = CW 90deg, -1 = CCW 90deg
+    console.log('🔄 applyRotation called: dir=' + dir + ' draggedItem=' + (draggedItem ? draggedItem.item.id : 'NULL'));
+    if (!draggedItem || !draggedItem.item) {
+        console.warn('⚠️ applyRotation ABORT: draggedItem is null or no item');
+        return;
+    }
+
+    _rotationCount++;
+
+    const item = draggedItem.item;
+    const currentRotIndex = draggedItem.rotationIndex || 0;
+    const nextRotIndex = dir === 1
+        ? (currentRotIndex + 1) % 4
+        : ((currentRotIndex - 1) + 4) % 4;
+
+    const rotationGrid = (typeof getItemRotationGrid === 'function')
+        ? getItemRotationGrid(item, nextRotIndex)
+        : null;
+    if (rotationGrid) {
+        draggedItem.rotationIndex = nextRotIndex;
+        draggedItem.previewShape = getItemBodyMatrix(item, nextRotIndex).map(r => [...r]);
+        const aura = getItemAuraMatrix(item, nextRotIndex);
+        draggedItem.rotatedAura = aura ? aura.map(r => [...r]) : null;
+        console.log('✅ Rotation updated: rotIndex=' + nextRotIndex + ' shape=' + JSON.stringify(draggedItem.previewShape) + ' aura=' + JSON.stringify(draggedItem.rotatedAura));
+
+        if (typeof window._updateFollowElement === 'function') {
+            window._updateFollowElement();
+        }
+        if (typeof window._updateFollowElementPosition === 'function' && window._dragLastPos) {
+            window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
+        }
+        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+        return;
+    }
+
+    applyRotationCanonical(dir);
+}
+
+function applyRotationCanonical(dir) {
+    // Legacy rotation code (for items without rotations)
     if (!draggedItem) return;
     
     _rotationCount++;
@@ -170,18 +209,21 @@ function applyRotation(dir) {
 function initGlobalDragListeners() {
     // Rotation via 'R' Taste (R = CW, Shift+R = CCW)
     window.addEventListener('keydown', (e) => {
+        console.log('⌨️ keydown:', e.key, 'draggedItem:', draggedItem ? draggedItem.item.id : 'null');
         if (!draggedItem) return;
         if (e.key.toLowerCase() !== 'r') return;
         const now = Date.now();
         if (now - _lastKeyRotate < 150) return; // debounce: ignore rapid repeats
         _lastKeyRotate = now;
         e.preventDefault();
+        console.log('🔑 R key detected, applying rotation');
         const dir = e.shiftKey ? -1 : 1;
         applyRotation(dir);
     });
 
     // Mausrad-Rotation (wheel up/down -> CCW/CW). Debounced to avoid repeated rotations.
     window.addEventListener('wheel', (e) => {
+        console.log('🎡 wheel event, draggedItem:', draggedItem ? draggedItem.item.id : 'null', 'deltaY:', e.deltaY);
         if (!draggedItem) return;
         const now = Date.now();
         if (now - _lastWheelRotate < 120) return; // ignore rapid repeats
@@ -189,6 +231,7 @@ function initGlobalDragListeners() {
         // deltaY < 0 => wheel up; map wheel up to CCW (-1), wheel down to CW (+1)
         const dir = (e.deltaY < 0) ? -1 : 1;
         e.preventDefault();
+        console.log('🎡 Wheel rotation applied: dir=' + dir);
         applyRotation(dir);
     }, { passive: false });
 

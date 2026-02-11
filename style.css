@@ -131,6 +131,24 @@ body {
     backdrop-filter: blur(10px); display: flex; flex-direction: column;
 }
 .workshop-header { padding: 25px 50px; background: #111; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; }
+.close-workshop { 
+    padding: 12px 28px; 
+    background: linear-gradient(135deg, #2a5298 0%, #1e3a70 100%);
+    border: 2px solid #3d6bb3; 
+    color: #fff; 
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px; 
+    cursor: pointer; 
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(42, 82, 152, 0.3);
+}
+.close-workshop:hover { 
+    background: linear-gradient(135deg, #3d6bb3 0%, #2a5298 100%);
+    border-color: #5a8fd8;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(42, 82, 152, 0.5);
+}
 .workshop-content { display: flex; gap: 60px; justify-content: center; padding: 60px; overflow-y: auto; }
 
 .workshop-content.storage-mode .active-grid-section { display: none !important; }

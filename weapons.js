@@ -1,3 +1,5 @@
+﻿/* ITEM DEFINITION - WEAPONS (Legacy Weapons with all 4 Rotations) */
+
 const WEAPON_ITEMS = [
     { 
         id: "sword_1", 
@@ -9,11 +11,12 @@ const WEAPON_ITEMS = [
         req: 2, 
         damage: 5, 
         desc: "Besser als nichts im Kampf.",
-        body: [
-            [1, 1],
-            [0, 1],
-            [0, 1]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'AB', 'A'], ['0', 'AB', 'A'], ['0', 'AB', '0'], ['0', 'A', '0']] },
+            1: { grid: [['A', 'A', '0'], ['AB', '0', 'A'], ['AB', 'AB', 'AB'], ['0', 'A', 'A']] },
+            2: { grid: [['AB', '0', 'A'], ['AB', 'A', '0'], ['AB', 'AB', 'A'], ['A', 'A', '0']] },
+            3: { grid: [['A', 'A', '0'], ['AB', 'AB', 'AB'], ['0', 'A', 'AB'], ['0', 'A', 'A']] }
+        }
     },
     { 
         id: "bow_1", 
@@ -25,12 +28,12 @@ const WEAPON_ITEMS = [
         req: 6, 
         damage: 12, 
         desc: "Hält gerade noch so zusammen.",
-        body: [
-            [1],
-            [1],
-            [1],
-            [1]
-        ]
+        rotations: {
+            0: { grid: [['A', 'AB', 'A'], ['0', 'AB', '0'], ['0', 'AB', '0'], ['0', 'AB', '0'], ['0', 'A', '0']] },
+            1: { grid: [['0', 'A', 'A', 'A'], ['AB', 'AB', 'B', 'AB'], ['0', 'A', 'A', 'A'], ['0', 'A', 'A', 'A']] },
+            2: { grid: [['0', 'AB', '0'], ['0', 'AB', '0'], ['0', 'AB', '0'], ['A', 'AB', 'A']] },
+            3: { grid: [['A', 'A', 'A', '0'], ['AB', 'B', 'AB', 'AB'], ['A', 'A', 'A', '0'], ['A', 'A', 'A', '0']] }
+        }
     },
     { 
         id: "sword_2", 
@@ -42,11 +45,12 @@ const WEAPON_ITEMS = [
         req: 5, 
         damage: 8, 
         desc: "Solider Stahl mit guter Balance.",
-        body: [
-            [1, 1],
-            [0, 1],
-            [0, 1]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'AB', 'A'], ['0', 'AB', 'A'], ['0', 'AB', '0'], ['0', 'A', '0']] },
+            1: { grid: [['A', 'A', '0'], ['AB', '0', 'A'], ['AB', 'AB', 'AB'], ['0', 'A', 'A']] },
+            2: { grid: [['AB', '0', 'A'], ['AB', 'A', '0'], ['AB', 'AB', 'A'], ['A', 'A', '0']] },
+            3: { grid: [['A', 'A', '0'], ['AB', 'AB', 'AB'], ['0', 'A', 'AB'], ['0', 'A', 'A']] }
+        }
     },
     { 
         id: "axe_1", 
@@ -58,10 +62,11 @@ const WEAPON_ITEMS = [
         req: 10, 
         damage: 15, 
         desc: "Schwer aber verheerend.",
-        body: [
-            [1, 1, 1],
-            [0, 1, 0],
-            [0, 1, 0]
-        ]
+        rotations: {
+            0: { grid: [['A', 'AB', 'AB', 'AB', 'A'], ['0', 'A', 'AB', 'A', '0'], ['0', 'A', 'B', 'A', '0'], ['0', 'A', '0', 'A', '0']] },
+            1: { grid: [['0', 'A', 'AB', 'A'], ['AB', 'AB', 'B', 'A'], ['AB', 'A', '0', 'A'], ['A', 'A', 'A', '0']] },
+            2: { grid: [['0', 'A', 'B', 'A', '0'], ['0', 'A', 'B', 'A', '0'], ['0', 'AB', 'AB', 'AB', '0'], ['A', 'A', 'A', 'A', 'A']] },
+            3: { grid: [['B', 'A', 'A', 'A'], ['AB', 'B', 'AB', 'A'], ['A', '0', 'AB', 'A'], ['A', 'A', 'A', '0']] }
+        }
     }
 ];

@@ -140,7 +140,13 @@ function openWorkshop(type) {
         overlay.classList.remove('hidden');
         overlay.style.display = 'flex';
         const title = document.getElementById('workshop-title');
-        if (title) title.innerText = type.toUpperCase() + (type === 'storage' ? " STORAGE" : " WORKSHOP");
+        if (title) title.innerText = type === 'storage' ? "STORAGE" : type.toUpperCase() + " WORKSHOP";
+        
+        // Hide grid name in storage mode
+        const gridName = document.getElementById('grid-name');
+        if (gridName) {
+            gridName.style.display = type === 'storage' ? 'none' : 'block';
+        }
     }
     
     // Ruft die Funktion aus der Workshopengine.js auf
@@ -176,8 +182,11 @@ function buyItem(itemId) {
             gameData.gold -= item.price;
             // Nutzt die Gridengine.js (pass a copy of item.body)
             if (typeof placeItemIntoGrid === 'function') {
-                const bodyCopy = (item.body || [[1]]).map(r => [...r]);
-                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, 6);
+                const baseBody = (typeof getItemBodyMatrix === 'function')
+                    ? getItemBodyMatrix(item, 0)
+                    : (item.body || [[1]]);
+                const bodyCopy = baseBody.map(r => [...r]);
+                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, 6, null, null, null, 0);
             }
             if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
             updateUI();
@@ -355,8 +364,11 @@ function addItemToBank(itemId) {
     for (let i = 0; i < BANK_SLOTS; i++) {
         if (!gameData.bank[i]) {
             if (typeof placeItemIntoGrid === 'function') {
-                const bodyCopy = (item.body || [[1]]).map(r => [...r]);
-                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, 6);
+                const baseBody = (typeof getItemBodyMatrix === 'function')
+                    ? getItemBodyMatrix(item, 0)
+                    : (item.body || [[1]]);
+                const bodyCopy = baseBody.map(r => [...r]);
+                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, 6, null, null, null, 0);
                 return true;
             }
         }

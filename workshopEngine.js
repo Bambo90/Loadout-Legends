@@ -63,9 +63,14 @@ function createSlot(container, location, index, cols) {
         return;
     }
 
-    // Use the stored shape from the grid cell (which may be rotated), fallback to item.body
+    const rotationIndex = (draggedItem && draggedItem.instanceId === cell.instanceId && typeof draggedItem.rotationIndex === 'number')
+        ? draggedItem.rotationIndex
+        : (typeof cell.rotationIndex === 'number' ? cell.rotationIndex : 0);
+
     // Always use body shape for placement (never aura)
-    const shape = item.body || [[1]];
+    const shape = (typeof getItemBodyMatrix === 'function')
+        ? getItemBodyMatrix(item, rotationIndex)
+        : (item.body || [[1]]);
     if (!shape || !Array.isArray(shape) || shape.length === 0) {
         container.appendChild(slot);
         return;
@@ -123,18 +128,21 @@ function createSlot(container, location, index, cols) {
     auraOverlay.style.pointerEvents = 'none';
     auraOverlay.style.zIndex = '50';
     
-    // Priority: 1) Stored rotatedAura in cell (persistent), 2) draggedItem rotatedAura (during drag), 3) original item.aura
-    let aura = item.aura || [[1,1,1], [1,0,1], [1,1,1]];
-    
-    // Check if cell has stored rotated aura (from previous placement)
-    if (cell.rotatedAura) {
-        aura = cell.rotatedAura;
-        console.log('  🔄 Using stored rotated aura from grid:', JSON.stringify(aura));
-    }
-    // Override if this item is being dragged and has a rotated aura
-    else if (draggedItem && draggedItem.instanceId === cell.instanceId && draggedItem.rotatedAura) {
+    // Priority: 1) draggedItem rotatedAura (during drag), 2) stored rotatedAura, 3) helper-derived aura
+    let aura = null;
+    let useBodyBoundsForAura = true;
+    if (draggedItem && draggedItem.instanceId === cell.instanceId && draggedItem.rotatedAura) {
         aura = draggedItem.rotatedAura;
         console.log('  🔄 Using rotated aura for drag preview:', JSON.stringify(aura));
+    } else if (cell.rotatedAura) {
+        aura = cell.rotatedAura;
+        console.log('  🔄 Using stored rotated aura from grid:', JSON.stringify(aura));
+    } else if (typeof getItemAuraMatrix === 'function') {
+        aura = getItemAuraMatrix(item, rotationIndex);
+    }
+    if (!aura) {
+        aura = [[1,1,1], [1,0,1], [1,1,1]];
+        useBodyBoundsForAura = false;
     }
     
     const auraRows = aura.length;
@@ -147,11 +155,19 @@ function createSlot(container, location, index, cols) {
     auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
     auraOverlay.style.gap = "8px";
     
-    // Offset die Aura so dass sie um die Body zentriert ist
-    const offsetX = (colsShape - auraColsShape) / 2 * (64 + 8);
-    const offsetY = (rows - auraRows) / 2 * (64 + 8);
-    auraOverlay.style.left = offsetX + "px";
-    auraOverlay.style.top = offsetY + "px";
+    const bodyBounds = (typeof getItemBodyBounds === 'function')
+        ? getItemBodyBounds(item, rotationIndex)
+        : { minR: 0, minC: 0 };
+    const tileSize = 64 + 8;
+    if (useBodyBoundsForAura) {
+        auraOverlay.style.left = (-bodyBounds.minC * tileSize) + "px";
+        auraOverlay.style.top = (-bodyBounds.minR * tileSize) + "px";
+    } else {
+        const offsetX = (colsShape - auraColsShape) / 2 * tileSize;
+        const offsetY = (rows - auraRows) / 2 * tileSize;
+        auraOverlay.style.left = offsetX + "px";
+        auraOverlay.style.top = offsetY + "px";
+    }
     
     // Calculate item position in grid to check aura bounds
     const itemGridX = index % cols;
@@ -171,8 +187,12 @@ function createSlot(container, location, index, cols) {
             auraCell.style.height = '64px';
             
             // Calculate absolute grid position of this aura cell
-            const auraGridX = itemGridX + c - Math.floor(auraColsShape / 2);
-            const auraGridY = itemGridY + r - Math.floor(auraRows / 2);
+            const auraGridX = useBodyBoundsForAura
+                ? itemGridX + (c - bodyBounds.minC)
+                : itemGridX + c - Math.floor(auraColsShape / 2);
+            const auraGridY = useBodyBoundsForAura
+                ? itemGridY + (r - bodyBounds.minR)
+                : itemGridY + r - Math.floor(auraRows / 2);
             
             // Check if aura cell is outside grid boundaries
             const isOutOfBounds = (auraGridX < 0 || auraGridX >= cols || auraGridY < 0 || auraGridY >= maxRows);
@@ -236,7 +256,7 @@ function createSlot(container, location, index, cols) {
             }
             
             // Pass cell.rotatedAura to preserve rotation when picking up item
-            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shapeCopy, itemEl, e, cell.instanceId, cell.rotatedAura);
+            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shapeCopy, itemEl, e, cell.instanceId, cell.rotatedAura, rotationIndex);
         }
     });
 

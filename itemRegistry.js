@@ -9,21 +9,70 @@
 const ALL_ITEMS = {};
 
 /**
+ * Build a single combined grid with flags: B=Body, A=Aura, 0=Empty
+ * Future: Bs=Body with socket
+ */
+function _buildCombinedGrid(body, aura) {
+    const bodyRows = body ? body.length : 0;
+    const bodyCols = (body && body[0]) ? body[0].length : 0;
+    const auraRows = aura ? aura.length : 0;
+    const auraCols = (aura && aura[0]) ? aura[0].length : 0;
+    const rows = Math.max(bodyRows, auraRows, 1);
+    const cols = Math.max(bodyCols, auraCols, 1);
+
+    const grid = Array.from({ length: rows }, () => Array(cols).fill('0'));
+    const bodyOffR = Math.floor((rows - bodyRows) / 2);
+    const bodyOffC = Math.floor((cols - bodyCols) / 2);
+    const auraOffR = Math.floor((rows - auraRows) / 2);
+    const auraOffC = Math.floor((cols - auraCols) / 2);
+
+    // Build combined grid: B for body, A for aura
+    if (body) {
+        for (let r = 0; r < bodyRows; r++) {
+            for (let c = 0; c < bodyCols; c++) {
+                if (!body[r][c]) continue;
+                const rr = r + bodyOffR;
+                const cc = c + bodyOffC;
+                if (grid[rr][cc] === '0') {
+                    grid[rr][cc] = 'B';
+                } else if (grid[rr][cc] === 'A') {
+                    grid[rr][cc] = 'AB';
+                }
+            }
+        }
+    }
+    if (aura) {
+        for (let r = 0; r < auraRows; r++) {
+            for (let c = 0; c < auraCols; c++) {
+                if (!aura[r][c]) continue;
+                const rr = r + auraOffR;
+                const cc = c + auraOffC;
+                if (grid[rr][cc] === '0') {
+                    grid[rr][cc] = 'A';
+                } else if (grid[rr][cc] === 'B') {
+                    grid[rr][cc] = 'AB';
+                }
+            }
+        }
+    }
+    return grid;
+}
+
+/**
  * Initialize item registry - call this AFTER all item files are loaded
  * This function consolidates all item arrays into a searchable dictionary
  */
 function initializeItemRegistry() {
-    const allArrays = [
-        TOOL_ITEMS,
-        SWORD_ITEMS,
-        BOW_ITEMS,
-        ARMOR_ITEMS,
-        SHIELD_ITEMS,
-        ACCESSORY_ITEMS,
-        // Legacy arrays for backward compatibility
-        typeof WEAPON_ITEMS !== 'undefined' ? WEAPON_ITEMS : null,
-        typeof JEWELRY_ITEMS !== 'undefined' ? JEWELRY_ITEMS : null
-    ].filter(arr => arr !== null && arr !== undefined);
+    const allArrays = [];
+    if (typeof TOOL_ITEMS !== 'undefined') allArrays.push(TOOL_ITEMS);
+    if (typeof SWORD_ITEMS !== 'undefined') allArrays.push(SWORD_ITEMS);
+    if (typeof BOW_ITEMS !== 'undefined') allArrays.push(BOW_ITEMS);
+    if (typeof ARMOR_ITEMS !== 'undefined') allArrays.push(ARMOR_ITEMS);
+    if (typeof SHIELD_ITEMS !== 'undefined') allArrays.push(SHIELD_ITEMS);
+    if (typeof ACCESSORY_ITEMS !== 'undefined') allArrays.push(ACCESSORY_ITEMS);
+    // Legacy arrays for backward compatibility
+    if (typeof WEAPON_ITEMS !== 'undefined') allArrays.push(WEAPON_ITEMS);
+    if (typeof JEWELRY_ITEMS !== 'undefined') allArrays.push(JEWELRY_ITEMS);
     
     allArrays.forEach(itemArray => {
         if (!itemArray) {
@@ -34,6 +83,15 @@ function initializeItemRegistry() {
             if (ALL_ITEMS[item.id]) {
                 console.warn('Duplicate item ID:', item.id, '- skipping');
                 return;
+            }
+            if (item && item.rotations) {
+                Object.keys(item.rotations).forEach(key => {
+                    const rot = item.rotations[key];
+                    if (!rot || rot.grid || (!rot.body && !rot.aura)) return;
+                    rot.grid = _buildCombinedGrid(rot.body || [[1]], rot.aura || null);
+                });
+            } else if (item && (item.body || item.aura) && !item.grid) {
+                item.grid = _buildCombinedGrid(item.body || [[1]], item.aura || null);
             }
             ALL_ITEMS[item.id] = item;
         });

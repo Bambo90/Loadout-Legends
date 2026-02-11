@@ -28,7 +28,10 @@ function createSlot(container, location, index, cols) {
         return;
     }
 
-    const shape = item.body; // Wir nutzen 'body' laut aktuellem Stand
+    const rotationIndex = typeof cell.rotationIndex === 'number' ? cell.rotationIndex : 0;
+    const shape = (typeof getItemBodyMatrix === 'function')
+        ? getItemBodyMatrix(item, rotationIndex)
+        : item.body; // Wir nutzen 'body' laut aktuellem Stand
     const rows = shape.length;
     const colsShape = shape[0].length;
 
@@ -77,7 +80,12 @@ function createSlot(container, location, index, cols) {
     auraOverlay.style.zIndex = '50';
     
     // Render die Aura-Zellen (item.aura oder standard 3x3)
-    const aura = item.aura || [[1,1,1], [1,0,1], [1,1,1]]; // Default aura wenn nicht definiert
+    let aura = (typeof getItemAuraMatrix === 'function') ? getItemAuraMatrix(item, rotationIndex) : null;
+    let useBodyBoundsForAura = true;
+    if (!aura) {
+        aura = item.aura || [[1,1,1], [1,0,1], [1,1,1]]; // Default aura wenn nicht definiert
+        if (!item.aura) useBodyBoundsForAura = false;
+    }
     const auraRows = aura.length;
     const auraColsShape = aura[0].length;
     
@@ -88,12 +96,19 @@ function createSlot(container, location, index, cols) {
     auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
     auraOverlay.style.gap = "8px";
     
-    // Offset die Aura so dass sie um die Body zentriert ist
-    // Wenn body 1x1 und aura 3x3 => offset um -1 (10px + 10px gap = 20px, aber mit gap ist es komplexer)
-    const offsetX = (colsShape - auraColsShape) / 2 * (64 + 8);
-    const offsetY = (rows - auraRows) / 2 * (64 + 8);
-    auraOverlay.style.left = offsetX + "px";
-    auraOverlay.style.top = offsetY + "px";
+    const bodyBounds = (typeof getItemBodyBounds === 'function')
+        ? getItemBodyBounds(item, rotationIndex)
+        : { minR: 0, minC: 0 };
+    const tileSize = 64 + 8;
+    if (useBodyBoundsForAura) {
+        auraOverlay.style.left = (-bodyBounds.minC * tileSize) + "px";
+        auraOverlay.style.top = (-bodyBounds.minR * tileSize) + "px";
+    } else {
+        const offsetX = (colsShape - auraColsShape) / 2 * tileSize;
+        const offsetY = (rows - auraRows) / 2 * tileSize;
+        auraOverlay.style.left = offsetX + "px";
+        auraOverlay.style.top = offsetY + "px";
+    }
     
     aura.forEach((row, r) => {
         row.forEach((cellValue, c) => {
@@ -137,8 +152,11 @@ function createSlot(container, location, index, cols) {
             fromIndex: index,
             offsetX: p ? parseInt(p.dataset.offsetX) : 0,
             offsetY: p ? parseInt(p.dataset.offsetY) : 0,
-            previewShape: item.body.map(r => [...r]), // Kopie der Matrix für Rotation
-            auraOverlay: auraOverlay  // Store reference für späteren Drag-Access
+            previewShape: (shape || [[1]]).map(r => [...r]), // Kopie der Matrix für Rotation
+            auraOverlay: auraOverlay,  // Store reference für späteren Drag-Access
+            instanceId: cell.instanceId,
+            rotatedAura: aura,
+            rotationIndex: rotationIndex
         };
 
         // Item während des Drags aus dem Grid "löschen", damit es nicht mit sich selbst kollidiert

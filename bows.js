@@ -1,4 +1,4 @@
-/* ITEM DEFINITION - BOWS (Ranged Weapons) */
+﻿/* ITEM DEFINITION - BOWS (Ranged Weapons with all 4 Rotations) */
 
 const BOW_ITEMS = [
     { 
@@ -15,18 +15,12 @@ const BOW_ITEMS = [
         accuracy: 0.85,
         desc: "Ein klassischer Holzbogen mit anständiger Reichweite.",
 
-        body: [
-            [1, 0],
-            [1, 1],
-            [1, 0]
-        ],
-
-        aura: [
-            [1, 1, 1],
-            [1, 0, 1],
-            [1, 1, 1],
-            [1, 0, 1]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'A', 'A'], ['AB', 'B', 'A'], ['AB', 'A', 'A'], ['A', '0', 'A']] },
+            1: { grid: [['A', 'A', 'A', 'A'], ['0', 'AB', '0', 'A'], ['0', 'A', '0', 'A']] },
+            2: { grid: [['A', 'B', 'A'], ['AB', 'AB', 'A'], ['A', 'B', 'A'], ['A', 'A', 'A']] },
+            3: { grid: [['A', 'B', 'A', '0'], ['AB', 'B', 'AB', '0'], ['A', 'A', 'A', 'A']] }
+        }
     },
 
     { 
@@ -37,126 +31,90 @@ const BOW_ITEMS = [
         icon: "🏹", 
         price: 180, 
         inShop: true,
-        req: 6, 
-        damage: 14,
-        attackSpeed: 1.6,
+        req: 5, 
+        damage: 13,
+        attackSpeed: 1.5,
         accuracy: 0.92,
-        piercing: 0.2,
-        desc: "Mehrschichtig aufgebaut für bessere Pfeil-Penetration.",
+        piercing: 0.15,
+        desc: "Ein moderner Bogen aus Laminate, sehr präzise.",
 
-        body: [
-            [1, 0],
-            [1, 1],
-            [1, 0],
-            [1, 0]
-        ],
-
-        aura: [
-            [1, 1, 1, 1],
-            [1, 0, 0, 1],
-            [1, 1, 1, 1],
-            [1, 0, 0, 1],
-            [1, 0, 0, 1]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'AB', 'A', 'A'], ['AB', 'B', 'B', 'AB'], ['A', '0', '0', 'A'], ['AB', 'AB', 'AB', 'AB'], ['AB', 'AB', 'A', 'A']] },
+            1: { grid: [['A', 'A', 'A', 'AB', 'A'], ['AB', 'AB', 'AB', 'AB', 'AB'], ['0', '0', '0', '0', 'A'], ['0', '0', '0', '0', 'A'], ['0', 'AB', 'AB', 'AB', 'AB']] },
+            2: { grid: [['A', 'A', 'A', 'A'], ['AB', 'B', 'B', 'AB'], ['A', '0', '0', 'A'], ['AB', 'AB', 'AB', 'AB'], ['AB', 'AB', 'A', 'A']] },
+            3: { grid: [['A', 'AB', 'AB', 'AB', 'AB'], ['AB', 'AB', 'AB', 'AB', 'A'], ['0', '0', '0', '0', 'A'], ['0', '0', '0', '0', 'A'], ['0', 'AB', 'AB', 'AB', 'AB']] }
+        }
     },
 
     { 
         id: "bow_new_3",
-        name: "Drachenarmbruster", 
+        name: "Eismondbogen", 
         type: "bow",
         rarity: "rare", 
         icon: "🏹", 
-        price: 1200, 
+        price: 850, 
         inShop: true,
-        req: 12, 
-        damage: 28,
+        req: 9, 
+        damage: 25,
         attackSpeed: 1.2,
         accuracy: 0.95,
-        armorIgnore: 0.3,
-        desc: "Eine massive Waffe, die Rüstungen durchdringt wie Papier.",
+        coldBonus: 1.2,
+        armorIgnore: 0.2,
+        desc: "Ein frostiger Bogen aus Eismithril.",
 
-        body: [
-            [1],
-            [1],
-            [1],
-            [1],
-            [1]
-        ],
-
-        aura: [
-            [1, 1, 1],
-            [1, 0, 1],
-            [1, 0, 1],
-            [1, 0, 1],
-            [1, 0, 1],
-            [1, 0, 1]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'AB', 'A', 'A', 'A'], ['AB', 'B', 'B', 'B', 'AB'], ['A', '0', '0', '0', 'A'], ['A', '0', '0', '0', 'A'], ['AB', 'B', 'B', 'B', 'AB'], ['AB', 'AB', 'A', 'A', 'A']] },
+            1: { grid: [['A', 'A', 'A', 'A', 'A', 'A'], ['AB', 'AB', 'AB', 'AB', 'AB', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', 'AB', 'AB', 'AB', 'AB', 'A']] },
+            2: { grid: [['A', 'A', 'A', 'A', 'A'], ['AB', 'B', 'B', 'B', 'AB'], ['A', '0', '0', '0', 'A'], ['A', '0', '0', '0', 'A'], ['AB', 'B', 'B', 'B', 'AB'], ['AB', 'AB', 'A', 'A', 'A']] },
+            3: { grid: [['A', 'AB', 'AB', 'AB', 'AB', 'A'], ['AB', 'AB', 'AB', 'AB', 'AB', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', 'AB', 'AB', 'AB', 'AB', 'A']] }
+        }
     },
 
     { 
         id: "bow_new_4",
-        name: "Eissturmbogen", 
+        name: "Flammenfeuer", 
         type: "bow",
         rarity: "unique", 
-        icon: "❄️", 
-        price: 4000, 
-        inShop: false, 
-        dropSources: ["frost_mage"],
+        icon: "🔥", 
+        price: 3500, 
+        inShop: false,
+        dropSources: ["phoenix", "fire_dragon"],
         dropChance: 0.07,
         req: 14, 
-        damage: 22,
-        attackSpeed: 2.2,
-        accuracy: 0.98,
-        coldBonus: 1.4,
-        desc: "Pfeile, die bei jedem Schuss Eis hinterlassen.",
+        damage: 38,
+        attackSpeed: 1.4,
+        fireBonus: 1.8,
+        desc: "Ein Bogen aus Phoenixholz, der Pfeile in Flammen verwandelt.",
 
-        body: [
-            [1, 0],
-            [1, 1],
-            [1, 0],
-            [1, 1]
-        ],
-
-        aura: [
-            [1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 1],
-            [1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 1],
-            [1, 0, 0, 0, 1]
-        ]
+        rotations: {
+            0: { grid: [['A', 'A', 'A', 'A', 'A'], ['AB', 'AB', 'B', 'B', 'AB'], ['A', '0', '0', '0', 'A'], ['A', '0', '0', '0', 'A'], ['AB', 'AB', 'B', 'B', 'AB'], ['A', 'A', 'A', 'A', 'A']] },
+            1: { grid: [['A', 'A', 'A', 'A', 'A', 'A'], ['AB', 'AB', 'AB', 'AB', 'AB', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', 'AB', 'AB', 'AB', 'AB', 'A']] },
+            2: { grid: [['A', 'A', 'A', 'A', 'A'], ['A', 'B', 'B', 'B', 'AB'], ['A', '0', '0', '0', 'A'], ['A', '0', '0', '0', 'A'], ['AB', 'AB', 'B', 'B', 'AB'], ['A', 'A', 'A', 'A', 'A']] },
+            3: { grid: [['A', 'AB', 'AB', 'AB', 'AB', 'A'], ['AB', 'AB', 'AB', 'AB', 'AB', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', 'A'], ['0', 'AB', 'AB', 'AB', 'AB', 'A']] }
+        }
     },
 
     { 
         id: "bow_new_5",
-        name: "Zeitloses Präzisions-Langbogen", 
+        name: "Dimensionriss", 
         type: "bow",
         rarity: "legendary", 
-        icon: "✨", 
+        icon: "⚡", 
         price: 18000, 
-        inShop: false, 
-        dropSources: ["time_keeper"],
+        inShop: false,
+        dropSources: ["void_archer"],
         dropChance: 0.01,
-        req: 22, 
-        damage: 45,
-        attackSpeed: 2.8,
-        accuracy: 1.0,
-        critMulti: 3.0,
-        desc: "Jeden Schuss präzise platziert, als ob die Zeit steht.",
+        req: 26, 
+        damage: 60,
+        attackSpeed: 1.6,
+        chainBonus: 2.1,
+        desc: "Ein rätselhafter Bogen, der zwischen Dimensionen reht.",
 
-        body: [
-            [1, 0],
-            [1, 1],
-            [1, 0],
-            [1, 1],
-            [1, 0]
-        ],
-
-        aura: [
-            [1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1]
-        ]
+        rotations: {
+            0: { grid: [['A', 'A', 'A', 'A', 'A', 'A'], ['AB', 'AB', 'B', 'B', '0', 'AB'], ['A', '0', '0', '0', '0', 'A'], ['A', '0', '0', '0', '0', 'A'], ['AB', 'AB', 'B', 'B', '0', 'AB'], ['AB', 'A', 'B', 'B', '0', 'A'], ['AB', 'A', 'B', 'B', '0', 'A']] },
+            1: { grid: [['A', 'A', 'A', 'A', 'A', 'A', 'A'], ['AB', 'AB', 'AB', 'AB', 'AB', 'AB', 'A'], ['0', '0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', '0', 'A'], ['0', 'AB', 'AB', 'AB', 'AB', 'AB', 'A']] },
+            2: { grid: [['A', 'A', 'A', 'A', 'A', 'A'], ['A', 'B', 'B', 'B', '0', 'AB'], ['A', '0', '0', '0', '0', 'A'], ['A', '0', '0', '0', '0', 'A'], ['AB', 'AB', 'B', 'B', '0', 'AB'], ['AB', 'A', 'B', 'B', '0', 'A'], ['AB', 'A', 'B', 'B', '0', 'A']] },
+            3: { grid: [['A', 'AB', 'AB', 'AB', 'AB', 'AB', 'A'], ['AB', 'AB', 'AB', 'AB', 'AB', 'AB', 'A'], ['0', '0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', '0', 'A'], ['0', '0', '0', '0', '0', '0', 'A'], ['0', 'AB', 'AB', 'AB', 'AB', 'AB', 'A']] }
+        }
     }
 ];

@@ -24,11 +24,14 @@ function normalizeGridInstances(grid, cols) {
         const item = getItemById(cell.itemId);
         if (!item) return;
         // Always use body shape (never aura) to ensure placement is valid
-        const shape = item.body || [[1]];
+        const rotationIndex = typeof cell.rotationIndex === 'number' ? cell.rotationIndex : 0;
+        const shape = (typeof getItemBodyMatrix === 'function')
+            ? getItemBodyMatrix(item, rotationIndex)
+            : (item.body || [[1]]);
         const shapeCopy = shape.map(r => [...r]);
         const instanceId = cell.instanceId;
         const rotatedAura = cell.rotatedAura || null; // Preserve rotated aura if it was stored
-        placeItemIntoGrid(newGrid, k, item, shapeCopy, cols, instanceId, null, rotatedAura);
+        placeItemIntoGrid(newGrid, k, item, shapeCopy, cols, instanceId, null, rotatedAura, rotationIndex);
     });
 
     return newGrid;

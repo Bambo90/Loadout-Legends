@@ -1,4 +1,4 @@
-/* ITEM DEFINITION - ACCESSORIES (Jewelry & Talismans) */
+﻿/* ITEM DEFINITION - ACCESSORIES (Jewelry & Talismans with all 4 Rotations) */
 
 const ACCESSORY_ITEMS = [
     { 
@@ -13,16 +13,12 @@ const ACCESSORY_ITEMS = [
         life: 10,
         desc: "Ein einfacher Kupferring mit lebenssteigernden Eigenschaften.",
 
-        body: [
-            [1, 1],
-            [1, 1]
-        ],
-
-        aura: [
-            [1, 1, 1],
-            [1, 0, 1],
-            [1, 1, 1]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            1: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            2: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            3: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] }
+        }
     },
 
     { 
@@ -34,118 +30,78 @@ const ACCESSORY_ITEMS = [
         price: 140, 
         inShop: true,
         req: 4, 
-        mana: 25,
-        willpower: 0.10,
-        desc: "Ein kunstvoll gearbeiteter Silberring für magische Nutzer.",
+        mana: 15,
+        magicBonus: 1.12,
+        desc: "Ein feiner Silberring mit mystischen Eigenschaften.",
 
-        body: [
-            [1, 1],
-            [1, 1]
-        ],
-
-        aura: [
-            [1, 1, 1, 1],
-            [1, 0, 0, 1],
-            [1, 0, 0, 1],
-            [1, 1, 1, 1]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            1: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            2: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            3: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] }
+        }
     },
 
     { 
-        id: "acc_new_necklace_1",
-        name: "Amberkette", 
+        id: "acc_new_ring_3",
+        name: "Goldring der Macht", 
         type: "accessory",
         rarity: "rare", 
-        icon: "🔻", 
-        price: 550, 
+        icon: "💍", 
+        price: 600, 
         inShop: true,
         req: 7, 
-        allResist: 0.08,
-        lifeRegen: 0.5,
-        desc: "Eine alte Kette aus fossilem Bernstein mit Schutz und Regeneration.",
+        life: 30,
+        mana: 25,
+        damageBonus: 1.15,
+        desc: "Ein prächtiger Goldring voller Kraft.",
 
-        body: [
-            [0, 1, 0],
-            [1, 1, 1],
-            [0, 1, 0]
-        ],
-
-        aura: [
-            [1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 1],
-            [1, 0, 0, 0, 1],
-            [1, 0, 0, 0, 1],
-            [1, 1, 1, 1, 1]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            1: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            2: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            3: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] }
+        }
     },
 
     { 
-        id: "acc_new_amulet_1",
-        name: "Amulett der Sternenhüter", 
+        id: "acc_new_brooch_1",
+        name: "Einfache Schließe", 
         type: "accessory",
-        rarity: "unique", 
-        icon: "✨", 
-        price: 2800, 
-        inShop: false, 
-        dropSources: ["celestial_oracle"],
-        dropChance: 0.04,
-        req: 10, 
-        life: 50,
-        mana: 40,
-        allResist: 0.12,
-        critChance: 0.05,
-        desc: "Ein glanzvoles Amulett, das Sternenlicht in Kraft umwandelt.",
+        rarity: "common", 
+        icon: "🔌", 
+        price: 25, 
+        inShop: true,  
+        req: 1, 
+        defense: 3,
+        desc: "Eine verstärkte Schließe für jede Robe.",
 
-        body: [
-            [0, 1, 0],
-            [1, 1, 1],
-            [0, 1, 0],
-            [0, 1, 0]
-        ],
-
-        aura: [
-            [1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1],
-            [0, 1, 0, 0, 1, 0],
-            [0, 1, 0, 0, 1, 0]
-        ]
+        rotations: {
+            0: { grid: [['A', 'A', 'A'], ['A', 'B', 'A'], ['A', 'A', 'A']] },
+            1: { grid: [['A', '0', 'A'], ['A', 'B', 'A'], ['A', 'A', 'A']] },
+            2: { grid: [['A', 'A', 'A'], ['A', 'B', 'A'], ['A', '0', 'A']] },
+            3: { grid: [['A', 'A', 'A'], ['A', 'B', 'A'], ['A', '0', 'A']] }
+        }
     },
 
     { 
-        id: "acc_new_crown_1",
-        name: "Krone der Ewigkeit", 
+        id: "acc_new_brooch_2",
+        name: "Verzierte Schließe", 
         type: "accessory",
-        rarity: "legendary", 
-        icon: "👑", 
-        price: 22000, 
-        inShop: false, 
-        dropSources: ["eternal_monarch"],
-        dropChance: 0.01,
-        req: 23, 
-        life: 150,
-        mana: 100,
-        allResist: 0.25,
-        damageBonus: 0.20,
-        critMulti: 1.5,
-        desc: "Die legendäre Krone, die jedem Träger unendliche Macht verleiht.",
+        rarity: "magic", 
+        icon: "🔌", 
+        price: 120, 
+        inShop: true,
+        req: 5, 
+        defense: 6,
+        evasion: 0.1,
+        desc: "Eine kunstvoll gestaltete Schließe.",
 
-        body: [
-            [0, 1, 0],
-            [1, 1, 1],
-            [1, 0, 1],
-            [1, 1, 1]
-        ],
-
-        aura: [
-            [1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [0, 1, 1, 1, 1, 1, 0]
-        ]
+        rotations: {
+            0: { grid: [['A', 'A', 'A'], ['A', 'B', 'A'], ['A', 'A', 'A']] },
+            1: { grid: [['A', '0', 'A'], ['A', 'B', 'A'], ['A', 'A', 'A']] },
+            2: { grid: [['A', 'A', 'A'], ['A', 'B', 'A'], ['A', '0', 'A']] },
+            3: { grid: [['A', 'A', 'A'], ['A', 'B', 'A'], ['A', '0', 'A']] }
+        }
     }
 ];

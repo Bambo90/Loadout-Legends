@@ -65,13 +65,16 @@ function hideAllAuras() {
 }
 window.hideAllAuras = hideAllAuras;
 
-function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previewShape, sourceElem, startEvent, instanceId, rotatedAura) {
+function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previewShape, sourceElem, startEvent, instanceId, rotatedAura, rotationIndex) {
     if (!item) return;
     // Ensure any existing drag cleaned
     if (draggedItem) return;
 
-    // CRITICAL: Always use item.body, NEVER previewShape (which might contain aura)
-    const baseShape = item.body;
+    // CRITICAL: Always use item body, NEVER previewShape (which might contain aura)
+    const initialRotationIndex = (typeof rotationIndex === 'number') ? rotationIndex : 0;
+    const baseShape = (typeof getItemBodyMatrix === 'function')
+        ? getItemBodyMatrix(item, initialRotationIndex)
+        : item.body;
     if (!baseShape) {
         console.error('❌ Item has no body shape!', item.id);
         return;
@@ -83,7 +86,10 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         offsetX: offsetX || 0,
         offsetY: offsetY || 0,
         previewShape: baseShape.map(r => [...r]),
-        rotatedAura: rotatedAura || null, // Preserve rotation from grid if exists
+        rotatedAura: (typeof getItemAuraMatrix === 'function')
+            ? getItemAuraMatrix(item, initialRotationIndex)
+            : (rotatedAura || null),
+        rotationIndex: initialRotationIndex,
         instanceId: instanceId // Store instance ID for tracking
     };
 
@@ -141,7 +147,9 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     
     // ADD AURA OVERLAY FIRST (behind icon)
     // Use rotated aura if available (when picking up rotated item)
-    const aura = draggedItem.rotatedAura || item.aura;
+    const aura = (typeof getItemAuraMatrix === 'function')
+        ? getItemAuraMatrix(item, draggedItem.rotationIndex)
+        : (draggedItem.rotatedAura || item.aura);
     if (aura) {
         const auraOverlay = document.createElement('div');
         auraOverlay.className = 'aura-overlay';
@@ -161,9 +169,12 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
         auraOverlay.style.gap = '8px';
         
-        // Center aura around body
-        const offsetX = (cols - auraCols) / 2 * (64 + 8);
-        const offsetY = (rows - auraRows) / 2 * (64 + 8);
+        // Align aura using body bounds inside the combined grid
+        const bounds = (typeof getItemBodyBounds === 'function')
+            ? getItemBodyBounds(item, draggedItem.rotationIndex)
+            : { minR: 0, minC: 0 };
+        const offsetX = -bounds.minC * (64 + 8);
+        const offsetY = -bounds.minR * (64 + 8);
         auraOverlay.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
         
         aura.forEach((row, r) => {
@@ -204,6 +215,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
     // Function to rebuild follow element visuals when shape changes (e.g., rotation)
     window._updateFollowElement = function() {
+        console.log('🎨 _updateFollowElement called: draggedItem=' + (draggedItem ? draggedItem.item.id : 'null') + ' rotIndex=' + (draggedItem ? draggedItem.rotationIndex : '?'));
         if (!draggedItem || !_customFollowEl) return;
         const shape = draggedItem.previewShape || [[1]];
         const rows = shape.length;
@@ -240,7 +252,9 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         _customFollowEl.appendChild(gridWrapper);
         
         // ADD AURA OVERLAY (using rotated aura if available)
-        const aura = draggedItem.rotatedAura || draggedItem.item.aura;
+        const aura = (typeof getItemAuraMatrix === 'function')
+            ? getItemAuraMatrix(draggedItem.item, draggedItem.rotationIndex)
+            : (draggedItem.rotatedAura || draggedItem.item.aura);
         if (aura) {
             const auraOverlay = document.createElement('div');
             auraOverlay.className = 'aura-overlay';
@@ -260,9 +274,12 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
             auraOverlay.style.gap = '8px';
             
-            // Center aura around body
-            const offsetX = (cols - auraCols) / 2 * (64 + 8);
-            const offsetY = (rows - auraRows) / 2 * (64 + 8);
+            // Align aura using body bounds inside the combined grid
+            const bounds = (typeof getItemBodyBounds === 'function')
+                ? getItemBodyBounds(draggedItem.item, draggedItem.rotationIndex)
+                : { minR: 0, minC: 0 };
+            const offsetX = -bounds.minC * (64 + 8);
+            const offsetY = -bounds.minR * (64 + 8);
             auraOverlay.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
             
             aura.forEach((row, r) => {
@@ -442,8 +459,20 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             if (draggedItem) {
                 if (gameData[draggedItem.fromLocation]) {
                     const fromCols = draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE;
-                    const restoreShape = draggedItem.item?.body || draggedItem.previewShape;
-                    placeItemIntoGrid(gameData[draggedItem.fromLocation], draggedItem.fromIndex, draggedItem.item, restoreShape, fromCols, draggedItem.instanceId, null, draggedItem.rotatedAura || null);
+                    const restoreShape = (typeof getItemBodyMatrix === 'function')
+                        ? getItemBodyMatrix(draggedItem.item, draggedItem.rotationIndex || 0)
+                        : (draggedItem.item?.body || draggedItem.previewShape);
+                    placeItemIntoGrid(
+                        gameData[draggedItem.fromLocation],
+                        draggedItem.fromIndex,
+                        draggedItem.item,
+                        restoreShape,
+                        fromCols,
+                        draggedItem.instanceId,
+                        null,
+                        draggedItem.rotatedAura || null,
+                        draggedItem.rotationIndex
+                    );
                 }
                 draggedItem = null;
                 try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }

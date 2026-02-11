@@ -1,4 +1,4 @@
-/* ITEM DEFINITION - TOOLS (Body + Aura vorbereitet) */
+﻿/* ITEM DEFINITION - TOOLS (Body + Aura vorbereitet) */
 
 const TOOL_ITEMS = [
     { 
@@ -13,13 +13,12 @@ const TOOL_ITEMS = [
         speedBonus: 1.05, 
         desc: "Besser als mit den Händen zu graben.",
 
-        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
-
-        aura: [
-            [1, 1, 1],
-            [0, 1, 0],
-            [0, 1, 0]
-        ]  // Pickaxt-Form (visuelle Synergy-Zone)
+        rotations: {
+            0: { grid: [['A','A','A'], ['0','B','0'], ['0','A','0']] },
+            1: { grid: [['0','0','A'], ['A','B','A'], ['0','0','A']] },
+            2: { grid: [['0','A','0'], ['0','B','0'], ['A','A','A']] },
+            3: { grid: [['A','0','0'], ['A','B','A'], ['A','0','0']] }
+        }
     },
 
     { 
@@ -34,13 +33,12 @@ const TOOL_ITEMS = [
         speedBonus: 1.20, 
         desc: "Solider Stahl für ehrliche Arbeit.",
 
-        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
-
-        aura: [
-            [1, 1, 1],
-            [0, 1, 0],
-            [0, 1, 0]
-        ]  // Pickaxt-Form (visuelle Synergy-Zone)
+        rotations: {
+            0: { grid: [['A','A','A'], ['0','B','0'], ['0','A','0']] },
+            1: { grid: [['0','0','A'], ['A','B','A'], ['0','0','A']] },
+            2: { grid: [['0','A','0'], ['0','B','0'], ['A','A','A']] },
+            3: { grid: [['A','0','0'], ['A','B','A'], ['A','0','0']] }
+        }
     },
 
     { 
@@ -55,13 +53,12 @@ const TOOL_ITEMS = [
         speedBonus: 1.45, 
         desc: "Damit knackst du jeden Fels.",
 
-        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
-
-        aura: [
-            [1, 1, 1],
-            [0, 1, 0],
-            [0, 1, 0]
-        ]  // Pickaxt-Form (visuelle Synergy-Zone)
+        rotations: {
+            0: { grid: [['A','A','A'], ['0','B','0'], ['0','A','0']] },
+            1: { grid: [['0','0','A'], ['A','B','A'], ['0','0','A']] },
+            2: { grid: [['0','A','0'], ['0','B','0'], ['A','A','A']] },
+            3: { grid: [['A','0','0'], ['A','B','A'], ['A','0','0']] }
+        }
     },
 
     { 
@@ -78,13 +75,12 @@ const TOOL_ITEMS = [
         speedBonus: 1.80, 
         desc: "Glänzt und arbeitet fast von allein.",
 
-        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
-
-        aura: [
-            [1, 1, 1],
-            [0, 1, 0],
-            [0, 1, 0]
-        ]  // Pickaxt-Form (visuelle Synergy-Zone)
+        rotations: {
+            0: { grid: [['A','A','A'], ['0','B','0'], ['0','A','0']] },
+            1: { grid: [['0','0','A'], ['A','B','A'], ['0','0','A']] },
+            2: { grid: [['0','A','0'], ['0','B','0'], ['A','A','A']] },
+            3: { grid: [['A','0','0'], ['A','B','A'], ['A','0','0']] }
+        }
     },
 
     { 
@@ -101,12 +97,11 @@ const TOOL_ITEMS = [
         speedBonus: 2.50, 
         desc: "Ein Relikt aus alter Zeit.",
 
-        body: [[1]],  // CRITICAL: Body ONLY - 1x1 center cell
-
-        aura: [
-            [1, 1, 1],
-            [0, 1, 0],
-            [0, 1, 0]
-        ]  // Pickaxt-Form (visuelle Synergy-Zone)
+        rotations: {
+            0: { grid: [['A','A','A'], ['0','B','0'], ['0','A','0']] },
+            1: { grid: [['0','0','A'], ['A','B','A'], ['0','0','A']] },
+            2: { grid: [['0','A','0'], ['0','B','0'], ['A','A','A']] },
+            3: { grid: [['A','0','0'], ['A','B','A'], ['A','0','0']] }
+        }
     }
 ];

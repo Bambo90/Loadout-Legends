@@ -79,7 +79,7 @@ function canPlaceItem(grid, originIndex, shape, cols, maxRows) {
     return true;
 }
 
-function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId, maxRowsOverride, rotatedAura) {
+function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId, maxRowsOverride, rotatedAura, rotationIndex) {
     // If no instanceId provided, generate a new one
     if (!instanceId) {
         instanceId = generateInstanceId();
@@ -153,6 +153,9 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId, max
             if (isRoot && rotatedAura) {
                 grid[idx].rotatedAura = rotatedAura.map(r => [...r]);
                 console.log('  🔄 Stored rotated aura:', JSON.stringify(rotatedAura));
+            }
+            if (isRoot && typeof rotationIndex === 'number') {
+                grid[idx].rotationIndex = rotationIndex;
             }
 
             if (isRoot) {

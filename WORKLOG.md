@@ -15,6 +15,27 @@ Session Close Checklist (what assistant will remind you to do besides saving):
 
 ## Entries
 
+### 2026-02-12 Session (AI)
+- **Summary**: Converted grid system from string-flag format (`'b'`, `'a'`) to single-character flags (`'B'`, `'A'`, `'AB'`, `'0'`). Cleaner data structure. All helpers in itemsEngine.js and itemRegistry.js updated to read/write new flags. Item data stays in legacy format (body/aura arrays); auto-conversion at startup generates flagged grids.
+- **Architecture**:
+  - **`_buildCombinedGrid(body, aura)`**: Creates single matrix. Body cells → `'B'`, aura cells → `'A'`, both → `'AB'`, empty → `'0'`.
+  - **`getItemBodyMatrix(item, rot)`**: Extracts body by reading all cells with `'B'` or `'AB'`.
+  - **`getItemAuraMatrix(item, rot)`**: Extracts aura by reading all cells with `'A'` or `'AB'`.
+  - **`getItemBodyBounds(item, rot)`**: Finds bounding box of body cells (for placement sizing).
+  - Rotation grids stored in `item.grid` (rot 0) or `rotations[*].grid` (rot 1-3); extracted on-demand.
+- **Files modified**: itemsEngine.js, itemRegistry.js. Future-proof for flags like `'Bs'` (body+socket).
+- **Testing artifacts created**:
+  - GRID_CONVERSION_GUIDE.md (architecture & manual conversion examples)
+  - GRID_CONVERSION_MANUAL_VERIFICATION.txt (hand-traced logic for 2 examples — pickaxe & sword)
+  - BROWSER_TEST_GRIDS.js (paste in console to test live conversion)
+- **Next**: Manually test in-browser. If grid rendering works, move to placement/rotation tests. Can optionally manually convert tools.js/swords.js to explicit grids if desired.
+
+### 2026-02-11 21:15:00 (AI)
+- **Summary**: Recovered single-grid pipeline. Added rotationIndex persistence in grid placement and save normalization. Updated workshop/custom drag rendering to use single-grid helpers and align aura using body bounds. Added registry safety for missing item arrays and runtime conversion of body/aura into combined grid matrices (item.grid / rotations[*].grid). Icon remains separate overlay.
+- **Key files touched**: itemRegistry.js, itemsEngine.js, gridEngine.js, dragdropengine.js, saveengine.js, script.js, customDrag.js, workshopEngine.js, gridRenderer.js.
+- **Open**: Verify shop + Ausruestungszentrum populate, test rotation/drag in grids, confirm aura alignment with rotated items. If anything off, finish remaining render/drag flow tweaks.
+- **Next**: Run a quick manual test pass and then optionally convert item data to explicit grids (if you want to remove body/aura fields).
+
 ### 2026-02-10 12:00:00 (AI)
 - **Summary**: Merged local repo with remote, resolved 14 add/add conflicts by keeping local versions. Pushed to GitHub. Created release v0.1.0 and CI workflow. Added `customDrag.js`, queued render fixes, and Electron scaffold.
 - **Next**: Continue with game features (items/skills/monsters). The assistant will update this file at session boundaries if `AI_AUTOMATIC_UPDATE` is present.

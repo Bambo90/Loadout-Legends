@@ -1,4 +1,4 @@
-/* ITEM DEFINITION - SHIELDS (Blocking/Defense) */
+﻿/* ITEM DEFINITION - SHIELDS (Defense with all 4 Rotations) */
 
 const SHIELD_ITEMS = [
     { 
@@ -10,23 +10,16 @@ const SHIELD_ITEMS = [
         price: 40, 
         inShop: true,  
         req: 2, 
-        blockChance: 0.15,
-        blockValue: 8,
-        desc: "Ein einfacher Schild, der einige Treffer abhält.",
+        defense: 8,
+        blockChance: 0.1,
+        desc: "Ein verstärkter Holzschild für Anfänger.",
 
-        body: [
-            [1, 1],
-            [1, 1],
-            [1, 1]
-        ],
-
-        aura: [
-            [1, 1, 1, 1],
-            [1, 0, 0, 1],
-            [1, 0, 0, 1],
-            [1, 0, 0, 1],
-            [0, 1, 1, 0]
-        ]
+        rotations: {
+            0: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            1: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            2: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            3: { grid: [['AB', 'AB', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] }
+        }
     },
 
     { 
@@ -37,132 +30,63 @@ const SHIELD_ITEMS = [
         icon: "🛡️", 
         price: 160, 
         inShop: true,
-        req: 5, 
-        blockChance: 0.22,
-        blockValue: 16,
-        lifeRegenBlock: 0.05,
-        desc: "Verstärkter Eisenschild mit Lebensregeneration beim Blocken.",
+        req: 4, 
+        defense: 16,
+        blockChance: 0.18,
+        evasion: -0.05,
+        desc: "Ein solider Schild aus Eisen.",
 
-        body: [
-            [1, 1],
-            [1, 1],
-            [1, 1],
-            [1, 1]
-        ],
-
-        aura: [
-            [1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 1],
-            [1, 0, 0, 0, 1],
-            [1, 0, 0, 0, 1],
-            [1, 0, 0, 0, 1],
-            [0, 1, 1, 1, 0]
-        ]
+        rotations: {
+            0: { grid: [['A', 'A', 'A', 'A', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', 'A', 'A', 'A', 'A']] },
+            1: { grid: [['A', 'A', 'A'], ['AB', 'B', 'A'], ['AB', 'B', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] },
+            2: { grid: [['A', 'A', 'A', 'A', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', 'A', 'A', 'A', 'A']] },
+            3: { grid: [['A', 'A', 'A'], ['AB', 'B', 'A'], ['AB', 'B', 'A'], ['AB', 'B', 'A'], ['A', 'A', 'A']] }
+        }
     },
 
     { 
         id: "shield_new_3",
-        name: "Kriegsschild des Erbauers", 
+        name: "Drachenschild", 
         type: "shield",
         rarity: "rare", 
         icon: "🛡️", 
         price: 900, 
         inShop: true,
-        req: 9, 
-        blockChance: 0.30,
-        blockValue: 32,
-        counterAttack: 0.1,
-        desc: "Massiver Schild mit Gegenschlag-Chance.",
+        req: 10, 
+        defense: 28,
+        blockChance: 0.28,
+        physicalReduction: 0.15,
+        desc: "Ein prächtiger Schild aus Drachenpanzern.",
 
-        body: [
-            [1],
-            [1],
-            [1],
-            [1],
-            [1]
-        ],
-
-        aura: [
-            [1, 1, 1, 1],
-            [1, 0, 0, 1],
-            [1, 0, 0, 1],
-            [1, 0, 0, 1],
-            [1, 0, 0, 1],
-            [1, 0, 0, 1],
-            [0, 1, 1, 0]
-        ]
+        rotations: {
+            0: { grid: [['A', 'A', 'A', 'A', 'A', 'A', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A', 'A']] },
+            1: { grid: [['A', 'A', 'A', 'A', 'A', 'A', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A', 'A']] },
+            2: { grid: [['A', 'A', 'A', 'A', 'A', 'A', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A', 'A']] },
+            3: { grid: [['A', 'A', 'A', 'A', 'A', 'A', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A', 'A']] }
+        }
     },
 
     { 
         id: "shield_new_4",
-        name: "Mondkristall-Schutzschild", 
+        name: "Kristallschild", 
         type: "shield",
         rarity: "unique", 
-        icon: "🌙", 
-        price: 3500, 
-        inShop: false, 
-        dropSources: ["lunar_guardian"],
-        dropChance: 0.05,
+        icon: "💎", 
+        price: 4000, 
+        inShop: false,
+        dropSources: ["crystal_golem"],
+        dropChance: 0.04,
         req: 13, 
+        defense: 35,
         blockChance: 0.35,
-        blockValue: 24,
-        magicAbsorption: 0.15,
-        desc: "Ein Schild, der Mondenergie in Schutz umwandelt.",
+        magicReduction: 0.2,
+        desc: "Ein wunderschöner Schild aus reinem Kristall.",
 
-        body: [
-            [1, 1],
-            [1, 1],
-            [1, 1],
-            [1, 1],
-            [1, 1]
-        ],
-
-        aura: [
-            [1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1],
-            [0, 1, 1, 1, 1, 0]
-        ]
-    },
-
-    { 
-        id: "shield_new_5",
-        name: "Unzerstörbarer Wall Guardian", 
-        type: "shield",
-        rarity: "legendary", 
-        icon: "⚔️", 
-        price: 25000, 
-        inShop: false, 
-        dropSources: ["immortal_sentinel"],
-        dropChance: 0.01,
-        req: 26, 
-        blockChance: 0.50,
-        blockValue: 60,
-        counterAttack: 0.3,
-        allDamageReduction: 0.1,
-        desc: "Der legendäre Schild, der mit jedem Block stärker wird.",
-
-        body: [
-            [1, 1],
-            [1, 1],
-            [1, 1],
-            [1, 1],
-            [1, 1],
-            [1, 1]
-        ],
-
-        aura: [
-            [1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1],
-            [0, 1, 1, 1, 1, 1, 0]
-        ]
+        rotations: {
+            0: { grid: [['A', 'A', 'A', 'A', 'A', 'A', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', 'B', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', 'A', '0']] },
+            1: { grid: [['A', 'A', 'A', 'A'], ['AB', 'B', 'B', 'A'], ['AB', 'B', 'B', 'A'], ['AB', 'B', 'B', 'A'], ['A', '0', '0', 'A'], ['0', 'A', 'A', 'A']] },
+            2: { grid: [['0', 'A', 'A', 'A', 'A', 'A', '0'], ['A', '0', '0', 'B', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A', 'A']] },
+            3: { grid: [['A', 'A', 'A', 'A'], ['A', 'B', 'B', 'AB'], ['A', 'B', 'B', 'AB'], ['A', 'B', 'B', 'AB'], ['A', '0', '0', 'A'], ['A', 'A', 'A', 'A']] }
+        }
     }
 ];
