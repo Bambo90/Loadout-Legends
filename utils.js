@@ -3,9 +3,10 @@ function getBankCols() {
     try {
         const workshopContent = document.querySelector('.workshop-content');
         const storageMode = (workshopContent && workshopContent.classList.contains('storage-mode')) || currentWorkshop === 'storage';
-        return storageMode ? 10 : 6;
+        // Keep bank at 10 columns in all modes for consistent layout
+        return storageMode ? 10 : 10;
     } catch (err) {
-        return 6;
+        return 10;
     }
 }
 

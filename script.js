@@ -551,6 +551,8 @@ function renderWorkshopGrids() {
     // Bank Grid - always use centralized bank columns (storage-mode or compact)
     const bankCols = getBankCols();
     bankGrid.innerHTML = '';
+    // Keep CSS width aligned with runtime column count
+    try { bankGrid.style.setProperty('--bank-cols', bankCols); } catch (err) {}
     for (let i = 0; i < BANK_SLOTS; i++) {
         createSlot(bankGrid, 'bank', i, bankCols);
     }

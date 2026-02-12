@@ -434,29 +434,16 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             colsUnder = (typeof getBankCols === 'function') ? getBankCols() : 6;
             geoUnder = getCellGeometry(document.getElementById('bank-grid') || document.body, colsUnder);
         }
-        // Snap follow element to nearest cell to avoid subpixel tearing across displays
         try {
-            const containerEl = gridEl || document.getElementById('bank-grid') || document.body;
-            const rect = containerEl.getBoundingClientRect();
-            const relX = clientX - rect.left;
-            const relY = clientY - rect.top;
-            const col = Math.max(0, Math.min((colsUnder || 1) - 1, Math.round(relX / geoUnder.cellW)));
-            const row = Math.max(0, Math.min(Math.ceil((containerEl === document.body ? window.innerHeight : containerEl.clientHeight) / geoUnder.cellH) - 1, Math.round(relY / geoUnder.cellH)));
-            const px = Math.round(rect.left + (col * geoUnder.cellW) - (curOffsetX * geoUnder.cellW));
-            const py = Math.round(rect.top + (row * geoUnder.cellH) - (curOffsetY * geoUnder.cellH));
+            const px = Math.round(clientX - (curOffsetX * geoUnder.cellW));
+            const py = Math.round(clientY - (curOffsetY * geoUnder.cellH));
             if (_customFollowEl) {
                 _customFollowEl.style.left = px + 'px';
                 _customFollowEl.style.top = py + 'px';
                 _customFollowEl.style.willChange = 'left, top, transform';
             }
         } catch (e) {
-            // fallback to best-effort positioning
-            const px = Math.round(clientX - (curOffsetX * geoUnder.cellW));
-            const py = Math.round(clientY - (curOffsetY * geoUnder.cellH));
-            if (_customFollowEl) {
-                _customFollowEl.style.left = px + 'px';
-                _customFollowEl.style.top = py + 'px';
-            }
+            // ignore
         }
     };
 

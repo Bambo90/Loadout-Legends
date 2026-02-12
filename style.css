@@ -484,16 +484,18 @@ body {
     padding: 15px; 
     border: 2px solid #333; 
     border-radius: 12px; 
-    width: calc(10 * 64px + 9 * 8px + 30px); 
+    width: auto;
+    max-width: 100%;
     margin: 0 auto; 
     box-sizing: border-box;
 }
 
 #bank-grid {
-    grid-template-columns: repeat(10, var(--slot-size)) !important;
-    grid-auto-rows: var(--slot-size) !important;
-    width: calc(10 * 64px + 9 * 8px + 35px) !important;
-    height: calc(10 * var(--slot-size) + 9 * 12px) !important;
+    --bank-cols: 10;
+    grid-template-columns: repeat(var(--bank-cols), var(--slot-size));
+    grid-auto-rows: var(--slot-size);
+    width: calc((var(--bank-cols) * var(--slot-size)) + ((var(--bank-cols) - 1) * 8px) + 30px);
+    height: calc(10 * var(--slot-size) + 9 * 8px + 30px);
     overflow-y: auto !important;
     overflow-x: hidden !important;
     box-sizing: border-box !important;
@@ -506,10 +508,10 @@ body {
 }
 
 #active-setup-grid {
-    grid-template-columns: repeat(10, var(--slot-size)) !important;
-    grid-auto-rows: var(--slot-size) !important;
-    width: calc(10 * 64px + 9 * 8px + 35px) !important;
-    height: 747px !important;
+    grid-template-columns: repeat(10, var(--slot-size));
+    grid-auto-rows: var(--slot-size);
+    width: calc(10 * var(--slot-size) + 9 * 8px + 30px);
+    height: calc(10 * var(--slot-size) + 9 * 8px + 30px);
     overflow: hidden !important;
     box-sizing: border-box !important;
 }
