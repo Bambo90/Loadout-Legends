@@ -9,4 +9,10 @@ echo "$LAST_MSG" | grep -q "Worklog:" && exit 0
 
 SHORT=$(git rev-parse --short HEAD)
 MSG="Auto: commit ${SHORT}"
-node "$(git rev-parse --show-toplevel)/update_worklog.js" "$MSG" --no-commit || true
+ROOT=$(git rev-parse --show-toplevel)
+WORKLOG_SCRIPT="$ROOT/update_worklog.js"
+if [ -f "$WORKLOG_SCRIPT" ]; then
+	node "$WORKLOG_SCRIPT" "$MSG" --no-commit || true
+else
+	echo "post-commit: update_worklog.js not found, skipping."
+fi

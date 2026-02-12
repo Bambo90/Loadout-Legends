@@ -20,7 +20,7 @@ const storageState = {
  * CATEGORY MAPPING
  * Maps item types to categories for filtering
  */
-const ITEM_CATEGORIES = {
+const STORAGE_ITEM_CATEGORIES = {
     weapon: ['sword', 'bow', 'weapon'],
     armor: ['armor', 'shield'],
     accessory: ['accessory', 'jewelry'],
@@ -44,7 +44,7 @@ const RARITY_ORDER = {
  * Get category for an item type
  */
 function getItemCategory(itemType) {
-    for (const [category, types] of Object.entries(ITEM_CATEGORIES)) {
+    for (const [category, types] of Object.entries(STORAGE_ITEM_CATEGORIES)) {
         if (types.includes(itemType)) return category;
     }
     return 'material'; // Default fallback
@@ -147,7 +147,7 @@ function autoSortStorage(gridKey) {
     });
     
     // Clear grid
-    const cols = gridKey === 'bank' ? 6 : 10;
+    const cols = gridKey === 'bank' ? getBankCols() : GRID_SIZE;
     for (const key of Object.keys(grid)) {
         delete grid[key];
     }
@@ -272,7 +272,7 @@ function executeBulkSell(gridKey) {
     if (!confirm(confirmMsg)) return;
     
     // Remove items from grid
-    const cols = gridKey === 'bank' ? 6 : 10;
+    const cols = gridKey === 'bank' ? getBankCols() : GRID_SIZE;
     for (const sold of soldItems) {
         removeItemFromGrid(grid, sold.instanceId, cols);
     }
@@ -358,10 +358,7 @@ function setStorageSearch(query) {
  * Called after renderWorkshopGrids() completes
  */
 function applyStorageFilters() {
-    // Only apply filters in storage mode
-    if (typeof currentWorkshop === 'undefined' || currentWorkshop !== 'storage') {
-        return;
-    }
+    // Apply filters to bank grid in any workshop mode (so Storage behaves identically everywhere)
     
     const bankGrid = document.getElementById('bank-grid');
     if (!bankGrid || !gameData.bank) return;
@@ -406,19 +403,21 @@ function applyStorageFilters() {
             }
         }
         
-        // Also hide the parent slot if item is hidden
+        // Keep the slot in the DOM to preserve grid geometry; hide only the item visuals.
         const slot = itemEl.closest('.grid-slot');
         if (slot) {
-            slot.style.display = shouldShow ? 'block' : 'none';
+            slot.style.visibility = shouldShow ? 'visible' : 'visible'; // keep slot visible
+            slot.style.pointerEvents = shouldShow ? 'auto' : 'none';
         }
-        
-        itemEl.style.display = shouldShow ? 'block' : 'none';
+        itemEl.style.visibility = shouldShow ? 'visible' : 'hidden';
+        itemEl.style.pointerEvents = shouldShow ? 'auto' : 'none';
     });
     
+    const visibleCount = Array.from(bankGrid.querySelectorAll('.item')).filter(el => el.style.visibility !== 'hidden').length;
     console.log('🔍 Applied storage filters:', {
         filter: storageState.activeFilter,
         search: storageState.searchQuery,
-        visibleItems: bankGrid.querySelectorAll('.item[style*="display: block"]').length
+        visibleItems: visibleCount
     });
 }
 

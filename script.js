@@ -113,15 +113,33 @@ function renderPreviewGrid(containerId, gridKey) {
         const cellData = gameData[gridKey][i];
         // FIX: Wir prüfen auf cellData.itemId, falls 'root' mal fehlt
         if (cellData && cellData.itemId) {
-            // Wir rendern in der Vorschau nur das Icon am Ankerpunkt
-            if (cellData.root || i === 0) { 
+            // Wir rendern in der Vorschau nur das Root/Anchor-Symbol
+            if (cellData.root || i === 0) {
                 const item = getItemById(cellData.itemId);
                 if (item) {
                     const itemEl = document.createElement('div');
                     itemEl.classList.add('item', item.rarity);
-                    itemEl.innerText = item.icon;
-                    // Mini-Skalierung für Vorschau
-                    itemEl.style.fontSize = "1rem";
+                    itemEl.style.display = 'flex';
+                    itemEl.style.alignItems = 'center';
+                    itemEl.style.justifyContent = 'center';
+
+                    // Prefer sprite image for preview if available
+                    if (item.sprite) {
+                        const img = document.createElement('img');
+                        img.src = item.sprite;
+                        img.alt = item.name || '';
+                        img.style.width = '20px';
+                        img.style.height = '20px';
+                        img.style.objectFit = 'contain';
+                        img.style.pointerEvents = 'none';
+                        itemEl.appendChild(img);
+                    } else {
+                        const txt = document.createElement('div');
+                        txt.innerText = item.icon || '?';
+                        txt.style.fontSize = '1rem';
+                        itemEl.appendChild(txt);
+                    }
+
                     slot.appendChild(itemEl);
                 }
             }
@@ -197,7 +215,7 @@ function buyItem(itemId) {
                     ? getItemBodyMatrix(item, 0)
                     : (item.body || [[1]]);
                 const bodyCopy = baseBody.map(r => [...r]);
-                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, 6, null, null, null, 0);
+                    placeItemIntoGrid(gameData.bank, i, item, bodyCopy, getBankCols(), null, null, null, 0);
             }
             if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
             updateUI();
@@ -380,7 +398,7 @@ function addItemToBank(itemId) {
                     ? getItemBodyMatrix(item, 0)
                     : (item.body || [[1]]);
                 const bodyCopy = baseBody.map(r => [...r]);
-                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, 6, null, null, null, 0);
+                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, getBankCols(), null, null, null, 0);
                 return true;
             }
         }
@@ -408,8 +426,10 @@ function renderShop() {
         if (item.speedBonus) statText.push(`+${Math.floor((item.speedBonus - 1) * 100)}% Speed`);
         if (item.xpBonus) statText.push(`+${Math.floor((item.xpBonus - 1) * 100)}% XP`);
         
+        const iconHtml = item.sprite ? `<img src="${item.sprite}" alt="${item.name}" class="shop-item-sprite" style="width:56px;height:56px;object-fit:contain;">` : `<div class="shop-item-icon">${item.icon}</div>`;
+
         card.innerHTML = `
-            <div class="shop-item-icon">${item.icon}</div>
+            ${iconHtml}
             <h4 style="margin: 10px 0;">${item.name}</h4>
             <p style="font-size: 0.8rem; color: #aaa; margin: 5px 0;">${item.desc || ''}</p>
             ${statText.length > 0 ? `<p style="font-size: 0.75rem; color: var(--accent-gold); margin: 5px 0;">${statText.join(' | ')}</p>` : ''}
@@ -448,8 +468,9 @@ function renderDragPreviewForGrid(container, location, cols, totalSlots) {
     if (draggedItem.hoverTarget && draggedItem.hoverTarget.location === location) {
         hoverIndex = draggedItem.hoverTarget.index;
     } else if (lastPos && lastPos.x >= rect.left && lastPos.x <= rect.right && lastPos.y >= rect.top && lastPos.y <= rect.bottom) {
-        const cellW = 64 + 8;
-        const cellH = 64 + 8;
+        const geo = getCellGeometry(container, cols);
+        const cellW = geo.cellW;
+        const cellH = geo.cellH;
         const relX = lastPos.x - rect.left;
         const relY = lastPos.y - rect.top;
         const col = Math.floor(relX / cellW);
@@ -527,12 +548,14 @@ function renderWorkshopGrids() {
     
     console.log("Rendering workshop grids for:", currentWorkshop);
     
-    // Bank Grid - use 10 columns in storage mode, 6 columns otherwise
-    const bankCols = currentWorkshop === 'storage' ? 10 : 6;
+    // Bank Grid - always use centralized bank columns (storage-mode or compact)
+    const bankCols = getBankCols();
     bankGrid.innerHTML = '';
     for (let i = 0; i < BANK_SLOTS; i++) {
         createSlot(bankGrid, 'bank', i, bankCols);
     }
+    // Ensure bank grid CSS columns match runtime cols (keeps storage appearance consistent)
+    try { bankGrid.style.gridTemplateColumns = `repeat(${bankCols}, var(--slot-size))`; } catch (err) {}
     // Render drag preview for bank
     renderDragPreviewForGrid(bankGrid, 'bank', bankCols, BANK_SLOTS);
     
