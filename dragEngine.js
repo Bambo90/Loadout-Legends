@@ -264,7 +264,7 @@ function initGlobalDragListeners() {
                         const idx = draggedItem.hoverTarget.index;
                         const slotEl = document.querySelector(`.grid-slot[data-location="${loc}"][data-index="${idx}"]`);
                         if (slotEl) {
-                            const cols = parseInt(slotEl.dataset.cols) || (loc === 'bank' ? 6 : GRID_SIZE);
+                            const cols = parseInt(slotEl.dataset.cols) || (loc === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
                             const grid = gameData[loc] || {};
                             const mouseX = idx % cols;
                             const mouseY = Math.floor(idx / cols);

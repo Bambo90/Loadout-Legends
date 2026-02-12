@@ -31,16 +31,16 @@ body {
     min-width: var(--sidebar-width);
     background: var(--bg-panel); 
     border-right: 2px solid var(--border-color); 
-    display: flex; flex-direction: column; padding: 25px; box-sizing: border-box; 
+    display: flex; flex-direction: column; padding: 28px; box-sizing: border-box; 
 }
-.logo h2 { color: var(--accent-gold); margin: 0; font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 15px rgba(255, 215, 0, 0.3); }
-.logo span { color: #666; font-size: 0.8rem; letter-spacing: 2px; }
-#main-nav { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; margin-top: 30px; }
+.logo h2 { color: var(--accent-gold); margin: 0; font-size: 2.6rem; font-weight: 900; text-shadow: 0 0 15px rgba(255, 215, 0, 0.3); }
+.logo span { color: #666; font-size: 0.9rem; letter-spacing: 2px; }
+#main-nav { display: flex; flex-direction: column; gap: 12px; flex-grow: 1; margin-top: 34px; }
 
 .nav-btn { 
     background: #1d1d1d; border: 1px solid #333; color: #888; 
-    padding: 16px; text-align: left; border-radius: 12px; 
-    cursor: pointer; transition: 0.3s; font-weight: bold;
+    padding: 18px 18px; text-align: left; border-radius: 12px; 
+    cursor: pointer; transition: 0.3s; font-weight: bold; font-size: 1.2rem;
 }
 .nav-btn:hover { transform: translateX(10px); color: white; border-color: var(--accent-gold); }
 .nav-btn.active { background: #2a2a2a; border-color: var(--accent-gold); color: var(--accent-gold); }
@@ -56,25 +56,25 @@ body {
    ========================================= */
 #main-view { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
 #top-bar { 
-    height: 90px; background: var(--bg-panel); border-bottom: 2px solid var(--border-color); 
-    display: flex; align-items: center; padding: 0 40px; gap: 30px; box-sizing: border-box; 
+    height: 144px; background: var(--bg-panel); border-bottom: 2px solid var(--border-color); 
+    display: flex; align-items: center; padding: 0 44px; gap: 44px; box-sizing: border-box; 
 }
 
-.stat-item { display: flex; flex-direction: column; min-width: 80px; }
-.label { font-size: 0.7rem; color: #888; font-weight: bold; }
-.value { font-size: 1.2rem; font-weight: 800; color: white; }
+.stat-item { display: flex; flex-direction: column; min-width: 90px; }
+.label { font-size: 0.8rem; color: #888; font-weight: bold; }
+.value { font-size: 1.35rem; font-weight: 800; color: white; }
 
-.bonus-display { display: flex; flex-direction: column; min-width: 100px; align-items: center; padding: 5px 15px; background: rgba(255, 215, 0, 0.1); border-radius: 8px; border: 1px solid rgba(255, 215, 0, 0.3); }
-.bonus-value { font-size: 1rem; font-weight: bold; color: var(--accent-gold); }
+.bonus-display { display: flex; flex-direction: column; min-width: 110px; align-items: center; padding: 7px 16px; background: rgba(255, 215, 0, 0.1); border-radius: 10px; border: 1px solid rgba(255, 215, 0, 0.3); }
+.bonus-value { font-size: 1.15rem; font-weight: bold; color: var(--accent-gold); }
 
 .hp-header-container, .xp-header-container { 
-    flex-grow: 1; max-width: 300px; height: 26px; background: #111; 
-    border: 1px solid #444; border-radius: 6px; position: relative; 
+    flex-grow: 1; max-width: 320px; height: 30px; background: #111; 
+    border: 1px solid #444; border-radius: 7px; position: relative; 
     overflow: hidden; display: flex; align-items: center; justify-content: center; 
 }
 #hp-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-red); width: 100%; transition: width 0.3s; z-index: 1; }
 #xp-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-blue); width: 0%; transition: width 0.3s; z-index: 1; }
-#hp-text-header, #xp-text-header { position: relative; z-index: 5; font-size: 11px; font-weight: bold; text-shadow: 1px 1px 2px black; color: white; }
+#hp-text-header, #xp-text-header { position: relative; z-index: 5; font-size: 16px; font-weight: bold; text-shadow: 1px 1px 2px black; color: white; }
 
 /* =========================================
    4. CONTENT & GRIND
@@ -110,17 +110,188 @@ body {
 /* =========================================
    5. EQUIPMENT HUB
    ========================================= */
-.equipment-hub { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-top: 30px; max-width: 1200px; }
+.hub-header {
+    text-align: center;
+    margin-bottom: 10px;
+}
+.hub-header h3 {
+    color: #ffffff;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+.hub-header p {
+    color: #888;
+    font-size: 1.1rem;
+}
+
+.equipment-hub { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 30px; max-width: 1200px; margin-left: auto; margin-right: auto; justify-items: center; }
 .loadout-preview-card { 
     background: #1a1a1a; padding: 25px; border-radius: 20px; border: 2px solid #333; 
-    cursor: pointer; transition: 0.3s; text-align: center;
+    cursor: pointer; transition: 0.3s; text-align: center; width: 100%; max-width: 380px; box-sizing: border-box;
 }
 .loadout-preview-card:hover { border-color: var(--accent-gold); transform: translateY(-5px); background: #222; }
 .loadout-preview-card h4 { color: #ffffff; font-size: 1.2rem; font-weight: 700; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
 .loadout-preview-card.disabled { opacity: 0.5; cursor: not-allowed; }
 .preview-grid { display: grid; grid-template-columns: repeat(10, 20px); gap: 2px; justify-content: center; margin-top: 15px; pointer-events: none; }
+.preview-grid .grid-slot { width: 20px; height: 20px; }
+
+/* Compact preview specifically for the storage preview in the equipment hub.
+   Prevents the large storage grid from increasing the card height and page length. */
+#preview-bank-small {
+    /* make the preview much smaller */
+    grid-template-columns: repeat(10, 12px) !important;
+    gap: 2px !important;
+    max-height: 120px; /* limit visible rows */
+    overflow: hidden; /* hide the rest */
+    justify-self: center;
+    width: auto;
+    margin: 0 auto;
+}
+
+/* Ensure the small preview slots render at the reduced size */
+#preview-bank-small .grid-slot { width: 12px; height: 12px; }
 .preview-grid .grid-slot { width: 20px; height: 20px; background: #111; border: 1px solid #222; position: relative; }
 .preview-grid .item { width: 16px; height: 16px; top: 1px; left: 1px; font-size: 0.7rem; border: none; box-shadow: none; }
+
+/* =========================================
+   5b. ADVENTURE HUB
+   ========================================= */
+#tab-grind {
+    background-image: url('Media/Images/Background_A.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    min-height: calc(100vh - 104px);
+    margin: -40px;
+    padding: 40px;
+    width: calc(100% + 80px);
+    height: calc(100% + 80px);
+}
+
+/* Equipment hub background (Ausrüstungs-Zentrum) */
+#tab-equipment {
+    background-image: url('Media/Images/Background_inventory.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    /* do not fix the background to allow content scrolling independently */
+    min-height: calc(100vh - 104px);
+    margin: -40px;
+    padding: 40px;
+    width: calc(100% + 80px);
+    height: calc(100% + 80px);
+}
+
+.adventure-hub { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 30px; 
+    margin-top: 30px; 
+    max-width: 1400px; 
+    margin-left: auto;
+    margin-right: auto;
+}
+.adventure-card { 
+    cursor: pointer; 
+    transition: all 0.3s ease; 
+    text-align: center;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: visible;
+    z-index: 1;
+}
+.adventure-card:hover { 
+    transform: translateY(-5px); 
+    z-index: 1;
+}
+.adventure-card h4 { 
+    color: #ffffff; 
+    font-size: 1.5rem; 
+    font-weight: 700; 
+    margin-bottom: 15px; 
+    text-transform: uppercase; 
+    letter-spacing: 1px; 
+}
+.adventure-card .card-desc {
+    color: #aaa;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.card-main-content {
+    z-index: 2;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: var(--card-bg, #1a1a1a);
+    padding: 40px 25px;
+    border-radius: 20px;
+    border: 2px solid #333;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+}
+
+.adventure-card:hover .card-main-content {
+    border-color: var(--accent-gold);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.card-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(20, 20, 20, 0.98);
+    border: 2px solid #333;
+    border-top: none;
+    border-radius: 0 0 20px 20px;
+    margin-top: -10px;
+    padding-top: 32px;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.4s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    z-index: -1;
+}
+
+.adventure-card:hover .card-dropdown {
+    opacity: 1;
+    max-height: 450px;
+    padding: 24px 18px 18px 18px;
+}
+
+.dropdown-item {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    border: 2px solid #444;
+    padding: 15px 20px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    width: 100%;
+    margin: 8px 0;
+}
+
+.dropdown-item:hover {
+    background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
+    border-color: var(--accent-gold);
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
 
 /* =========================================
    6. WORKSHOP & GRIDS
@@ -244,10 +415,6 @@ body {
 #auto-sort-btn:hover { background: #3a6bb8; transform: scale(1.05); }
 #bulk-sell-btn:hover { background: #c89b3c; }
 #bulk-sell-btn.active { background: #c89b3c; box-shadow: 0 0 10px rgba(200, 155, 60, 0.5); }
-
-.storage-grid {
-    /* Scrollbar-Gutter ist jetzt auf #bank-grid */
-}
 
 /* Scrollbar styling for storage grid */
 .storage-grid::-webkit-scrollbar { width: 12px; }
@@ -415,6 +582,22 @@ body {
     pointer-events: none; /* Icon blockiert den Klick auf die Blöcke nicht */
     z-index: 110;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+/* Sprite image rendered for items when available */
+.item-sprite {
+    display: block;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Shop sprite small sizing */
+.shop-item-sprite {
+    display: block;
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    margin: 8px auto 0 auto;
 }
 
 /* =========================================

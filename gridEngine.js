@@ -89,10 +89,16 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId, max
     let maxRows = maxRowsOverride;
     if (typeof maxRows === 'undefined' || maxRows === null) {
         // Bank has dynamic rows based on BANK_SLOTS and 6 columns
-        if (cols === 6) {
-            maxRows = Math.ceil(BANK_SLOTS / cols);
-        } else {
-            // Default grids use fixed GRID_ROWS
+        // If placing into the bank grid (gameData.bank) compute rows from BANK_SLOTS
+        try {
+            if (grid === gameData.bank) {
+                maxRows = Math.ceil(BANK_SLOTS / cols);
+            } else {
+                // Default grids use fixed GRID_ROWS
+                maxRows = GRID_ROWS;
+            }
+        } catch (err) {
+            // Fallback
             maxRows = GRID_ROWS;
         }
     }

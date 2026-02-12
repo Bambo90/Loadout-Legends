@@ -10,8 +10,12 @@ function _getGridSlotFromPoint(clientX, clientY) {
     const activeGrid = document.getElementById('active-setup-grid');
     if (!bankGrid || !activeGrid) return null;
 
-    const cellW = 64 + 8;
-    const cellH = 64 + 8;
+    // Use runtime geometry so hit-testing matches actual grid CSS
+    const activeGeo = activeGrid ? getCellGeometry(activeGrid, GRID_SIZE) : { cellW: 72, cellH: 72 };
+    const bankColsForGeo = (typeof getBankCols === 'function') ? getBankCols() : 6;
+    const bankGeo = bankGrid ? getCellGeometry(bankGrid, bankColsForGeo) : { cellW: 72, cellH: 72 };
+    const cellW = activeGeo.cellW;
+    const cellH = activeGeo.cellH;
 
     // Active grid (farm/pve)
     const activeRect = activeGrid.getBoundingClientRect();
@@ -35,15 +39,17 @@ function _getGridSlotFromPoint(clientX, clientY) {
     if (clientX >= bankRect.left && clientX <= bankRect.right && clientY >= bankRect.top && clientY <= bankRect.bottom) {
         const relX = clientX - bankRect.left;
         const relY = clientY - bankRect.top;
-        const col = Math.floor(relX / cellW);
-        const row = Math.floor(relY / cellH);
-        const maxRows = Math.ceil(BANK_SLOTS / 6);
-        const clampedCol = Math.max(0, Math.min(6 - 1, col));
+        const col = Math.floor(relX / bankGeo.cellW);
+        const row = Math.floor(relY / bankGeo.cellH);
+        // Determine bank columns based on current workshop/storage-mode
+        const bankCols = (typeof getBankCols === 'function') ? getBankCols() : ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6);
+        const maxRows = Math.ceil(BANK_SLOTS / bankCols);
+        const clampedCol = Math.max(0, Math.min(bankCols - 1, col));
         const clampedRow = Math.max(0, Math.min(maxRows - 1, row));
-        const index = clampedRow * 6 + clampedCol;
+        const index = clampedRow * bankCols + clampedCol;
         const selector = `.grid-slot[data-location="bank"][data-index="${index}"]`;
         const el = document.querySelector(selector);
-        return el ? { element: el, location: 'bank', index, cols: 6 } : null;
+        return el ? { element: el, location: 'bank', index, cols: bankCols } : null;
     }
 
     return null;
@@ -83,6 +89,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         item: item,
         fromLocation: fromLocation,
         fromIndex: fromIndex,
+        // store the originating grid column count so restores/drops use same geometry
+        fromCols: (fromLocation === 'bank') ? (typeof getBankCols === 'function' ? getBankCols() : ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6)) : GRID_SIZE,
         offsetX: offsetX || 0,
         offsetY: offsetY || 0,
         previewShape: baseShape.map(r => [...r]),
@@ -113,8 +121,21 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     const shape = draggedItem.previewShape || [[1]];
     const rows = shape.length;
     const cols = shape[0] ? shape[0].length : 1;
-    _customFollowEl.style.width = ((cols * 64) + ((cols - 1) * 8)) + 'px';
-    _customFollowEl.style.height = ((rows * 64) + ((rows - 1) * 8)) + 'px';
+    const sourceGrid = (sourceElem && sourceElem.closest) ? sourceElem.closest('.inventory-grid') : document.getElementById('bank-grid');
+    // Determine columns for source grid (bank vs active)
+    let sourceGridCols = GRID_SIZE;
+    try {
+        if (sourceGrid && sourceGrid.id === 'bank-grid') sourceGridCols = (typeof getBankCols === 'function') ? getBankCols() : 6;
+        else sourceGridCols = GRID_SIZE;
+    } catch (e) { sourceGridCols = GRID_SIZE; }
+    const geo = getCellGeometry(sourceGrid || document.body, sourceGridCols);
+    const slotSize = geo.slotSize;
+    const gap = geo.gap;
+    const cellW2 = geo.cellW;
+    const cellH2 = geo.cellH;
+    // (debug logging removed)
+    _customFollowEl.style.width = (cols * cellW2 - gap) + 'px';
+    _customFollowEl.style.height = (rows * cellH2 - gap) + 'px';
     
     // CRITICAL: Use relative positioning to allow absolute children (aura, icon)
     _customFollowEl.style.position = 'fixed'; 
@@ -125,15 +146,21 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     // Create grid wrapper for shape blocks
     const gridWrapper = document.createElement('div');
     gridWrapper.style.display = 'grid';
-    gridWrapper.style.gridTemplateColumns = `repeat(${cols}, 64px)`;
-    gridWrapper.style.gridTemplateRows = `repeat(${rows}, 64px)`;
-    gridWrapper.style.gap = '8px';
+    gridWrapper.style.gridTemplateColumns = `repeat(${cols}, ${slotSize}px)`;
+    gridWrapper.style.gridTemplateRows = `repeat(${rows}, ${slotSize}px)`;
+    gridWrapper.style.gap = gap + 'px';
     gridWrapper.style.position = 'relative';
+    gridWrapper.style.boxSizing = 'border-box';
+    gridWrapper.style.alignItems = 'start';
+    gridWrapper.style.justifyItems = 'start';
 
     // fill visual squares similar to item
     shape.forEach((row, r) => {
         row.forEach((cell, c) => {
             const pixel = document.createElement('div');
+            pixel.style.boxSizing = 'border-box';
+            pixel.style.width = slotSize + 'px';
+            pixel.style.height = slotSize + 'px';
             if (cell) {
                 pixel.className = 'shape-block ' + (item.rarity || 'common');
             } else {
@@ -163,26 +190,28 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         
         const auraRows = aura.length;
         const auraCols = aura[0] ? aura[0].length : 1;
-        auraOverlay.style.width = ((auraCols * 64) + ((auraCols - 1) * 8)) + 'px';
-        auraOverlay.style.height = ((auraRows * 64) + ((auraRows - 1) * 8)) + 'px';
-        auraOverlay.style.gridTemplateColumns = `repeat(${auraCols}, 64px)`;
-        auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
-        auraOverlay.style.gap = '8px';
+            auraOverlay.style.width = ((auraCols * slotSize) + ((auraCols - 1) * gap)) + 'px';
+            auraOverlay.style.height = ((auraRows * slotSize) + ((auraRows - 1) * gap)) + 'px';
+            auraOverlay.style.gridTemplateColumns = `repeat(${auraCols}, ${slotSize}px)`;
+            auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, ${slotSize}px)`;
+            auraOverlay.style.gap = gap + 'px';
         
-        // Align aura using body bounds inside the combined grid
+        // Align aura using body bounds inside the combined grid (use left/top for consistency)
         const bounds = (typeof getItemBodyBounds === 'function')
             ? getItemBodyBounds(item, draggedItem.rotationIndex)
             : { minR: 0, minC: 0 };
-        const offsetX = -bounds.minC * (64 + 8);
-        const offsetY = -bounds.minR * (64 + 8);
-        auraOverlay.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+        const offsetX = -bounds.minC * cellW2;
+        const offsetY = -bounds.minR * cellH2;
+        auraOverlay.style.left = offsetX + 'px';
+        auraOverlay.style.top = offsetY + 'px';
         
         aura.forEach((row, r) => {
             if (!Array.isArray(row)) return;
             row.forEach((cellValue, c) => {
                 const auraCell = document.createElement('div');
-                auraCell.style.width = '64px';
-                auraCell.style.height = '64px';
+                auraCell.style.width = slotSize + 'px';
+                auraCell.style.height = slotSize + 'px';
+                auraCell.style.boxSizing = 'border-box';
                 if (cellValue === 1) {
                     auraCell.style.backgroundColor = 'rgba(100, 200, 255, 0.4)';
                     auraCell.style.border = '2px solid rgba(100, 200, 255, 0.7)';
@@ -198,20 +227,38 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         _customFollowEl.appendChild(auraOverlay);
     }
     
-    // ADD ICON LAST (on top)
-    const icon = document.createElement('div');
-    icon.className = 'item-icon-overlay';
-    icon.style.position = 'absolute';
-    icon.style.top = '50%';
-    icon.style.left = '50%';
-    icon.style.transform = 'translate(-50%, -50%)';
-    icon.style.zIndex = '100'; // Above everything
-    icon.style.pointerEvents = 'none';
-    icon.style.fontSize = '2rem';
-    icon.innerText = item.icon;
-    _customFollowEl.appendChild(icon);
+    // ADD ICON / SPRITE LAST (on top)
+    if (item.sprite || item.image) {
+        const img = document.createElement('img');
+        img.src = item.sprite || item.image;
+        img.alt = item.name || '';
+        img.className = 'item-sprite';
+        img.style.position = 'absolute';
+        img.style.top = '50%';
+        img.style.left = '50%';
+        img.style.transform = 'translate(-50%, -50%)';
+        img.style.zIndex = '100';
+        img.style.pointerEvents = 'none';
+        img.style.maxWidth = '90%';
+        img.style.maxHeight = '90%';
+        _customFollowEl.appendChild(img);
+    } else {
+        const icon = document.createElement('div');
+        icon.className = 'item-icon-overlay';
+        icon.style.position = 'absolute';
+        icon.style.top = '50%';
+        icon.style.left = '50%';
+        icon.style.transform = 'translate(-50%, -50%)';
+        icon.style.zIndex = '100'; // Above everything
+        icon.style.pointerEvents = 'none';
+        icon.style.fontSize = '2rem';
+        icon.innerText = item.icon;
+        _customFollowEl.appendChild(icon);
+    }
 
     document.body.appendChild(_customFollowEl);
+
+    
 
     // Function to rebuild follow element visuals when shape changes (e.g., rotation)
     window._updateFollowElement = function() {
@@ -221,9 +268,34 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         const rows = shape.length;
         const cols = shape[0] ? shape[0].length : 1;
         
-        // Update dimensions
-        _customFollowEl.style.width = ((cols * 64) + ((cols - 1) * 8)) + 'px';
-        _customFollowEl.style.height = ((rows * 64) + ((rows - 1) * 8)) + 'px';
+        // Update dimensions based on runtime cell geometry
+        // Choose the grid element according to where the item was picked up (fromLocation)
+        let gridEl = document.body;
+        try {
+            if (draggedItem && draggedItem.fromLocation === 'bank') {
+                gridEl = document.getElementById('bank-grid') || document.querySelector('.workshop-content .bank-section .inventory-grid') || document.querySelector('.inventory-grid') || document.body;
+            } else {
+                // active grid (farm/pve)
+                gridEl = document.getElementById('active-setup-grid') || document.querySelector('.workshop-content .active-section .inventory-grid') || document.querySelector('.inventory-grid') || document.body;
+            }
+        } catch (e) {
+            gridEl = document.querySelector('.inventory-grid') || document.body;
+        }
+        const debugGridInfo = { gridEl: gridEl && (gridEl.id || gridEl.className), fromLocation: draggedItem && draggedItem.fromLocation };
+        // compute grid columns for gridEl when possible
+        let gridColsLocal = GRID_SIZE;
+        try {
+            if (gridEl && gridEl.id === 'bank-grid') gridColsLocal = (typeof getBankCols === 'function') ? getBankCols() : 6;
+            else gridColsLocal = GRID_SIZE;
+        } catch (e) { gridColsLocal = GRID_SIZE; }
+        const geo2 = getCellGeometry(gridEl, gridColsLocal);
+        // (debug logging removed)
+        const slotSize2 = geo2.slotSize;
+        const gap2 = geo2.gap;
+        const cellWLocal = geo2.cellW;
+        const cellHLocal = geo2.cellH;
+        _customFollowEl.style.width = (cols * cellWLocal - gap2) + 'px';
+        _customFollowEl.style.height = (rows * cellHLocal - gap2) + 'px';
         
         // Clear all children
         while (_customFollowEl.firstChild) _customFollowEl.removeChild(_customFollowEl.firstChild);
@@ -231,9 +303,9 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         // Create grid wrapper
         const gridWrapper = document.createElement('div');
         gridWrapper.style.display = 'grid';
-        gridWrapper.style.gridTemplateColumns = `repeat(${cols}, 64px)`;
-        gridWrapper.style.gridTemplateRows = `repeat(${rows}, 64px)`;
-        gridWrapper.style.gap = '8px';
+        gridWrapper.style.gridTemplateColumns = `repeat(${cols}, ${slotSize2}px)`;
+        gridWrapper.style.gridTemplateRows = `repeat(${rows}, ${slotSize2}px)`;
+        gridWrapper.style.gap = gap2 + 'px';
         gridWrapper.style.position = 'relative';
         
         // Redraw shape blocks
@@ -268,26 +340,27 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             
             const auraRows = aura.length;
             const auraCols = aura[0] ? aura[0].length : 1;
-            auraOverlay.style.width = ((auraCols * 64) + ((auraCols - 1) * 8)) + 'px';
-            auraOverlay.style.height = ((auraRows * 64) + ((auraRows - 1) * 8)) + 'px';
-            auraOverlay.style.gridTemplateColumns = `repeat(${auraCols}, 64px)`;
-            auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
-            auraOverlay.style.gap = '8px';
-            
+            auraOverlay.style.width = ((auraCols * slotSize2) + ((auraCols - 1) * gap2)) + 'px';
+            auraOverlay.style.height = ((auraRows * slotSize2) + ((auraRows - 1) * gap2)) + 'px';
+            auraOverlay.style.gridTemplateColumns = `repeat(${auraCols}, ${slotSize2}px)`;
+            auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, ${slotSize2}px)`;
+            auraOverlay.style.gap = gap2 + 'px';
+
             // Align aura using body bounds inside the combined grid
             const bounds = (typeof getItemBodyBounds === 'function')
                 ? getItemBodyBounds(draggedItem.item, draggedItem.rotationIndex)
                 : { minR: 0, minC: 0 };
-            const offsetX = -bounds.minC * (64 + 8);
-            const offsetY = -bounds.minR * (64 + 8);
-            auraOverlay.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+            const offsetX = -bounds.minC * cellWLocal;
+            const offsetY = -bounds.minR * cellHLocal;
+            auraOverlay.style.left = offsetX + 'px';
+            auraOverlay.style.top = offsetY + 'px';
             
             aura.forEach((row, r) => {
                 if (!Array.isArray(row)) return;
                 row.forEach((cellValue, c) => {
                     const auraCell = document.createElement('div');
-                    auraCell.style.width = '64px';
-                    auraCell.style.height = '64px';
+                    auraCell.style.width = slotSize2 + 'px';
+                    auraCell.style.height = slotSize2 + 'px';
                     if (cellValue === 1) {
                         auraCell.style.backgroundColor = 'rgba(100, 200, 255, 0.4)';
                         auraCell.style.border = '2px solid rgba(100, 200, 255, 0.7)';
@@ -303,38 +376,104 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             _customFollowEl.appendChild(auraOverlay);
         }
         
-        // ADD ICON (on top)
-        const icon = document.createElement('div');
-        icon.className = 'item-icon-overlay';
-        icon.style.position = 'absolute';
-        icon.style.top = '50%';
-        icon.style.left = '50%';
-        icon.style.transform = 'translate(-50%, -50%)';
-        icon.style.zIndex = '100';
-        icon.style.pointerEvents = 'none';
-        icon.style.fontSize = '2rem';
-        icon.innerText = draggedItem.item.icon;
-        _customFollowEl.appendChild(icon);
+        // ADD ICON / SPRITE (on top)
+        if (draggedItem.item.sprite || draggedItem.item.image) {
+            const img = document.createElement('img');
+            img.src = draggedItem.item.sprite || draggedItem.item.image;
+            img.alt = draggedItem.item.name || '';
+            img.className = 'item-sprite';
+            img.style.position = 'absolute';
+            img.style.top = '50%';
+            img.style.left = '50%';
+            img.style.transform = 'translate(-50%, -50%)';
+            img.style.zIndex = '100';
+            img.style.pointerEvents = 'none';
+            img.style.maxWidth = '90%';
+            img.style.maxHeight = '90%';
+            _customFollowEl.appendChild(img);
+        } else {
+            const icon = document.createElement('div');
+            icon.className = 'item-icon-overlay';
+            icon.style.position = 'absolute';
+            icon.style.top = '50%';
+            icon.style.left = '50%';
+            icon.style.transform = 'translate(-50%, -50%)';
+            icon.style.zIndex = '100';
+            icon.style.pointerEvents = 'none';
+            icon.style.fontSize = '2rem';
+            icon.innerText = draggedItem.item.icon;
+            _customFollowEl.appendChild(icon);
+        }
     };
 
     // capture initial offsets locally to avoid race when draggedItem becomes null during cleanup
     const _localOffsetX = draggedItem.offsetX;
     const _localOffsetY = draggedItem.offsetY;
-    // position (use current draggedItem offsets if available so rotations update follow position)
-    const updatePos = (clientX, clientY) => {
+
+    // Throttled positioning: use requestAnimationFrame to avoid doing heavy layout math on every pointermove
+    let _pendingRAF = false;
+    let _rafX = 0;
+    let _rafY = 0;
+
+    const doUpdatePos = (clientX, clientY) => {
         window._dragLastPos = { x: clientX, y: clientY };
         const curOffsetX = (draggedItem && typeof draggedItem.offsetX === 'number') ? draggedItem.offsetX : _localOffsetX;
         const curOffsetY = (draggedItem && typeof draggedItem.offsetY === 'number') ? draggedItem.offsetY : _localOffsetY;
-        const px = clientX - (curOffsetX * (64 + 8));
-        const py = clientY - (curOffsetY * (64 + 8));
-        if (_customFollowEl) {
-            _customFollowEl.style.left = px + 'px';
-            _customFollowEl.style.top = py + 'px';
+        // Determine grid under cursor to get accurate cell geometry
+        let geoUnder = null;
+        let gridEl = null;
+        let colsUnder = GRID_SIZE;
+        try {
+            const elems = document.elementsFromPoint(clientX, clientY);
+            const slot = elems && elems.find(el => el.classList && el.classList.contains('grid-slot')) || null;
+            gridEl = slot ? slot.closest('.inventory-grid') : null;
+            // when hit-testing use the cols of the detected grid if available
+            try { colsUnder = (gridEl && gridEl.id === 'bank-grid') ? (typeof getBankCols === 'function' ? getBankCols() : 6) : GRID_SIZE; } catch (e) { colsUnder = GRID_SIZE; }
+            geoUnder = getCellGeometry(gridEl || document.getElementById('bank-grid') || document.body, colsUnder);
+        } catch (err) {
+            colsUnder = (typeof getBankCols === 'function') ? getBankCols() : 6;
+            geoUnder = getCellGeometry(document.getElementById('bank-grid') || document.body, colsUnder);
+        }
+        // Snap follow element to nearest cell to avoid subpixel tearing across displays
+        try {
+            const containerEl = gridEl || document.getElementById('bank-grid') || document.body;
+            const rect = containerEl.getBoundingClientRect();
+            const relX = clientX - rect.left;
+            const relY = clientY - rect.top;
+            const col = Math.max(0, Math.min((colsUnder || 1) - 1, Math.round(relX / geoUnder.cellW)));
+            const row = Math.max(0, Math.min(Math.ceil((containerEl === document.body ? window.innerHeight : containerEl.clientHeight) / geoUnder.cellH) - 1, Math.round(relY / geoUnder.cellH)));
+            const px = Math.round(rect.left + (col * geoUnder.cellW) - (curOffsetX * geoUnder.cellW));
+            const py = Math.round(rect.top + (row * geoUnder.cellH) - (curOffsetY * geoUnder.cellH));
+            if (_customFollowEl) {
+                _customFollowEl.style.left = px + 'px';
+                _customFollowEl.style.top = py + 'px';
+                _customFollowEl.style.willChange = 'left, top, transform';
+            }
+        } catch (e) {
+            // fallback to best-effort positioning
+            const px = Math.round(clientX - (curOffsetX * geoUnder.cellW));
+            const py = Math.round(clientY - (curOffsetY * geoUnder.cellH));
+            if (_customFollowEl) {
+                _customFollowEl.style.left = px + 'px';
+                _customFollowEl.style.top = py + 'px';
+            }
         }
     };
-    
-    // Expose updatePos globally so rotation can update position after offset changes
-    window._updateFollowElementPosition = updatePos;
+
+    // Expose direct updater for immediate repositioning (used after rotation)
+    window._updateFollowElementPosition = (x, y) => { doUpdatePos(x, y); };
+
+    // Throttled wrapper invoked on pointermove
+    const updatePos = (clientX, clientY) => {
+        _rafX = clientX;
+        _rafY = clientY;
+        if (_pendingRAF) return;
+        _pendingRAF = true;
+        requestAnimationFrame(() => {
+            _pendingRAF = false;
+            doUpdatePos(_rafX, _rafY);
+        });
+    };
 
     // initial position
     const initX = (startEvent && startEvent.clientX) || (window._dragLastPos && window._dragLastPos.x) || (window.innerWidth/2);
@@ -349,6 +488,13 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         // update hover target via elementsFromPoint
         try {
             const elems = document.elementsFromPoint(ev.clientX, ev.clientY);
+            // Targeted snapshot for problematic armor item to diagnose left-storage tearing
+            try {
+                if (window.DEBUG_DRAG && draggedItem && draggedItem.item && draggedItem.item.id === 'armor_new_2') {
+                    const snap = elems.slice(0,8).map(el => ({ tag: el.tagName, id: el.id || null, class: el.className || null, dataset: el.dataset && { location: el.dataset.location, index: el.dataset.index } }));
+                    // (debug logging removed)
+                }
+            } catch (e) { /* ignore */ }
             const slot = elems && elems.find(el => el.classList && el.classList.contains('grid-slot')) || null;
             if (slot) {
                 const loc = slot.dataset.location;
@@ -458,7 +604,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             // if draggedItem still exists (drop failed), restore
             if (draggedItem) {
                 if (gameData[draggedItem.fromLocation]) {
-                    const fromCols = draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE;
+                    const fromCols = draggedItem.fromCols || (draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
                     const restoreShape = (typeof getItemBodyMatrix === 'function')
                         ? getItemBodyMatrix(draggedItem.item, draggedItem.rotationIndex || 0)
                         : (draggedItem.item?.body || draggedItem.previewShape);

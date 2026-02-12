@@ -24,7 +24,7 @@ const ARMOR_ITEMS = [
 
     { 
         id: "armor_new_2",
-        name: "Lederwams", 
+        name: "Bronzerüstung", 
         type: "armor",
         rarity: "magic", 
         icon: "🥾", 
@@ -34,13 +34,18 @@ const ARMOR_ITEMS = [
         defense: 12,
         evasion: 0.15,
         durability: 1.1,
-        desc: "Hochwertiges Leder mit guter Bewegungsfreihheit.",
+        desc: "Schwere Bronzerüstung, robust und zuverlässig.",
+        sprite: "Media/Images/Items/Armours/Bronze_A.png",
 
+        /*
+         * Define rotations as a 5x4 combined grid (5 cols x 4 rows).
+         * The body is a centered 3x2 block (columns 1-3, rows 1-2).
+         */
         rotations: {
-            0: { grid: [['A', 'AB', 'AB', 'AB', 'A', 'A'], ['A', 'B', 'B', 'B', '0', 'A'], ['A', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', '0', '0', 'A'], ['0', 'A', '0', '0', 'A', '0']] },
-            1: { grid: [['0', 'A', 'A', 'A', 'A', '0'], ['A', '0', 'B', 'B', 'B', 'A'], ['A', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', '0']] },
-            2: { grid: [['0', 'A', 'B', '0', 'A', '0'], ['A', 'B', 'B', 'B', '0', 'A'], ['A', 'B', 'B', 'B', '0', 'A'], ['A', 'B', 'B', 'B', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A']] },
-            3: { grid: [['0', 'A', 'A', 'A', 'A', '0'], ['A', '0', 'B', 'B', 'B', 'A'], ['A', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', '0']] }
+            0: { grid: [['A','A','A','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','A','A','A']] },
+            1: { grid: [['A','A','A','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','A','A','A']] },
+            2: { grid: [['A','A','A','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','A','A','A']] },
+            3: { grid: [['A','A','A','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','A','A','A']] }
         }
     },
 

@@ -25,12 +25,13 @@ function handleDropInSlot(e) {
         const restoreShape = (typeof getItemBodyMatrix === 'function')
             ? getItemBodyMatrix(draggedItem.item, draggedItem.rotationIndex || 0)
             : (draggedItem.item?.body || draggedItem.previewShape);
+        const fallbackFromCols = draggedItem && draggedItem.fromCols ? draggedItem.fromCols : (draggedItem && draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
         placeItemIntoGrid(
             gameData[draggedItem.fromLocation],
             draggedItem.fromIndex,
             draggedItem.item,
             restoreShape,
-            draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE,
+            fallbackFromCols,
             draggedItem.instanceId,
             null,
             draggedItem.rotatedAura || null,
@@ -131,7 +132,7 @@ function handleDropInSlot(e) {
     
     if (!hasOverlap) {
         console.log('❌ BODY COMPLETELY OUTSIDE GRID (no overlap) - snapping back to Storage');
-        const fromCols = draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE;
+        const fromCols = draggedItem && draggedItem.fromCols ? draggedItem.fromCols : (draggedItem && draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
         placeItemIntoGrid(
             gameData[draggedItem.fromLocation],
             draggedItem.fromIndex,
@@ -210,7 +211,7 @@ function handleDropInSlot(e) {
     // VALIDATION: If still invalid, snap back to original location
     if (!canPlace) {
         console.log("❌ Drop FAILED - restoring item to original location (no valid placement found)");
-        const fromCols = draggedItem.fromLocation === 'bank' ? 6 : GRID_SIZE;
+        const fromCols = draggedItem && draggedItem.fromCols ? draggedItem.fromCols : (draggedItem && draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
         placeItemIntoGrid(
             gameData[draggedItem.fromLocation],
             draggedItem.fromIndex,

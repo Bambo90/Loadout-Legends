@@ -46,6 +46,8 @@ function createSlot(container, location, index, cols) {
     const grid = gameData[location];
     const cell = grid[index];
 
+    // (debug logging removed)
+
     // Falls Slot leer oder kein Anker (Root), nur leeren Slot rendern
     if (!cell) {
         container.appendChild(slot);
@@ -87,13 +89,16 @@ function createSlot(container, location, index, cols) {
     itemEl.dataset.fromLocation = location;
     itemEl.dataset.fromIndex = index;
 
-    // Dimensionen berechnen (64px Slot + 8px Gap)
-    itemEl.style.width = ((colsShape * 64) + ((colsShape - 1) * 8)) + "px";
-    itemEl.style.height = ((rows * 64) + ((rows - 1) * 8)) + "px";
+    // Dimensionen berechnen basierend auf Laufzeit-Grid-Geometrie
+    const geo = (typeof getCellGeometry === 'function') ? getCellGeometry(container, cols) : { slotSize: 64, gap: 8, cellW: 72, cellH: 72 };
+    const slotSize = geo.slotSize;
+    const gap = geo.gap;
+    itemEl.style.width = ((colsShape * slotSize) + ((colsShape - 1) * gap)) + "px";
+    itemEl.style.height = ((rows * slotSize) + ((rows - 1) * gap)) + "px";
     itemEl.style.display = "grid";
-    itemEl.style.gridTemplateColumns = `repeat(${colsShape}, 64px)`;
-    itemEl.style.gridTemplateRows = `repeat(${rows}, 64px)`;
-    itemEl.style.gap = "8px";
+    itemEl.style.gridTemplateColumns = `repeat(${colsShape}, ${slotSize}px)`;
+    itemEl.style.gridTemplateRows = `repeat(${rows}, ${slotSize}px)`;
+    itemEl.style.gap = `${gap}px`;
     itemEl.style.zIndex = "100";
 
     shape.forEach((row, r) => {
@@ -113,11 +118,28 @@ function createSlot(container, location, index, cols) {
         });
     });
 
-    const icon = document.createElement('div');
-    icon.classList.add('item-icon-overlay');
-    icon.innerText = item.icon;
-    icon.style.pointerEvents = "none";
-    itemEl.appendChild(icon);
+    // Prefer sprite image overlay when available, centered above the body.
+    if (item.sprite || item.image) {
+        const img = document.createElement('img');
+        img.src = item.sprite || item.image;
+        img.alt = item.name || '';
+        img.classList.add('item-sprite');
+        img.style.position = 'absolute';
+        img.style.left = '50%';
+        img.style.top = '50%';
+        img.style.transform = 'translate(-50%, -50%)';
+        img.style.maxWidth = '90%';
+        img.style.maxHeight = '90%';
+        img.style.pointerEvents = 'none';
+        img.style.zIndex = '110';
+        itemEl.appendChild(img);
+    } else {
+        const icon = document.createElement('div');
+        icon.classList.add('item-icon-overlay');
+        icon.innerText = item.icon;
+        icon.style.pointerEvents = "none";
+        itemEl.appendChild(icon);
+    }
 
     // ===== STORAGE SYSTEM INTEGRATION =====
     // Apply lock/selection visual states if storageEngine is initialized
@@ -193,17 +215,19 @@ function createSlot(container, location, index, cols) {
     const auraRows = aura.length;
     const auraColsShape = aura[0] ? aura[0].length : 1;
     
-    auraOverlay.style.width = ((auraColsShape * 64) + ((auraColsShape - 1) * 8)) + "px";
-    auraOverlay.style.height = ((auraRows * 64) + ((auraRows - 1) * 8)) + "px";
+    const auraWidth = ((auraColsShape * slotSize) + ((auraColsShape - 1) * gap));
+    const auraHeight = ((auraRows * slotSize) + ((auraRows - 1) * gap));
+    auraOverlay.style.width = auraWidth + "px";
+    auraOverlay.style.height = auraHeight + "px";
     auraOverlay.style.display = "grid";
-    auraOverlay.style.gridTemplateColumns = `repeat(${auraColsShape}, 64px)`;
-    auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, 64px)`;
-    auraOverlay.style.gap = "8px";
+    auraOverlay.style.gridTemplateColumns = `repeat(${auraColsShape}, ${slotSize}px)`;
+    auraOverlay.style.gridTemplateRows = `repeat(${auraRows}, ${slotSize}px)`;
+    auraOverlay.style.gap = `${gap}px`;
     
     const bodyBounds = (typeof getItemBodyBounds === 'function')
         ? getItemBodyBounds(item, rotationIndex)
         : { minR: 0, minC: 0 };
-    const tileSize = 64 + 8;
+    const tileSize = geo.cellW;
     if (useBodyBoundsForAura) {
         auraOverlay.style.left = (-bodyBounds.minC * tileSize) + "px";
         auraOverlay.style.top = (-bodyBounds.minR * tileSize) + "px";
@@ -228,8 +252,8 @@ function createSlot(container, location, index, cols) {
         if (!Array.isArray(row)) return;
         row.forEach((cellValue, c) => {
             const auraCell = document.createElement('div');
-            auraCell.style.width = '64px';
-            auraCell.style.height = '64px';
+            auraCell.style.width = `${slotSize}px`;
+            auraCell.style.height = `${slotSize}px`;
             
             // Calculate absolute grid position of this aura cell
             const auraGridX = useBodyBoundsForAura
@@ -277,8 +301,8 @@ function createSlot(container, location, index, cols) {
     itemEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const rect = itemEl.getBoundingClientRect();
-        const tileW = 64 + 8;
-        const tileH = 64 + 8;
+        const tileW = geo.cellW;
+        const tileH = geo.cellH;
         const cx = (e.clientX && e.clientX !== 0) ? e.clientX : (rect.left + rect.width / 2);
         const cy = (e.clientY && e.clientY !== 0) ? e.clientY : (rect.top + rect.height / 2);
         let relX = cx - rect.left;

@@ -14,7 +14,7 @@
                 <span>v0.1</span>
             </div>
             <nav id="main-nav">
-                <button class="nav-btn active" onclick="switchTab('grind')">⛏️ Grind</button>
+                <button class="nav-btn active" onclick="switchTab('grind')">⚔️ Abenteuer</button>
                 <button class="nav-btn" onclick="switchTab('equipment')">🛡️ Ausrüstung</button>
                 <button class="nav-btn" onclick="switchTab('shop')">💰 Shop</button>
                 <button class="nav-btn" onclick="switchTab('stats')">📊 Stats</button>
@@ -39,24 +39,47 @@
 
             <section id="content-area">
                 <div id="tab-grind" class="tab-content active">
-                    <div class="battle-area">
-                        <div id="monster-card" class="monster-card">
-                            <div id="monster-icon" class="monster-icon">🟢</div>
-                            <h3 id="monster-name">Wald-Schleim</h3>
-                            <div class="monster-hp-bar"><div id="monster-hp-fill"></div></div>
-                            <p id="monster-hp-text">HP: 50 / 50</p>
-                        </div>
-                        <div class="monster-selection">
-                            <button onclick="changeMonster(-1)" style="margin-right: 10px;">← Easier</button>
-                            <span id="monster-info" style="flex: 1; text-align: center; color: #888;">Monster Selection</span>
-                            <button onclick="changeMonster(1)" style="margin-left: 10px;">Harder →</button>
-                        </div>
-                        <div class="grind-controls">
-                            <div class="work-container-large">
-                                <div id="work-fill"></div>
-                                <span id="work-text">+0 Gold</span>
+                    <div class="hub-header">
+                        <h3>Abenteuer-Zentrum</h3>
+                        <p>Wähle einen Modus zum Spielen.</p>
+                    </div>
+                    <div class="adventure-hub">
+                        <div class="adventure-card" style="--card-bg: linear-gradient(135deg, #2a4a2a 0%, #1a3a1a 100%);">
+                            <div class="card-main-content">
+                                <h4>📖 Chroniken</h4>
+                                <p class="card-desc">Story-Kampagne und Episoden</p>
                             </div>
-                            <button id="action-button" onclick="handleWorkClick()">Fokus auffrischen (Boost!)</button>
+                            <div class="card-dropdown">
+                                <button class="dropdown-item" onclick="alert('Welt - Coming Soon!')">🌍 Welt</button>
+                                <button class="dropdown-item" onclick="alert('Karten - Coming Soon!')">🗺️ Karten</button>
+                                <button class="dropdown-item" onclick="alert('Dungeons - Coming Soon!')">🏰 Dungeons</button>
+                                <button class="dropdown-item" onclick="alert('Bosse - Coming Soon!')">👹 Bosse</button>
+                            </div>
+                        </div>
+                        <div class="adventure-card" style="--card-bg: linear-gradient(135deg, #4a2a2a 0%, #3a1a1a 100%);">
+                            <div class="card-main-content">
+                                <h4>⚔️ Arena</h4>
+                                <p class="card-desc">PvE-Kämpfe und Herausforderungen</p>
+                            </div>
+                            <div class="card-dropdown">
+                                <button class="dropdown-item" onclick="alert('PVP (ungewertet) - Coming Soon!')">🎮 PVP (ungewertet)</button>
+                                <button class="dropdown-item" onclick="alert('PVP (gewertet) - Coming Soon!')">🏆 PVP (gewertet)</button>
+                                <button class="dropdown-item" onclick="alert('Draft Modus - Coming Soon!')">🎲 Draft Modus</button>
+                                <button class="dropdown-item" onclick="alert('Mutatoren Liga - Coming Soon!')">⚡ Mutatoren Liga</button>
+                                <button class="dropdown-item" onclick="alert('Spiegel Challenge - Coming Soon!')">🪞 Spiegel Challenge</button>
+                            </div>
+                        </div>
+                        <div class="adventure-card" style="--card-bg: linear-gradient(135deg, #2a3a4a 0%, #1a2a3a 100%);">
+                            <div class="card-main-content">
+                                <h4>⛏️ Ressourcen</h4>
+                                <p class="card-desc">Farmen und Sammeln</p>
+                            </div>
+                            <div class="card-dropdown">
+                                <button class="dropdown-item" onclick="alert('Holzfällerei - Coming Soon!')">🪓 Holzfällerei</button>
+                                <button class="dropdown-item" onclick="alert('Bergbau - Coming Soon!')">⛏️ Bergbau</button>
+                                <button class="dropdown-item" onclick="alert('Fischen - Coming Soon!')">🎣 Fischen</button>
+                                <button class="dropdown-item" onclick="alert('Landwirtschaft - Coming Soon!')">🌾 Landwirtschaft</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -162,7 +185,7 @@
 <script src="monsters.js"></script>
 
 <script src="itemsEngine.js"></script>
-
+<script src="utils.js"></script>
 <script src="gridEngine.js"></script>
 <script src="dragEngine.js"></script>
 <script src="dragdropengine.js"></script>
