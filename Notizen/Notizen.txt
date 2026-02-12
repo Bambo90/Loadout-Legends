@@ -1,0 +1,10 @@
+backup-stable-2026-02-12.
+
+Backup Powershell cmd
+$repo = "C:\Users\bbs2e\Desktop\Loadout Legends"
+$script = "$repo\tools\auto-backup.ps1"
+schtasks /Create /TN "LoadoutLegends-AutoBackup" /SC HOURLY /MO 1 /TR "powershell.exe -ExecutionPolicy Bypass -File \`"$script\`"" /F
+
+Backup Stoppen
+
+schtasks /Delete /TN "LoadoutLegends-AutoBackup" /F

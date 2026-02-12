@@ -26,12 +26,14 @@ function createSlot(container, location, index, cols) {
     slot.addEventListener('drop', handleDropInSlot);
     // Hover target to improve drag responsiveness
     slot.addEventListener('mouseenter', () => {
+        const draggedItem = DragSystem.getDraggedItem();
         if (draggedItem) {
             draggedItem.hoverTarget = { location, index };
             try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
         }
     });
     slot.addEventListener('mouseleave', () => {
+        const draggedItem = DragSystem.getDraggedItem();
         if (draggedItem && draggedItem.hoverTarget && draggedItem.hoverTarget.location === location && draggedItem.hoverTarget.index === index) {
             delete draggedItem.hoverTarget;
             try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
@@ -65,6 +67,7 @@ function createSlot(container, location, index, cols) {
         return;
     }
 
+    const draggedItem = DragSystem.getDraggedItem();
     const rotationIndex = (draggedItem && draggedItem.instanceId === cell.instanceId && typeof draggedItem.rotationIndex === 'number')
         ? draggedItem.rotationIndex
         : (typeof cell.rotationIndex === 'number' ? cell.rotationIndex : 0);
@@ -198,6 +201,7 @@ function createSlot(container, location, index, cols) {
     // Priority: 1) draggedItem rotatedAura (during drag), 2) stored rotatedAura, 3) helper-derived aura
     let aura = null;
     let useBodyBoundsForAura = true;
+    // draggedItem already declared above
     if (draggedItem && draggedItem.instanceId === cell.instanceId && draggedItem.rotatedAura) {
         aura = draggedItem.rotatedAura;
         console.log('  🔄 Using rotated aura for drag preview:', JSON.stringify(aura));
@@ -315,7 +319,7 @@ function createSlot(container, location, index, cols) {
         calcOffsetY = Math.min(calcOffsetY, rows - 1);
 
         // Start the custom pointer drag with instanceId from grid cell
-        if (typeof window.startCustomDrag === 'function') {
+        if (typeof DragSystem?.startCustomDrag === 'function') {
             // Pass a COPY of the shape to avoid modifying the grid cell during rotation
             const shapeCopy = shape.map(r => [...r]);
             
@@ -325,7 +329,7 @@ function createSlot(container, location, index, cols) {
             }
             
             // Pass cell.rotatedAura to preserve rotation when picking up item
-            window.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shapeCopy, itemEl, e, cell.instanceId, cell.rotatedAura, rotationIndex);
+            DragSystem.startCustomDrag(item, location, index, calcOffsetX, calcOffsetY, shapeCopy, itemEl, e, cell.instanceId, cell.rotatedAura, rotationIndex);
         }
     });
 

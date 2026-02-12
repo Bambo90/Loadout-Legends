@@ -1,10 +1,194 @@
 // customDrag.js
 // Pointer-based drag & drop replacement to avoid native drag inconsistencies.
+// Includes rotation logic for items during drag.
+// Fully encapsulated drag system with explicit API (window.DragSystem).
+
+// ===== PRIVATE STATE =====
+let draggedItem = null; // Private drag state - only accessible via DragSystem API
 
 let _customFollowEl = null;
 let _customPointerMove = null;
 let _customPointerUp = null;
+let _rotationKeyHandler = null;
+let _rotationWheelHandler = null;
+let _rotationCount = 0;
+let _lastKeyRotate = 0;
+let _lastWheelRotate = 0;
 
+// ===== PERFORMANCE MONITORING =====
+let _perfFrameTimes = [];
+let _perfLastFrameTime = 0;
+let _perfEnabled = false; // Set to true to enable perf logging
+
+// ===== ROTATION UTILITIES =====
+function rotateMatrixCW(matrix) {
+    const h = matrix.length;
+    const w = matrix[0].length;
+    const res = Array.from({ length: w }, () => Array(h).fill(0));
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            res[x][h - 1 - y] = matrix[y][x];
+        }
+    }
+    return res;
+}
+
+function rotateMatrixCCW(matrix) {
+    // rotate CCW by applying CW three times (simple and robust)
+    let m = matrix;
+    m = rotateMatrixCW(m);
+    m = rotateMatrixCW(m);
+    m = rotateMatrixCW(m);
+    return m;
+}
+
+function normalizeShape(shape) {
+    let minR = Infinity;
+    let minC = Infinity;
+    let maxR = -1;
+    let maxC = -1;
+    for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[0].length; c++) {
+            if (!shape[r][c]) continue;
+            if (r < minR) minR = r;
+            if (c < minC) minC = c;
+            if (r > maxR) maxR = r;
+            if (c > maxC) maxC = c;
+        }
+    }
+    if (maxR === -1 || maxC === -1) {
+        console.error('  ⚠️ EMPTY SHAPE! All cells zero:', JSON.stringify(shape));
+        return { shape, minR: 0, minC: 0 };
+    }
+    const trimmed = [];
+    for (let r = minR; r <= maxR; r++) {
+        const row = [];
+        for (let c = minC; c <= maxC; c++) {
+            row.push(shape[r][c] ? 1 : 0);
+        }
+        trimmed.push(row);
+    }
+    return { shape: trimmed, minR, minC };
+}
+
+function applyRotation(dir) {
+    // dir: +1 = CW 90deg, -1 = CCW 90deg
+    if (!draggedItem || !draggedItem.item) {
+        console.warn('⚠️ applyRotation ABORT: draggedItem is null or no item');
+        return;
+    }
+
+    _rotationCount++;
+
+    const item = draggedItem.item;
+    const currentRotIndex = draggedItem.rotationIndex || 0;
+    const nextRotIndex = dir === 1
+        ? (currentRotIndex + 1) % 4
+        : ((currentRotIndex - 1) + 4) % 4;
+
+    const rotationGrid = (typeof getItemRotationGrid === 'function')
+        ? getItemRotationGrid(item, nextRotIndex)
+        : null;
+    if (rotationGrid) {
+        draggedItem.rotationIndex = nextRotIndex;
+        draggedItem.previewShape = getItemBodyMatrix(item, nextRotIndex).map(r => [...r]);
+        const aura = getItemAuraMatrix(item, nextRotIndex);
+        draggedItem.rotatedAura = aura ? aura.map(r => [...r]) : null;
+
+        if (typeof window._updateFollowElement === 'function') {
+            window._updateFollowElement();
+        }
+        if (typeof window._updateFollowElementPosition === 'function' && window._dragLastPos) {
+            window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
+        }
+        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+        return;
+    }
+
+    applyRotationCanonical(dir);
+}
+
+function applyRotationCanonical(dir) {
+    // Legacy rotation code (for items without rotations)
+    if (!draggedItem) return;
+    
+    _rotationCount++;
+    
+    // capture OLD shape dimensions BEFORE rotation
+    const oldShape = draggedItem.previewShape;
+    const oldH = oldShape.length;
+    const oldW = oldShape[0] ? oldShape[0].length : 1;
+    const oldX = draggedItem.offsetX;
+    const oldY = draggedItem.offsetY;
+    
+    if (dir === 1) {
+        // CW rotation: offset formula uses OLD dimensions
+        const rotated = rotateMatrixCW(oldShape);
+        let newOffsetX = (oldH - 1) - oldY;
+        let newOffsetY = oldX;
+        const norm = normalizeShape(rotated);
+        draggedItem.previewShape = norm.shape;
+        // adjust offsets after trimming
+        newOffsetX -= norm.minC;
+        newOffsetY -= norm.minR;
+        const newW = norm.shape[0] ? norm.shape[0].length : 1;
+        const newH = norm.shape.length;
+        // Clamp offsets inside new shape bounds
+        draggedItem.offsetX = Math.min(Math.max(0, newOffsetX), newW - 1);
+        draggedItem.offsetY = Math.min(Math.max(0, newOffsetY), newH - 1);
+        
+        // ROTATE AURA as well!
+        if (draggedItem.item && draggedItem.item.aura) {
+            const oldAura = draggedItem.rotatedAura || draggedItem.item.aura;
+            const rotatedAura = rotateMatrixCW(oldAura);
+            const normAura = normalizeShape(rotatedAura);
+            draggedItem.rotatedAura = normAura.shape;
+        }
+        
+        // Update follow element visuals and position
+        if (typeof window._updateFollowElement === 'function') {
+            window._updateFollowElement();
+        }
+        if (typeof window._updateFollowElementPosition === 'function' && window._dragLastPos) {
+            window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
+        }
+    } else if (dir === -1) {
+        // CCW rotation: offset formula uses OLD dimensions
+        const rotated = rotateMatrixCCW(oldShape);
+        let newOffsetX = oldY;
+        let newOffsetY = (oldW - 1) - oldX;
+        const norm = normalizeShape(rotated);
+        draggedItem.previewShape = norm.shape;
+        // adjust offsets after trimming
+        newOffsetX -= norm.minC;
+        newOffsetY -= norm.minR;
+        const newW = norm.shape[0] ? norm.shape[0].length : 1;
+        const newH = norm.shape.length;
+        // Clamp offsets inside new shape bounds
+        draggedItem.offsetX = Math.min(Math.max(0, newOffsetX), newW - 1);
+        draggedItem.offsetY = Math.min(Math.max(0, newOffsetY), newH - 1);
+        
+        // ROTATE AURA as well!
+        if (draggedItem.item && draggedItem.item.aura) {
+            const oldAura = draggedItem.rotatedAura || draggedItem.item.aura;
+            const rotatedAura = rotateMatrixCCW(oldAura);
+            const normAura = normalizeShape(rotatedAura);
+            draggedItem.rotatedAura = normAura.shape;
+        }
+        
+        // Update follow element visuals and position
+        if (typeof window._updateFollowElement === 'function') {
+            window._updateFollowElement();
+        }
+        if (typeof window._updateFollowElementPosition === 'function' && window._dragLastPos) {
+            window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
+        }
+    }
+    // Update grid preview to show new rotation
+    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+}
+
+// ===== GRID UTILITIES =====
 function _getGridSlotFromPoint(clientX, clientY) {
     const bankGrid = document.getElementById('bank-grid');
     const activeGrid = document.getElementById('active-setup-grid');
@@ -117,6 +301,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     _customFollowEl.style.position = 'fixed';
     _customFollowEl.style.pointerEvents = 'none';
     _customFollowEl.style.zIndex = 99999;
+    _customFollowEl.style.willChange = 'transform'; // Compositor optimization
 
     const shape = draggedItem.previewShape || [[1]];
     const rows = shape.length;
@@ -262,7 +447,6 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
     // Function to rebuild follow element visuals when shape changes (e.g., rotation)
     window._updateFollowElement = function() {
-        console.log('🎨 _updateFollowElement called: draggedItem=' + (draggedItem ? draggedItem.item.id : 'null') + ' rotIndex=' + (draggedItem ? draggedItem.rotationIndex : '?'));
         if (!draggedItem || !_customFollowEl) return;
         const shape = draggedItem.previewShape || [[1]];
         const rows = shape.length;
@@ -376,6 +560,11 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             _customFollowEl.appendChild(auraOverlay);
         }
         
+        // Update cached geometry after rotation changes dimensions
+        if (typeof window._updateCachedGeometry === 'function') {
+            window._updateCachedGeometry();
+        }
+        
         // ADD ICON / SPRITE (on top)
         if (draggedItem.item.sprite || draggedItem.item.image) {
             const img = document.createElement('img');
@@ -410,40 +599,46 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     const _localOffsetX = draggedItem.offsetX;
     const _localOffsetY = draggedItem.offsetY;
 
+    // Cache geometry once on drag start to avoid repeated DOM reads in mousemove loop
+    const _cachedGeo = { cellW: cellW2, cellH: cellH2 };
+    
+    // Update cached geometry when rotation changes shape
+    window._updateCachedGeometry = () => {
+        if (!draggedItem) return;
+        const sourceGrid = (fromLocation === 'bank') ? document.getElementById('bank-grid') : document.getElementById('active-setup-grid');
+        const sourceCols = (fromLocation === 'bank') ? getBankCols() : GRID_SIZE;
+        const geo = getCellGeometry(sourceGrid || document.body, sourceCols);
+        _cachedGeo.cellW = geo.cellW;
+        _cachedGeo.cellH = geo.cellH;
+    };
+
     // Throttled positioning: use requestAnimationFrame to avoid doing heavy layout math on every pointermove
     let _pendingRAF = false;
     let _rafX = 0;
     let _rafY = 0;
 
     const doUpdatePos = (clientX, clientY) => {
+        // Performance monitoring (frame time delta)
+        if (_perfEnabled) {
+            const now = performance.now();
+            if (_perfLastFrameTime > 0) {
+                const delta = now - _perfLastFrameTime;
+                _perfFrameTimes.push(delta);
+            }
+            _perfLastFrameTime = now;
+        }
+        
         window._dragLastPos = { x: clientX, y: clientY };
         const curOffsetX = (draggedItem && typeof draggedItem.offsetX === 'number') ? draggedItem.offsetX : _localOffsetX;
         const curOffsetY = (draggedItem && typeof draggedItem.offsetY === 'number') ? draggedItem.offsetY : _localOffsetY;
-        // Determine grid under cursor to get accurate cell geometry
-        let geoUnder = null;
-        let gridEl = null;
-        let colsUnder = GRID_SIZE;
-        try {
-            const elems = document.elementsFromPoint(clientX, clientY);
-            const slot = elems && elems.find(el => el.classList && el.classList.contains('grid-slot')) || null;
-            gridEl = slot ? slot.closest('.inventory-grid') : null;
-            // when hit-testing use the cols of the detected grid if available
-            try { colsUnder = (gridEl && gridEl.id === 'bank-grid') ? (typeof getBankCols === 'function' ? getBankCols() : 6) : GRID_SIZE; } catch (e) { colsUnder = GRID_SIZE; }
-            geoUnder = getCellGeometry(gridEl || document.getElementById('bank-grid') || document.body, colsUnder);
-        } catch (err) {
-            colsUnder = (typeof getBankCols === 'function') ? getBankCols() : 6;
-            geoUnder = getCellGeometry(document.getElementById('bank-grid') || document.body, colsUnder);
-        }
-        try {
-            const px = Math.round(clientX - (curOffsetX * geoUnder.cellW));
-            const py = Math.round(clientY - (curOffsetY * geoUnder.cellH));
-            if (_customFollowEl) {
-                _customFollowEl.style.left = px + 'px';
-                _customFollowEl.style.top = py + 'px';
-                _customFollowEl.style.willChange = 'left, top, transform';
-            }
-        } catch (e) {
-            // ignore
+        
+        // Use cached geometry for compositor-friendly transform positioning (no layout reads)
+        const px = Math.round(clientX - (curOffsetX * _cachedGeo.cellW));
+        const py = Math.round(clientY - (curOffsetY * _cachedGeo.cellH));
+        
+        if (_customFollowEl) {
+            // Use transform for GPU-accelerated movement (no layout thrashing)
+            _customFollowEl.style.transform = `translate(${px}px, ${py}px)`;
         }
     };
 
@@ -503,26 +698,19 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     _customPointerUp = (ev) => {
         ev.preventDefault();
         try {
-            // debug: log current offsets and shape at drop
-            console.log('drop - draggedItem offsets/shape', draggedItem && { offsetX: draggedItem.offsetX, offsetY: draggedItem.offsetY, shape: (draggedItem.previewShape || []).map(r=>r.length) });
-            
             // Check if dropped on SELL ZONE first
             const elemsForSell = document.elementsFromPoint(ev.clientX, ev.clientY);
             const sellZone = elemsForSell && elemsForSell.find(el => el.id === 'sell-zone');
             
             if (sellZone && draggedItem) {
-                console.log('💰 SELL ATTEMPT (custom drag)', { itemId: draggedItem.item.id, instanceId: draggedItem.instanceId, fromLocation: draggedItem.fromLocation, item: draggedItem.item });
                 const item = draggedItem.item;
                 const sellPrice = Math.floor(item.price * 0.5);
-                console.log('  Price:', item.price, '→ Sell for:', sellPrice);
                 gameData.gold += sellPrice;
-                console.log('  Gold now:', gameData.gold);
                 // Item already cleared from grid when drag started, so just null draggedItem
                 hideAllAuras(); // Hide aura when drag ends
                 draggedItem = null;
                 updateUI();
                 saveGame();
-                console.log('  ✅ SELL COMPLETE');
                 
                 // Cleanup and exit
                 setTimeout(() => {
@@ -530,10 +718,26 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                     _customFollowEl = null;
                     window.removeEventListener('pointermove', _customPointerMove);
                     window.removeEventListener('pointerup', _customPointerUp);
+                    if (_rotationKeyHandler) window.removeEventListener('keydown', _rotationKeyHandler);
+                    if (_rotationWheelHandler) window.removeEventListener('wheel', _rotationWheelHandler);
                     _customPointerMove = null;
                     _customPointerUp = null;
+                    _rotationKeyHandler = null;
+                    _rotationWheelHandler = null;
                     document.body.style.cursor = '';
                     document.body.classList.remove('dragging','drop-allowed','drop-invalid');
+                    
+                    // Performance report
+                    if (_perfEnabled && _perfFrameTimes.length > 0) {
+                        const avg = _perfFrameTimes.reduce((a,b) => a+b, 0) / _perfFrameTimes.length;
+                        const min = Math.min(..._perfFrameTimes);
+                        const max = Math.max(..._perfFrameTimes);
+                        const fps = 1000 / avg;
+                        console.log(`📈 Drag Performance: avg=${avg.toFixed(2)}ms (${fps.toFixed(1)}fps), min=${min.toFixed(2)}ms, max=${max.toFixed(2)}ms, frames=${_perfFrameTimes.length}`);
+                        _perfFrameTimes = [];
+                        _perfLastFrameTime = 0;
+                    }
+                    
                     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
                 }, 10);
                 return;
@@ -550,7 +754,6 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             if (_customFollowEl) _customFollowEl.style.display = 'none';
             const elems = document.elementsFromPoint(ev.clientX, ev.clientY);
             const slot = elems && elems.find(el => el.classList && el.classList.contains('grid-slot')) || null;
-            console.log('custom drop coords', ev.clientX, ev.clientY, 'found slot', !!slot, 'hoverTarget', draggedItem && draggedItem.hoverTarget);
             
             let dropSlot = slot || draggedItem._dropSlot || draggedItem._lastValidSlot || null;
             if (!dropSlot) {
@@ -568,7 +771,6 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 // final fallback: try hoverTarget selector
                 const selector = `.grid-slot[data-location="${draggedItem.hoverTarget.location}"][data-index="${draggedItem.hoverTarget.index}"]`;
                 const slot2 = document.querySelector(selector);
-                console.log('custom drop fallback selector', selector, 'found', !!slot2);
                 if (slot2) handleDropInSlot({ preventDefault: () => {}, currentTarget: slot2 });
             }
         } catch (err) {
@@ -584,10 +786,26 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             _customFollowEl = null;
             window.removeEventListener('pointermove', _customPointerMove);
             window.removeEventListener('pointerup', _customPointerUp);
+            if (_rotationKeyHandler) window.removeEventListener('keydown', _rotationKeyHandler);
+            if (_rotationWheelHandler) window.removeEventListener('wheel', _rotationWheelHandler);
             _customPointerMove = null;
             _customPointerUp = null;
+            _rotationKeyHandler = null;
+            _rotationWheelHandler = null;
             // Restore cursor
             document.body.style.cursor = '';
+            
+            // Performance report
+            if (_perfEnabled && _perfFrameTimes.length > 0) {
+                const avg = _perfFrameTimes.reduce((a,b) => a+b, 0) / _perfFrameTimes.length;
+                const min = Math.min(..._perfFrameTimes);
+                const max = Math.max(..._perfFrameTimes);
+                const fps = 1000 / avg;
+                console.log(`📈 Drag Performance: avg=${avg.toFixed(2)}ms (${fps.toFixed(1)}fps), min=${min.toFixed(2)}ms, max=${max.toFixed(2)}ms, frames=${_perfFrameTimes.length}`);
+                _perfFrameTimes = [];
+                _perfLastFrameTime = 0;
+            }
+            
             // if draggedItem still exists (drop failed), restore
             if (draggedItem) {
                 if (gameData[draggedItem.fromLocation]) {
@@ -611,13 +829,50 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
             }
             document.body.classList.remove('dragging','drop-allowed','drop-invalid');
-            _lastDropState = null;
         }, 10);
     };
 
     window.addEventListener('pointermove', _customPointerMove);
     window.addEventListener('pointerup', _customPointerUp, { once: true });
+    
+    // Attach rotation listeners (active only during drag)
+    _rotationKeyHandler = (e) => {
+        if (!draggedItem) return;
+        if (e.key.toLowerCase() !== 'r') return;
+        const now = Date.now();
+        if (now - _lastKeyRotate < 150) return; // debounce: ignore rapid repeats
+        _lastKeyRotate = now;
+        e.preventDefault();
+        const dir = e.shiftKey ? -1 : 1;
+        applyRotation(dir);
+    };
+    
+    _rotationWheelHandler = (e) => {
+        if (!draggedItem) return;
+        const now = Date.now();
+        if (now - _lastWheelRotate < 120) return; // ignore rapid repeats
+        _lastWheelRotate = now;
+        // deltaY < 0 => wheel up; map wheel up to CCW (-1), wheel down to CW (+1)
+        const dir = (e.deltaY < 0) ? -1 : 1;
+        e.preventDefault();
+        applyRotation(dir);
+    };
+    
+    window.addEventListener('keydown', _rotationKeyHandler);
+    window.addEventListener('wheel', _rotationWheelHandler, { passive: false });
 }
 
-// Expose startCustomDrag globally so workshopEngine can call it
-window.startCustomDrag = startCustomDrag;
+// ===== PUBLIC API =====
+// Single namespace for all drag system interactions
+window.DragSystem = {
+    // Drag state access
+    getDraggedItem: () => draggedItem,
+    clearDraggedItem: () => { draggedItem = null; },
+    
+    // Drag operations
+    startCustomDrag: startCustomDrag,
+    
+    // Performance monitoring (for debugging)
+    enablePerf: () => { _perfEnabled = true; console.log('🎯 Drag performance logging ENABLED'); },
+    disablePerf: () => { _perfEnabled = false; console.log('🎯 Drag performance logging DISABLED'); }
+};

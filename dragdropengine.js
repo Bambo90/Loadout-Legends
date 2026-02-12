@@ -5,6 +5,7 @@
 
 function handleDropInSlot(e) {
     e.preventDefault();
+    const draggedItem = DragSystem.getDraggedItem();
     if (!draggedItem) return;
 
     const slot = e.currentTarget;
@@ -37,7 +38,7 @@ function handleDropInSlot(e) {
             draggedItem.rotatedAura || null,
             draggedItem.rotationIndex
         );
-        draggedItem = null;
+        DragSystem.clearDraggedItem();
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
         return;
     }
@@ -144,7 +145,7 @@ function handleDropInSlot(e) {
             draggedItem.rotatedAura || null,
             draggedItem.rotationIndex
         );
-        draggedItem = null;
+        DragSystem.clearDraggedItem();
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
         return;
     }
@@ -223,7 +224,7 @@ function handleDropInSlot(e) {
             draggedItem.rotatedAura || null,
             draggedItem.rotationIndex
         );
-        draggedItem = null;
+        DragSystem.clearDraggedItem();
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
         return;
     }
@@ -242,7 +243,7 @@ function handleDropInSlot(e) {
         draggedItem.rotationIndex
     );
     console.log('✅ PLACED ITEM', { itemId: draggedItem.item.id, instance: draggedItem.instanceId, location, index: chosenIndex });
-    draggedItem = null;
+    DragSystem.clearDraggedItem();
     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
     
     if (typeof saveGame === 'function') {

@@ -456,6 +456,7 @@ function renderShop() {
  * Preview shows BODY only; aura is shown on hover elsewhere.
  */
 function renderDragPreviewForGrid(container, location, cols, totalSlots) {
+    const draggedItem = DragSystem.getDraggedItem();
     if (!draggedItem) return;
 
     // Determine whether the mouse is over THIS container. Prefer explicit hoverTarget
@@ -588,6 +589,7 @@ function renderWorkshopGrids() {
         sellZone.addEventListener('drop', (e) => {
             e.preventDefault();
             sellZone.classList.remove('drag-over');
+            const draggedItem = DragSystem.getDraggedItem();
             if (draggedItem) {
                 console.log('💰 SELL ATTEMPT', { itemId: draggedItem.item.id, instanceId: draggedItem.instanceId, fromLocation: draggedItem.fromLocation, item: draggedItem.item });
                 const item = draggedItem.item;
@@ -597,7 +599,7 @@ function renderWorkshopGrids() {
                 console.log('  Gold now:', gameData.gold);
                 console.log('  Clearing from grid:', gameData[draggedItem.fromLocation]);
                 clearItemFromGrid(gameData[draggedItem.fromLocation], draggedItem.instanceId);
-                draggedItem = null;
+                DragSystem.clearDraggedItem();
                     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
                 updateUI();
                 saveGame();

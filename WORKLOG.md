@@ -109,3 +109,4 @@ Session Close Checklist (what assistant will remind you to do besides saving):
 
 <!-- Add new AI or user entries below using the `npm run worklog "message"` helper or by manual edit. -->
 - 2026-02-12 19:02 - Auto: merge 475ce55
+- 2026-02-12 19:16 - Auto: commit 1809152
