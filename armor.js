@@ -1,6 +1,45 @@
-﻿/* ITEM DEFINITION - ARMOR (Defense with all 4 Rotations) */
+﻿/* ITEM DEFINITION - ARMOR (Centralized Rotation Table) */
+
+/* =========================================================
+   DEFAULT ROTATION TABLE FOR ALL ARMOR ITEMS
+   ========================================================= */
+
+const DEFAULT_ARMOR_ROTATIONS = {
+    0: { grid: [
+        ['A','A','A','A'],
+        ['A','B','B','A'],
+        ['A','B','B','A'],
+        ['A','B','B','A'],
+        ['A','A','A','A']
+    ]},
+    1: { grid: [
+        ['A','A','A','A','A'],
+        ['A','B','B','B','A'],
+        ['A','B','B','B','A'],
+        ['A','A','A','A','A']
+    ]},
+    2: { grid: [
+        ['A','A','A','A'],
+        ['A','B','B','A'],
+        ['A','B','B','A'],
+        ['A','B','B','A'],
+        ['A','A','A','A']
+    ]},
+    3: { grid: [
+        ['A','A','A','A','A'],
+        ['A','B','B','B','A'],
+        ['A','B','B','B','A'],
+        ['A','A','A','A','A']
+    ]}
+};
+
+
+/* =========================================================
+   ARMOR ITEMS
+   ========================================================= */
 
 const ARMOR_ITEMS = [
+
     { 
         id: "armor_new_1",
         name: "Leinenpanzer", 
@@ -12,14 +51,7 @@ const ARMOR_ITEMS = [
         req: 1, 
         defense: 5,
         evasion: 0.1,
-        desc: "Einfache Leinenkleidung, bietet minimalen Schutz.",
-
-        rotations: {
-            0: { grid: [['A', 'A', 'A', 'A', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', '0', 'B', '0', 'A'], ['0', 'A', '0', 'A', '0']] },
-            1: { grid: [['0', 'A', 'A', 'A', '0'], ['A', '0', 'B', 'B', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', '0', 'B', '0', 'A'], ['0', 'A', '0', 'A', '0']] },
-            2: { grid: [['0', 'A', '0', 'A', '0'], ['A', '0', 'B', '0', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', 'A', 'A', 'A', 'A']] },
-            3: { grid: [['0', 'A', '0', 'A', '0'], ['A', '0', 'B', '0', 'A'], ['A', 'B', 'B', 'B', 'A'], ['A', 'B', 'B', '0', 'A'], ['0', 'A', 'A', 'A', 'A']] }
-        }
+        desc: "Einfache Leinenkleidung, bietet minimalen Schutz."
     },
 
     { 
@@ -35,18 +67,7 @@ const ARMOR_ITEMS = [
         evasion: 0.15,
         durability: 1.1,
         desc: "Schwere Bronzerüstung, robust und zuverlässig.",
-        sprite: "Media/Images/Items/Armours/Bronze_A.png",
-
-        /*
-         * Define rotations as a 5x4 combined grid (5 cols x 4 rows).
-         * The body is a centered 3x2 block (columns 1-3, rows 1-2).
-         */
-        rotations: {
-            0: { grid: [['A','A','A','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','A','A','A']] },
-            1: { grid: [['A','A','A','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','A','A','A']] },
-            2: { grid: [['A','A','A','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','A','A','A']] },
-            3: { grid: [['A','A','A','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','B','B','A'], ['A','A','A','A']] }
-        }
+        sprite: "Media/Images/Items/Armours/Bronze_A.png"
     },
 
     { 
@@ -61,14 +82,7 @@ const ARMOR_ITEMS = [
         defense: 22,
         evasion: 0.25,
         magicReduction: 0.15,
-        desc: "Elegante Plattenkombination aus feinem Mithril.",
-
-        rotations: {
-            0: { grid: [['A', 'A', 'AB', 'AB', 'AB', 'A', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', 'B', '0', '0', 'A'], ['0', 'A', '0', 'B', '0', 'A', '0'], ['0', 'A', '0', '0', '0', 'A', '0']] },
-            1: { grid: [['0', 'A', 'A', 'A', 'A', 'A', '0'], ['A', '0', '0', '0', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'B', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', '0', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', 'A', '0']] },
-            2: { grid: [['0', 'A', '0', 'B', '0', 'A', '0'], ['0', 'A', '0', 'B', '0', 'A', '0'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A', 'A']] },
-            3: { grid: [['0', 'A', 'A', 'A', 'A', 'A', '0'], ['A', '0', '0', '0', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', 'B', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', '0', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', 'A', '0']] }
-        }
+        desc: "Elegante Plattenkombination aus feinem Mithril."
     },
 
     { 
@@ -85,14 +99,7 @@ const ARMOR_ITEMS = [
         defense: 18,
         evasion: 0.35,
         spectralDefense: 0.2,
-        desc: "Eine mystische Robe, die zwischen Welten flüstert.",
-
-        rotations: {
-            0: { grid: [['A', 'A', 'AB', 'AB', 'AB', 'A', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', 'B', '0', '0', 'A'], ['0', 'A', '0', 'B', '0', 'A', '0'], ['0', 'A', '0', '0', '0', 'A', '0']] },
-            1: { grid: [['0', 'A', 'A', 'A', 'A', 'A', '0'], ['A', '0', '0', '0', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'B', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', '0', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', 'A', '0']] },
-            2: { grid: [['0', 'A', '0', 'B', '0', 'A', '0'], ['0', 'A', '0', 'B', '0', 'A', '0'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A', 'A']] },
-            3: { grid: [['0', 'A', 'A', 'A', 'A', 'A', '0'], ['A', '0', '0', '0', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', 'B', 'A'], ['A', '0', 'B', 'B', 'B', '0', 'A'], ['A', '0', '0', '0', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', 'A', '0']] }
-        }
+        desc: "Eine mystische Robe, die zwischen Welten flüstert."
     },
 
     { 
@@ -109,13 +116,25 @@ const ARMOR_ITEMS = [
         defense: 45,
         evasion: -0.05,
         physicalReduction: 0.3,
-        desc: "Die ultimative Rüstung, geschmiedet im Mithril-Hochofen.",
-
-        rotations: {
-            0: { grid: [['A', 'A', 'AB', 'AB', 'AB', 'A', 'A', 'A'], ['A', '0', 'B', 'B', 'B', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', '0', 'A'], ['A', '0', '0', 'B', '0', '0', '0', 'A'], ['0', 'A', '0', '0', '0', '0', 'A', '0']] },
-            1: { grid: [['0', 'A', 'A', 'A', 'A', 'A', 'A', '0'], ['A', '0', '0', '0', '0', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', 'B', '0', 'A'], ['A', 'B', 'B', 'B', 'B', '0', '0', 'A'], ['A', '0', '0', '0', '0', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', 'A', 'A', '0']] },
-            2: { grid: [['0', 'A', '0', 'B', '0', '0', 'A', '0'], ['A', '0', 'B', 'B', 'B', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', '0', '0', 'A'], ['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A']] },
-            3: { grid: [['0', 'A', 'A', 'A', 'A', 'A', 'A', '0'], ['A', '0', '0', '0', '0', '0', '0', 'A'], ['A', '0', 'B', 'B', 'B', 'B', '0', 'A'], ['A', 'B', 'B', 'B', 'B', '0', '0', 'A'], ['A', '0', '0', '0', '0', '0', '0', 'A'], ['0', 'A', 'A', 'A', 'A', 'A', 'A', '0']] }
-        }
+        desc: "Die ultimative Rüstung, geschmiedet im Mithril-Hochofen."
     }
 ];
+
+
+/* =========================================================
+   APPLY DEFAULT ROTATIONS (DEEP COPY)
+   ========================================================= */
+
+ARMOR_ITEMS.forEach(item => {
+    if (!item.rotations) {
+        // Deep copy to avoid shared mutation between items
+        item.rotations = JSON.parse(JSON.stringify(DEFAULT_ARMOR_ROTATIONS));
+    }
+});
+
+
+/* =========================================================
+   EXPORT (if needed globally)
+   ========================================================= */
+
+window.ARMOR_ITEMS = ARMOR_ITEMS;

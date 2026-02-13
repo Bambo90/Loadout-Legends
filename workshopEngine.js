@@ -122,25 +122,41 @@ function createSlot(container, location, index, cols) {
     });
 
     // Prefer sprite image overlay when available, centered above the body.
+    const rotationDeg = rotationIndex * 90;
     if (item.sprite || item.image) {
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'absolute';
+        wrapper.style.left = '0';
+        wrapper.style.top = '0';
+        wrapper.style.width = '100%';
+        wrapper.style.height = '100%';
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.justifyContent = 'center';
+        wrapper.style.pointerEvents = 'none';
+        wrapper.style.zIndex = '110';
+        
         const img = document.createElement('img');
         img.src = item.sprite || item.image;
         img.alt = item.name || '';
         img.classList.add('item-sprite');
-        img.style.position = 'absolute';
-        img.style.left = '50%';
-        img.style.top = '50%';
-        img.style.transform = 'translate(-50%, -50%)';
-        img.style.maxWidth = '90%';
-        img.style.maxHeight = '90%';
-        img.style.pointerEvents = 'none';
-        img.style.zIndex = '110';
-        itemEl.appendChild(img);
+        if (rotationIndex % 2 === 0) {
+            img.style.width = '100%';
+            img.style.height = 'auto';
+        } else {
+            img.style.width = 'auto';
+            img.style.height = '100%';
+        }
+        img.style.transform = `rotate(${rotationDeg}deg)`;
+        img.style.transformOrigin = 'center';
+        wrapper.appendChild(img);
+        itemEl.appendChild(wrapper);
     } else {
         const icon = document.createElement('div');
         icon.classList.add('item-icon-overlay');
         icon.innerText = item.icon;
         icon.style.pointerEvents = "none";
+        icon.style.transform = `rotate(${rotationDeg}deg)`;
         itemEl.appendChild(icon);
     }
 

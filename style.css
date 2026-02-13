@@ -9,7 +9,12 @@
     --accent-blue: #2196F3;
     --accent-red: #ff3b3b;
     --border-color: #333;
-    --slot-size: 64px;
+    /* Grid + layout scale with viewport size (stable on 1440p, denser on 1080p) */
+    --slot-size: clamp(48px, min(5.2vh, 3.4vw), 64px);
+    --grid-gap: clamp(6px, 0.75vh, 8px);
+    --grid-padding: clamp(10px, 1.2vh, 15px);
+    --workshop-gap: clamp(16px, min(3vw, 4vh), 60px);
+    --workshop-padding: clamp(16px, min(3vw, 4vh), 60px);
 }
 
 body { 
@@ -56,8 +61,8 @@ body {
    ========================================= */
 #main-view { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
 #top-bar { 
-    height: 144px; background: var(--bg-panel); border-bottom: 2px solid var(--border-color); 
-    display: flex; align-items: center; padding: 0 44px; gap: 44px; box-sizing: border-box; 
+    height: clamp(100px, 11vh, 144px); background: var(--bg-panel); border-bottom: 2px solid var(--border-color); 
+    display: flex; align-items: center; padding: 0 clamp(16px, min(2.2vw, 2.8vh), 44px); gap: clamp(12px, min(2.2vw, 2.8vh), 44px); box-sizing: border-box; 
 }
 
 .stat-item { display: flex; flex-direction: column; min-width: 90px; }
@@ -79,11 +84,64 @@ body {
 /* =========================================
    4. CONTENT & GRIND
    ========================================= */
-#content-area { padding: 40px; overflow-y: auto; flex-grow: 1; }
-.tab-content { display: none; opacity: 0; transform: translateY(15px); transition: all 0.4s ease; }
-.tab-content.active { display: block; opacity: 1; transform: translateY(0); }
+/* Game Container: True fullscreen game viewport (100% of available space minus top-bar) */
+/* Game Container: True fullscreen game viewport (100% of available space minus top-bar) */
+#game-container {
+    flex-grow: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-dark);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
 
-.battle-area { display: flex; flex-direction: column; align-items: center; gap: 30px; }
+#content-area {
+    position: relative;
+    flex-grow: 1;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-dark);
+}
+
+/* Tab content: Fullscreen game scenes (no scrolling) */
+.tab-content { 
+    display: none; 
+    opacity: 0; 
+    transform: translateY(15px); 
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.tab-content.active { 
+    display: block;
+    opacity: 1; 
+    transform: translateY(0);
+    pointer-events: auto;
+    z-index: 5;
+}
+
+.battle-area { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    gap: 30px;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
 .monster-card { background: #1a1a1a; padding: 30px; border-radius: 20px; border: 2px solid #333; text-align: center; min-width: 300px; }
 .monster-icon { font-size: 4rem; margin-bottom: 15px; display: block; }
 .monster-hp-bar { width: 100%; height: 20px; background: #333; border-radius: 10px; overflow: hidden; margin: 15px 0; position: relative; }
@@ -112,7 +170,7 @@ body {
    ========================================= */
 .hub-header {
     text-align: center;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 .hub-header h3 {
     color: #ffffff;
@@ -124,7 +182,7 @@ body {
 }
 .hub-header p {
     color: #888;
-    font-size: 1.1rem;
+    font-size: 1.0rem;
 }
 
 .equipment-hub { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 30px; max-width: 1200px; margin-left: auto; margin-right: auto; justify-items: center; }
@@ -157,33 +215,43 @@ body {
 .preview-grid .item { width: 16px; height: 16px; top: 1px; left: 1px; font-size: 0.7rem; border: none; box-shadow: none; }
 
 /* =========================================
-   5b. ADVENTURE HUB
+   5b. ADVENTURE HUB - FULLSCREEN GAME SCENES
    ========================================= */
+/* Grind/Adventure zone view - Fullscreen game scene */
 #tab-grind {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow: hidden;
     background-image: url('Media/Images/Background_A.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-attachment: fixed;
-    min-height: calc(100vh - 104px);
-    margin: -40px;
-    padding: 40px;
-    width: calc(100% + 80px);
-    height: calc(100% + 80px);
+    background-attachment: scroll;
+    box-sizing: border-box;
 }
 
-/* Equipment hub background (Ausrüstungs-Zentrum) */
+/* Equipment hub - Fullscreen game scene */
 #tab-equipment {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow: hidden;
     background-image: url('Media/Images/Background_inventory.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    /* do not fix the background to allow content scrolling independently */
-    min-height: calc(100vh - 104px);
-    margin: -40px;
-    padding: 40px;
-    width: calc(100% + 80px);
-    height: calc(100% + 80px);
+    background-attachment: scroll;
+    box-sizing: border-box;
+    padding: 20px;
 }
 
 .adventure-hub { 
@@ -194,6 +262,21 @@ body {
     max-width: 1400px; 
     margin-left: auto;
     margin-right: auto;
+    padding: 40px 20px;
+    height: auto;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+/* Keep the default adventure hub dropdowns fully visible and avoid nested scrolling. */
+#tab-grind:not(.world-view) {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#tab-grind:not(.world-view) .adventure-hub {
+    max-height: none;
+    overflow: visible;
 }
 .adventure-card { 
     cursor: pointer; 
@@ -320,7 +403,7 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(42, 82, 152, 0.5);
 }
-.workshop-content { display: flex; gap: 60px; justify-content: center; align-items: flex-start; padding: 60px; overflow-y: auto; }
+.workshop-content { display: flex; gap: var(--workshop-gap); justify-content: center; align-items: flex-start; padding: var(--workshop-padding); overflow-y: auto; }
 
 .workshop-content.storage-mode .active-grid-section { display: none !important; }
 .workshop-content.storage-mode #bank-grid { grid-template-columns: repeat(10, var(--slot-size)) !important; }
@@ -337,7 +420,7 @@ body {
     background: #0f0f0f;
     border: 5px solid #333;
     border-radius: 16px;
-    padding: 20px;
+    padding: clamp(12px, 1.6vh, 20px);
     align-items: center;
 }
 
@@ -479,23 +562,21 @@ body {
 
 .inventory-grid { 
     display: grid; 
-    gap: 8px; 
+    gap: var(--grid-gap); 
     background: #000; 
-    padding: 15px; 
+    padding: var(--grid-padding); 
     border: 2px solid #333; 
     border-radius: 12px; 
-    width: auto;
-    max-width: 100%;
+    width: calc(10 * var(--slot-size) + 9 * var(--grid-gap) + 2 * var(--grid-padding)); 
     margin: 0 auto; 
     box-sizing: border-box;
 }
 
 #bank-grid {
-    --bank-cols: 10;
-    grid-template-columns: repeat(var(--bank-cols), var(--slot-size));
-    grid-auto-rows: var(--slot-size);
-    width: calc((var(--bank-cols) * var(--slot-size)) + ((var(--bank-cols) - 1) * 8px) + 30px);
-    height: calc(10 * var(--slot-size) + 9 * 8px + 30px);
+    grid-template-columns: repeat(10, var(--slot-size)) !important;
+    grid-auto-rows: var(--slot-size) !important;
+    width: calc(10 * var(--slot-size) + 9 * var(--grid-gap) + 2 * var(--grid-padding) + 5px) !important;
+    height: calc(10 * var(--slot-size) + 9 * var(--grid-gap) + 2 * var(--grid-padding) + 5px) !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     box-sizing: border-box !important;
@@ -508,10 +589,10 @@ body {
 }
 
 #active-setup-grid {
-    grid-template-columns: repeat(10, var(--slot-size));
-    grid-auto-rows: var(--slot-size);
-    width: calc(10 * var(--slot-size) + 9 * 8px + 30px);
-    height: calc(10 * var(--slot-size) + 9 * 8px + 30px);
+    grid-template-columns: repeat(10, var(--slot-size)) !important;
+    grid-auto-rows: var(--slot-size) !important;
+    width: calc(10 * var(--slot-size) + 9 * var(--grid-gap) + 2 * var(--grid-padding) + 5px) !important;
+    height: calc(10 * var(--slot-size) + 9 * var(--grid-gap) + 2 * var(--grid-padding) + 5px) !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
 }
@@ -572,6 +653,18 @@ body {
 .shape-block.unique { background: rgba(249, 115, 22, 0.75); border-color: #f97316; }
 .shape-block.legendary { background: rgba(168, 85, 247, 0.75); border-color: #a855f7; }
 
+/* Reduce expensive effects while dragging for smoother motion */
+body.dragging .shape-block,
+body.dragging .item.legendary,
+body.dragging .item.unique,
+body.dragging .item.rare,
+body.dragging .item.magic,
+body.dragging .item.common {
+    box-shadow: none !important;
+}
+body.dragging .item-icon-overlay { text-shadow: none; }
+body.dragging .aura-overlay { opacity: 0.35 !important; }
+
 /* Das Icon-Overlay (Absolute Zentrierung über die Form) */
 .item-icon-overlay {
     position: absolute;
@@ -600,6 +693,219 @@ body {
     height: 56px;
     object-fit: contain;
     margin: 8px auto 0 auto;
+}
+
+/* World view readability without containers */
+.world-view {
+    position: relative;
+}
+.world-view::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.08) 35%, rgba(0,0,0,0.22) 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+.world-view > * {
+    position: relative;
+    z-index: 1;
+}
+.world-view .world-title,
+.world-view .world-subtitle,
+.world-view .world-act-title,
+.world-view .world-zone-title,
+.world-view .world-zone-desc {
+    color: #f4f1e8;
+    text-shadow:
+        0 1px 2px rgba(0,0,0,0.75),
+        0 3px 12px rgba(0,0,0,0.55),
+        0 0 24px rgba(0,0,0,0.35);
+}
+.world-view .world-subtitle,
+.world-view .world-zone-desc {
+    color: #e7e1d4;
+}
+.world-view .world-title {
+    letter-spacing: 3px;
+}
+.world-view .world-act-title,
+.world-view .world-zone-title {
+    letter-spacing: 1px;
+}
+.world-view .world-back-btn {
+    background: rgba(10,10,10,0.55);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #f2efe7;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+
+/* Zone (Küstenpfad) view layout - Fullscreen game scene */
+.zone-view {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow: hidden;
+}
+
+.zone-view .hub-header {
+    position: absolute;
+    top: 20px;
+    right: 3%;
+    margin: 0;
+    text-align: right;
+    max-width: 20%;
+    z-index: 10;
+}
+
+.zone-view .hub-header h3 {
+    font-size: clamp(1rem, 3vw, 1.4rem);
+    margin-bottom: 6px;
+}
+
+.zone-view .hub-header p {
+    font-size: clamp(0.8rem, 1.5vw, 0.9rem);
+}
+
+/* Monster display container - Positioned in viewport center-top */
+.zone-monster {
+    position: absolute;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    z-index: 5;
+}
+
+.zone-monster-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 30px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(6,6,6,0.45);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    position: relative;
+}
+
+.zone-monster-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,215,0,0.6);
+}
+
+.zone-monster-portrait {
+    width: 280px;
+    height: 280px;
+    border-radius: 20px;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.2), rgba(0,0,0,0.6)),
+                linear-gradient(135deg, rgba(40,60,80,0.6), rgba(10,10,10,0.9));
+    border: 1px solid rgba(255,255,255,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6rem;
+    color: #f4f1e8;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+    flex-shrink: 0;
+}
+
+.zone-monster-details {
+    font-size: 0.95rem;
+    color: #e6dfcf;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease, max-height 0.2s ease;
+}
+
+.zone-monster-card:hover .zone-monster-details {
+    opacity: 1;
+    max-height: 120px;
+}
+
+/* Combat log positioned at bottom-left */
+.zone-info-grid {
+    position: absolute;
+    bottom: 120px;
+    left: 2%;
+    display: block;
+    max-width: 500px;
+    width: clamp(300px, 45vw, 500px);
+    margin: 0;
+    z-index: 8;
+}
+
+.zone-panel {
+    padding: 18px 22px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(8,8,8,0.45);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.3);
+    max-height: 220px;
+    display: flex;
+    flex-direction: column;
+}
+
+.zone-stats-panel {
+    position: absolute;
+    left: calc(100% + 5px);
+    top: 0;
+    width: 280px;
+    opacity: 0;
+    transform: translateX(-8px);
+    pointer-events: none;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    z-index: 9;
+}
+
+.zone-monster:hover .zone-stats-panel {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+}
+
+.zone-log {
+    min-height: 100px;
+    max-height: 160px;
+    overflow-y: auto;
+    color: #e7e1d4;
+    line-height: 1.45;
+    flex-grow: 1;
+}
+
+.zone-stats {
+    color: #e7e1d4;
+    display: grid;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Start button - Fixed to bottom center */
+.zone-start-btn {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: block;
+    width: min(320px, 85%);
+    margin: 0;
+    text-align: center;
+    z-index: 8;
+}
+
+/* Keep zone start CTA centered on hover (no sideways slide from .dropdown-item:hover). */
+.zone-start-btn:hover {
+    transform: translateX(-50%);
 }
 
 /* =========================================
@@ -646,7 +952,9 @@ body {
     cursor: copy;
 }
 
-/* 10. UTILS */
+/* =========================================
+   10. UTILS
+   ========================================= */
 .hidden { display: none !important; }
 #tooltip { position: fixed; z-index: 9999; background: rgba(0,0,0,0.95); padding: 15px; border: 1px solid #555; pointer-events: none; backdrop-filter: blur(5px); color: white; }
 
@@ -654,3 +962,105 @@ body {
 body.dragging { cursor: grabbing !important; }
 body.dragging.drop-allowed { cursor: grab !important; }
 body.dragging.drop-invalid { cursor: not-allowed !important; }
+
+/* =========================================
+   11. RESPONSIVE ADJUSTMENTS - FULLSCREEN GAME VIEWPORT
+   ========================================= */
+/* Ultra-wide displays (2560px+) */
+@media (min-width: 2560px) {
+    .zone-view .hub-header {
+        right: 4%;
+        top: 30px;
+    }
+    .zone-info-grid {
+        left: 3%;
+    }
+}
+
+/* Wide displays (1920px) */
+@media (max-width: 1920px) {
+    .zone-view .hub-header {
+        right: 3%;
+    }
+    
+    .zone-monster {
+        top: 50px;
+    }
+}
+
+/* Standard displays (1440px and below) */
+@media (max-width: 1440px) {
+    .zone-monster-portrait {
+        width: clamp(240px, 20vw, 280px);
+        height: clamp(240px, 20vw, 280px);
+        font-size: clamp(4rem, 5vw, 6rem);
+    }
+    
+    .zone-info-grid {
+        width: clamp(280px, 40vw, 500px);
+    }
+}
+
+/* Tablets and smaller screens (1200px and below) */
+@media (max-width: 1200px) {
+    .zone-info-grid {
+        bottom: 110px;
+        left: 1.5%;
+        width: clamp(260px, 60vw, 450px);
+    }
+    
+    .zone-monster {
+        top: 40px;
+    }
+    
+    .zone-monster-portrait {
+        width: clamp(200px, 18vw, 260px);
+        height: clamp(200px, 18vw, 260px);
+        font-size: clamp(3.5rem, 6vw, 5.5rem);
+    }
+    
+    .zone-start-btn {
+        bottom: 25px;
+        width: min(300px, 90%);
+    }
+}
+
+/* Mobile/Portrait orientation (768px and below) */
+@media (max-width: 768px) {
+    .zone-view .hub-header {
+        top: 15px;
+        right: 2%;
+        max-width: 30%;
+    }
+    
+    .zone-info-grid {
+        bottom: 100px;
+        left: 1%;
+        width: clamp(240px, 85vw, 400px);
+    }
+    
+    .zone-monster {
+        top: 30px;
+    }
+    
+    .zone-monster-portrait {
+        width: clamp(160px, 25vw, 220px);
+        height: clamp(160px, 25vw, 220px);
+        font-size: clamp(3rem, 7vw, 4.5rem);
+    }
+    
+    .zone-monster-card {
+        padding: 15px 20px;
+        gap: 12px;
+    }
+    
+    .zone-start-btn {
+        bottom: 20px;
+        width: min(280px, 90%);
+    }
+    
+    .zone-log {
+        min-height: 80px;
+        max-height: 140px;
+    }
+}

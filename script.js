@@ -90,6 +90,262 @@ function switchTab(tabId) {
     if (tabId === 'equipment') renderEquipmentHub();
 }
 
+let _worldViewBackup = null;
+
+function restoreWorldView() {
+    const grindTab = document.getElementById('tab-grind');
+    if (!grindTab || _worldViewBackup === null) return;
+    grindTab.innerHTML = _worldViewBackup;
+    grindTab.style.backgroundImage = '';
+    grindTab.style.backgroundSize = '';
+    grindTab.style.backgroundPosition = '';
+    grindTab.style.backgroundRepeat = '';
+    grindTab.classList.remove('world-view');
+    grindTab.classList.remove('zone-view');
+    _worldViewBackup = null;
+}
+
+function renderWorldView() {
+    const grindTab = document.getElementById('tab-grind');
+    if (!grindTab || typeof WORLD_DATA === 'undefined') return;
+
+    if (_worldViewBackup === null) {
+        _worldViewBackup = grindTab.innerHTML;
+    }
+
+    grindTab.innerHTML = '';
+    grindTab.style.backgroundImage = "url('Media/Images/World/Welt_A.png')";
+    grindTab.style.backgroundSize = 'cover';
+    grindTab.style.backgroundPosition = 'center';
+    grindTab.style.backgroundRepeat = 'no-repeat';
+    grindTab.style.position = 'relative';
+    grindTab.classList.add('world-view');
+    grindTab.classList.remove('zone-view');
+
+    const header = document.createElement('div');
+    header.classList.add('hub-header');
+    const title = document.createElement('h3');
+    title.classList.add('world-title');
+    title.textContent = 'Welt';
+    const subtitle = document.createElement('p');
+    subtitle.classList.add('world-subtitle');
+    subtitle.textContent = 'Wähle eine Zone für die Reise.';
+    header.appendChild(title);
+    header.appendChild(subtitle);
+
+    const backWrap = document.createElement('div');
+    backWrap.style.position = 'absolute';
+    backWrap.style.top = '16px';
+    backWrap.style.left = '16px';
+    const backBtn = document.createElement('button');
+    backBtn.classList.add('dropdown-item');
+    backBtn.classList.add('world-back-btn');
+    backBtn.style.width = 'auto';
+    backBtn.style.padding = '8px 12px';
+    backBtn.style.fontSize = '0.95rem';
+    backBtn.textContent = '← Zurück';
+    backBtn.addEventListener('click', restoreWorldView);
+    backWrap.appendChild(backBtn);
+
+    const actsContainer = document.createElement('div');
+    actsContainer.classList.add('adventure-hub');
+
+    WORLD_DATA.acts.forEach((act) => {
+        const actSection = document.createElement('div');
+        actSection.classList.add('adventure-card');
+
+        const actTitle = document.createElement('h4');
+        actTitle.classList.add('world-act-title');
+        actTitle.textContent = act.name;
+        actSection.appendChild(actTitle);
+
+        if (act.unlocked) {
+            act.zones.forEach((zone) => {
+                const zoneCard = document.createElement('div');
+                zoneCard.classList.add('adventure-card');
+                zoneCard.style.cursor = 'pointer';
+                zoneCard.addEventListener('click', () => renderZoneView(zone.id));
+
+                const zoneTitle = document.createElement('h4');
+                zoneTitle.classList.add('world-zone-title');
+                zoneTitle.textContent = zone.name;
+                const zoneDesc = document.createElement('p');
+                zoneDesc.classList.add('card-desc');
+                zoneDesc.classList.add('world-zone-desc');
+                zoneDesc.textContent = zone.description;
+
+                zoneCard.appendChild(zoneTitle);
+                zoneCard.appendChild(zoneDesc);
+                actSection.appendChild(zoneCard);
+            });
+        } else {
+            actSection.classList.add('disabled');
+            const comingSoon = document.createElement('p');
+            comingSoon.classList.add('card-desc');
+            comingSoon.classList.add('world-zone-desc');
+            comingSoon.textContent = 'Coming Soon';
+            actSection.appendChild(comingSoon);
+        }
+
+        actsContainer.appendChild(actSection);
+    });
+
+    grindTab.appendChild(header);
+    grindTab.appendChild(backWrap);
+    grindTab.appendChild(actsContainer);
+}
+
+function renderZoneView(zoneId) {
+    const grindTab = document.getElementById('tab-grind');
+    if (!grindTab) return;
+
+    if (zoneId !== 'coast') {
+        alert('Coming Soon');
+        return;
+    }
+
+    if (_worldViewBackup === null) {
+        _worldViewBackup = grindTab.innerHTML;
+    }
+
+    grindTab.innerHTML = '';
+    grindTab.style.backgroundImage = "url('Media/Images/World/Kuestenpfad_A.png')";
+    grindTab.style.backgroundSize = 'cover';
+    grindTab.style.backgroundPosition = 'center';
+    grindTab.style.backgroundRepeat = 'no-repeat';
+    grindTab.style.position = 'relative';
+    grindTab.classList.add('world-view');
+    grindTab.classList.add('zone-view');
+
+    const backWrap = document.createElement('div');
+    backWrap.style.position = 'absolute';
+    backWrap.style.top = '16px';
+    backWrap.style.left = '16px';
+    const backBtn = document.createElement('button');
+    backBtn.classList.add('dropdown-item');
+    backBtn.classList.add('world-back-btn');
+    backBtn.style.width = 'auto';
+    backBtn.style.padding = '8px 12px';
+    backBtn.style.fontSize = '0.95rem';
+    backBtn.textContent = '← Zurück';
+    backBtn.addEventListener('click', renderWorldView);
+    backWrap.appendChild(backBtn);
+
+    const header = document.createElement('div');
+    header.classList.add('hub-header');
+    const title = document.createElement('h3');
+    title.classList.add('world-title');
+    title.textContent = 'Küstenpfad';
+    const subtitle = document.createElement('p');
+    subtitle.classList.add('world-subtitle');
+    subtitle.textContent = 'Erstes Gefecht im Backpack Battles Stil (PvE).';
+    header.appendChild(title);
+    header.appendChild(subtitle);
+
+    const monsterSection = document.createElement('div');
+    monsterSection.classList.add('zone-monster');
+
+    const monsterCard = document.createElement('div');
+    monsterCard.classList.add('zone-monster-card');
+
+    const monsterPortrait = document.createElement('div');
+    monsterPortrait.classList.add('zone-monster-portrait');
+
+    const monsterName = document.createElement('div');
+    monsterName.classList.add('world-zone-title');
+    monsterName.textContent = 'Unbekanntes Monster';
+
+    const monsterDetails = document.createElement('div');
+    monsterDetails.classList.add('zone-monster-details');
+    monsterDetails.innerHTML = '<div>Typ: ???</div><div>Resistenzen: ???</div><div>Fähigkeiten: ???</div>';
+
+    monsterCard.appendChild(monsterPortrait);
+    monsterCard.appendChild(monsterName);
+    monsterCard.appendChild(monsterDetails);
+    monsterSection.appendChild(monsterCard);
+
+    const infoGrid = document.createElement('div');
+    infoGrid.classList.add('zone-info-grid');
+
+    const logPanel = document.createElement('div');
+    logPanel.classList.add('zone-panel');
+    const logTitle = document.createElement('h4');
+    logTitle.classList.add('world-act-title');
+    logTitle.textContent = 'Kampf-Log';
+    const logBody = document.createElement('div');
+    logBody.classList.add('zone-log');
+    logBody.textContent = 'Log erscheint hier, sobald der Kampf startet.';
+    logPanel.appendChild(logTitle);
+    logPanel.appendChild(logBody);
+
+    const statsPanel = document.createElement('div');
+    statsPanel.classList.add('zone-panel');
+    statsPanel.classList.add('zone-stats-panel');
+    const statsTitle = document.createElement('h4');
+    statsTitle.classList.add('world-act-title');
+    statsTitle.textContent = 'Monster-Stats';
+    const statsList = document.createElement('div');
+    statsList.classList.add('zone-stats');
+    statsList.innerHTML = '<div>HP: ???</div><div>DMG: ???</div><div>SPD: ???</div><div>Armor: ???</div>';
+    statsPanel.appendChild(statsTitle);
+    statsPanel.appendChild(statsList);
+
+    monsterSection.appendChild(statsPanel);
+    infoGrid.appendChild(logPanel);
+
+    const startBtn = document.createElement('button');
+    startBtn.classList.add('dropdown-item');
+    startBtn.classList.add('zone-start-btn');
+    startBtn.textContent = 'Kampf starten';
+
+    const zoneMonsterPool = (typeof MONSTERS !== 'undefined' && Array.isArray(MONSTERS))
+        ? MONSTERS.filter((m) => Array.isArray(m.tags) && m.tags.includes(zoneId))
+        : [];
+    const pickZoneMonster = () => {
+        if (!zoneMonsterPool.length) return null;
+        return zoneMonsterPool[Math.floor(Math.random() * zoneMonsterPool.length)];
+    };
+
+    startBtn.addEventListener('click', () => {
+        const monster = pickZoneMonster();
+        if (!monster) {
+            logBody.textContent = 'Keine Monster fuer diese Zone definiert.';
+            return;
+        }
+
+        monsterPortrait.innerHTML = '';
+        if (monster.sprite) {
+            const img = document.createElement('img');
+            img.src = monster.sprite;
+            img.alt = monster.name || '';
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'contain';
+            img.style.pointerEvents = 'none';
+            monsterPortrait.appendChild(img);
+        } else {
+            monsterPortrait.textContent = monster.icon || '❔';
+        }
+        monsterName.textContent = monster.name || 'Unbekanntes Monster';
+        statsList.innerHTML =
+            `<div>HP: ${monster.hp ?? '??'}</div>` +
+            `<div>DMG: ${monster.damage ?? '??'}</div>` +
+            `<div>SPD: ${monster.attackSpeed ?? '??'} ms</div>` +
+            `<div>Level: ${monster.level ?? '??'}</div>`;
+        monsterDetails.innerHTML =
+            `<div>Lebensraum: Kuestenpfad</div>` +
+            `<div>Beute: ${monster.goldMin ?? '??'}-${monster.goldMax ?? '??'} Gold</div>` +
+            `<div>XP: ${monster.xp ?? '??'}</div>`;
+        logBody.textContent = `Ein ${monster.name} erscheint...`;
+    });
+
+    grindTab.appendChild(header);
+    grindTab.appendChild(backWrap);
+    grindTab.appendChild(monsterSection);
+    grindTab.appendChild(infoGrid);
+    grindTab.appendChild(startBtn);
+}
+
 function renderEquipmentHub() {
     renderPreviewGrid('preview-farm', 'farmGrid');
     renderPreviewGrid('preview-pve', 'pveGrid');
@@ -123,20 +379,30 @@ function renderPreviewGrid(containerId, gridKey) {
                     itemEl.style.alignItems = 'center';
                     itemEl.style.justifyContent = 'center';
 
+                    // Get rotation angle from cellData
+                    const rotationIndex = (typeof cellData.rotationIndex === 'number') ? cellData.rotationIndex : 0;
+                    const rotationDeg = rotationIndex * 90;
+
                     // Prefer sprite image for preview if available
                     if (item.sprite) {
                         const img = document.createElement('img');
                         img.src = item.sprite;
                         img.alt = item.name || '';
-                        img.style.width = '20px';
-                        img.style.height = '20px';
-                        img.style.objectFit = 'contain';
+                        if (rotationIndex % 2 === 0) {
+                            img.style.width = '100%';
+                            img.style.height = 'auto';
+                        } else {
+                            img.style.width = 'auto';
+                            img.style.height = '100%';
+                        }
                         img.style.pointerEvents = 'none';
+                        img.style.transform = `rotate(${rotationDeg}deg)`;
                         itemEl.appendChild(img);
                     } else {
                         const txt = document.createElement('div');
                         txt.innerText = item.icon || '?';
                         txt.style.fontSize = '1rem';
+                        txt.style.transform = `rotate(${rotationDeg}deg)`;
                         itemEl.appendChild(txt);
                     }
 
@@ -260,12 +526,13 @@ function updateLogic() {
         
         // Monster damage
         if (gameData.currentMonster) {
-            const damage = calculatePlayerDamage();
+            const equipped = getEquippedItems('farmGrid');
+            const damage = calculatePlayerDamageWithEquipment(gameData.level, equipped);
             gameData.currentMonster.hp -= damage;
             
             if (gameData.currentMonster.hp <= 0) {
                 // Monster defeated
-                const goldBonus = Math.floor(Math.random() * (gameData.currentMonster.goldMax - gameData.currentMonster.goldMin + 1)) + gameData.currentMonster.goldMin;
+                const goldBonus = calculateLootReward(gameData.currentMonster.goldMin, gameData.currentMonster.goldMax);
                 gameData.gold += goldBonus;
                 gameData.totalGold += goldBonus;
                 gameData.xp += gameData.currentMonster.xp * xpBonus;
@@ -290,9 +557,9 @@ function updateLogic() {
         if (gameData.xp >= gameData.xpNextLevel) {
             gameData.xp -= gameData.xpNextLevel;
             gameData.level++;
-            gameData.maxHp = 100 + (gameData.level * 10);
+            gameData.maxHp = calculateMaxHp(gameData.level);
             gameData.hp = gameData.maxHp;
-            gameData.xpNextLevel = Math.floor(500 * Math.pow(1.4, gameData.level - 1));
+            gameData.xpNextLevel = calculateNextLevelXpRequirement(gameData.level);
         }
     }
 }
@@ -311,8 +578,9 @@ function updateUI() {
     setW('xp-fill-header', (gameData.xp / gameData.xpNextLevel) * 100);
     
     // Update bonus display
-    const speedBonus = calculateEquipmentBonus('farmGrid', 'speed');
-    const xpBonus = calculateEquipmentBonus('farmGrid', 'xp');
+    const equippedFarm = getEquippedItems('farmGrid');
+    const speedBonus = calculateEquipmentBonusValue(equippedFarm, 'speed');
+    const xpBonus = calculateEquipmentBonusValue(equippedFarm, 'xp');
     const combinedBonus = speedBonus * xpBonus;
     setT('bonus-display', combinedBonus.toFixed(2) + 'x');
     
@@ -327,13 +595,17 @@ function updateUI() {
 // ==========================================
 
 function getUnlockedMonsters() {
-    return MONSTERS.filter(m => gameData.level >= m.level);
+    const unlocked = [];
+    for (let i = 0; i < MONSTERS.length; i++) {
+        if (isMonsterUnlocked(gameData.level, MONSTERS[i].level)) {
+            unlocked.push(MONSTERS[i]);
+        }
+    }
+    return unlocked;
 }
 
 function getNextMonsterIndex() {
-    const unlocked = getUnlockedMonsters();
-    if (unlocked.length === 0) return 0;
-    return MONSTERS.indexOf(unlocked[unlocked.length - 1]);
+    return getHighestUnlockedMonsterIndex(gameData.level, MONSTERS);
 }
 
 function spawnMonster(monsterIndex) {
@@ -683,25 +955,12 @@ function getEquippedItems(gridType) {
 
 function calculateEquipmentBonus(gridType, bonusType) {
     const equipped = getEquippedItems(gridType);
-    let bonus = 1.0;
-    
-    equipped.forEach(item => {
-        if (bonusType === 'damage' && item.damage) {
-            bonus += item.damage * 0.1;
-        } else if (bonusType === 'speed' && item.speedBonus) {
-            bonus *= item.speedBonus;
-        } else if (bonusType === 'xp' && item.xpBonus) {
-            bonus *= item.xpBonus;
-        }
-    });
-    
-    return bonus;
+    return calculateEquipmentBonusValue(equipped, bonusType);
 }
 
 function calculatePlayerDamage() {
-    const baseDamage = 2 + (gameData.level * 0.5);
-    const equipmentBonus = calculateEquipmentBonus('farmGrid', 'damage');
-    return baseDamage * equipmentBonus;
+    const equipped = getEquippedItems('farmGrid');
+    return calculatePlayerDamageWithEquipment(gameData.level, equipped);
 }
 
 // ==========================================

@@ -8,3 +8,5 @@ schtasks /Create /TN "LoadoutLegends-AutoBackup" /SC HOURLY /MO 1 /TR "powershel
 Backup Stoppen
 
 schtasks /Delete /TN "LoadoutLegends-AutoBackup" /F
+
+Steinkrabbe, Riesenkranken(Boss), Ertrunkener, Geister Pirat, Horde Schiffbrüchiger,

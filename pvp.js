@@ -5,6 +5,21 @@
 
 const PVP_SAVE_KEY = "LoadoutLegends_PVP";
 
+function getPVPStorageAdapter() {
+    if (typeof window !== "undefined" && window.PlatformBridge && window.PlatformBridge.storage) {
+        return window.PlatformBridge.storage;
+    }
+
+    return {
+        getItem(key) {
+            try { return localStorage.getItem(key); } catch (err) { return null; }
+        },
+        setItem(key, value) {
+            try { localStorage.setItem(key, value); return true; } catch (err) { return false; }
+        }
+    };
+}
+
 /**
  * Creates a snapshot of player's current state for PvP
  */
@@ -27,6 +42,7 @@ function createPlayerSnapshot() {
  * Saves a snapshot for other players to battle against
  */
 function savePlayerSnapshot() {
+    const storage = getPVPStorageAdapter();
     const snapshot = createPlayerSnapshot();
     const snapshots = getPVPSnapshots();
     
@@ -34,7 +50,7 @@ function savePlayerSnapshot() {
     const cleaned = snapshots.filter(s => s.timestamp < Date.now() - 7 * 24 * 60 * 60 * 1000);
     cleaned.push(snapshot);
     
-    localStorage.setItem(PVP_SAVE_KEY, JSON.stringify(cleaned));
+    storage.setItem(PVP_SAVE_KEY, JSON.stringify(cleaned));
     console.log("Player snapshot saved for PvP!");
 }
 
@@ -42,7 +58,8 @@ function savePlayerSnapshot() {
  * Gets all available PvP opponent snapshots
  */
 function getPVPSnapshots() {
-    const saved = localStorage.getItem(PVP_SAVE_KEY);
+    const storage = getPVPStorageAdapter();
+    const saved = storage.getItem(PVP_SAVE_KEY);
     if (!saved) return [];
     
     try {

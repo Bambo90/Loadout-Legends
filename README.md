@@ -1,5 +1,15 @@
 # Loadout Legends
 
+Regel 1:
+Simulation ist immer rein logisch.
+
+Regel 2:
+Item-Instanz ist immer serialisierbar.
+
+Regel 3:
+UI darf nur anzeigen, nie rechnen.
+
+
 A grid-based, idle progression + loadout combat game mixing Melvor Idle and Backpack Battles mechanics.
 
 ## Local Development

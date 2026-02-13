@@ -285,6 +285,9 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         instanceId: instanceId // Store instance ID for tracking
     };
 
+    // Mark drag state for performance-friendly styling
+    document.body.classList.add('dragging');
+
     // Show all auras during drag
     showAllAuras();
 
@@ -413,27 +416,42 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     }
     
     // ADD ICON / SPRITE LAST (on top)
+    const rotationDeg = draggedItem.rotationIndex * 90;
     if (item.sprite || item.image) {
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'absolute';
+        wrapper.style.top = '0';
+        wrapper.style.left = '0';
+        wrapper.style.width = '100%';
+        wrapper.style.height = '100%';
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.justifyContent = 'center';
+        wrapper.style.pointerEvents = 'none';
+        wrapper.style.zIndex = '100';
+        
         const img = document.createElement('img');
         img.src = item.sprite || item.image;
         img.alt = item.name || '';
         img.className = 'item-sprite';
-        img.style.position = 'absolute';
-        img.style.top = '50%';
-        img.style.left = '50%';
-        img.style.transform = 'translate(-50%, -50%)';
-        img.style.zIndex = '100';
-        img.style.pointerEvents = 'none';
-        img.style.maxWidth = '90%';
-        img.style.maxHeight = '90%';
-        _customFollowEl.appendChild(img);
+        if (draggedItem.rotationIndex % 2 === 0) {
+            img.style.width = '100%';
+            img.style.height = 'auto';
+        } else {
+            img.style.width = 'auto';
+            img.style.height = '100%';
+        }
+        img.style.transform = `rotate(${rotationDeg}deg)`;
+        img.style.transformOrigin = 'center';
+        wrapper.appendChild(img);
+        _customFollowEl.appendChild(wrapper);
     } else {
         const icon = document.createElement('div');
         icon.className = 'item-icon-overlay';
         icon.style.position = 'absolute';
         icon.style.top = '50%';
         icon.style.left = '50%';
-        icon.style.transform = 'translate(-50%, -50%)';
+        icon.style.transform = `translate(-50%, -50%) rotate(${rotationDeg}deg)`;
         icon.style.zIndex = '100'; // Above everything
         icon.style.pointerEvents = 'none';
         icon.style.fontSize = '2rem';
@@ -566,27 +584,42 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         }
         
         // ADD ICON / SPRITE (on top)
+        const rotationDeg = draggedItem.rotationIndex * 90;
         if (draggedItem.item.sprite || draggedItem.item.image) {
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'absolute';
+            wrapper.style.top = '0';
+            wrapper.style.left = '0';
+            wrapper.style.width = '100%';
+            wrapper.style.height = '100%';
+            wrapper.style.display = 'flex';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.justifyContent = 'center';
+            wrapper.style.pointerEvents = 'none';
+            wrapper.style.zIndex = '100';
+            
             const img = document.createElement('img');
             img.src = draggedItem.item.sprite || draggedItem.item.image;
             img.alt = draggedItem.item.name || '';
             img.className = 'item-sprite';
-            img.style.position = 'absolute';
-            img.style.top = '50%';
-            img.style.left = '50%';
-            img.style.transform = 'translate(-50%, -50%)';
-            img.style.zIndex = '100';
-            img.style.pointerEvents = 'none';
-            img.style.maxWidth = '90%';
-            img.style.maxHeight = '90%';
-            _customFollowEl.appendChild(img);
+            if (draggedItem.rotationIndex % 2 === 0) {
+                img.style.width = '100%';
+                img.style.height = 'auto';
+            } else {
+                img.style.width = 'auto';
+                img.style.height = '100%';
+            }
+            img.style.transform = `rotate(${rotationDeg}deg)`;
+            img.style.transformOrigin = 'center';
+            wrapper.appendChild(img);
+            _customFollowEl.appendChild(wrapper);
         } else {
             const icon = document.createElement('div');
             icon.className = 'item-icon-overlay';
             icon.style.position = 'absolute';
             icon.style.top = '50%';
             icon.style.left = '50%';
-            icon.style.transform = 'translate(-50%, -50%)';
+            icon.style.transform = `translate(-50%, -50%) rotate(${rotationDeg}deg)`;
             icon.style.zIndex = '100';
             icon.style.pointerEvents = 'none';
             icon.style.fontSize = '2rem';
@@ -663,10 +696,27 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     updatePos(initX, initY);
 
     // pointer move/up handlers
+    const _hoverThrottleMs = 48;
+    const _hoverMinMove = 4;
+    let _lastHoverCheck = 0;
+    let _lastHoverX = 0;
+    let _lastHoverY = 0;
+
     _customPointerMove = (ev) => {
         if (!draggedItem) return;
         ev.preventDefault();
         updatePos(ev.clientX, ev.clientY);
+
+        const now = performance.now();
+        const dx = ev.clientX - _lastHoverX;
+        const dy = ev.clientY - _lastHoverY;
+        if (now - _lastHoverCheck < _hoverThrottleMs && (dx * dx + dy * dy) < (_hoverMinMove * _hoverMinMove)) {
+            return;
+        }
+        _lastHoverCheck = now;
+        _lastHoverX = ev.clientX;
+        _lastHoverY = ev.clientY;
+
         // update hover target via elementsFromPoint
         try {
             const elems = document.elementsFromPoint(ev.clientX, ev.clientY);

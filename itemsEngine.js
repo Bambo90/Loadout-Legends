@@ -189,6 +189,123 @@ function getItemShape(item) {
 }
 
 /**
+ * Creates a serializable item instance from a base item definition
+ * Rolls stats if stat ranges are defined, stores rotation state
+ * Base item definition remains unmodified
+ * @param {Object} baseItem - Base item template (from item registry)
+ * @param {Object} rng - Optional seeded RNG object with nextInt/nextFloat methods
+ * @returns {Object} Item instance with baseId, rolled stats, rotation state
+ */
+function createItemInstance(baseItem, rng) {
+    if (!baseItem) return null;
+
+    // Create instance object with base item reference
+    const instance = {
+        baseId: baseItem.id,
+        // Copy immutable properties
+        id: baseItem.id,
+        name: baseItem.name,
+        type: baseItem.type,
+        rarity: baseItem.rarity,
+        icon: baseItem.icon,
+        price: baseItem.price,
+        req: baseItem.req,
+        desc: baseItem.desc,
+        inShop: baseItem.inShop,
+        // Grid and rotation support
+        rotations: baseItem.rotations,
+        grid: baseItem.grid,
+        body: baseItem.body,
+        aura: baseItem.aura,
+        // Instance-specific state
+        rotationIndex: 0,
+        // Rolled stats (copied from base, can be overridden)
+        damage: baseItem.damage,
+        defense: baseItem.defense,
+        evasion: baseItem.evasion,
+        speedBonus: baseItem.speedBonus,
+        xpBonus: baseItem.xpBonus,
+        // Stat ranges for future rolling (copied from base if present)
+        statRanges: baseItem.statRanges ? {
+            damage: baseItem.statRanges.damage,
+            defense: baseItem.statRanges.defense,
+            evasion: baseItem.statRanges.evasion,
+            speedBonus: baseItem.statRanges.speedBonus,
+            xpBonus: baseItem.statRanges.xpBonus
+        } : null
+    };
+
+    // Roll stats if RNG provided and stat ranges defined
+    if (rng && instance.statRanges) {
+        if (instance.statRanges.damage) {
+            const range = instance.statRanges.damage;
+            instance.damage = rng.nextInt(range.min, range.max);
+        }
+        if (instance.statRanges.defense) {
+            const range = instance.statRanges.defense;
+            instance.defense = rng.nextInt(range.min, range.max);
+        }
+        if (instance.statRanges.evasion) {
+            const range = instance.statRanges.evasion;
+            instance.evasion = rng.nextFloat(range.min, range.max);
+        }
+        if (instance.statRanges.speedBonus) {
+            const range = instance.statRanges.speedBonus;
+            instance.speedBonus = rng.nextFloat(range.min, range.max);
+        }
+        if (instance.statRanges.xpBonus) {
+            const range = instance.statRanges.xpBonus;
+            instance.xpBonus = rng.nextFloat(range.min, range.max);
+        }
+    }
+
+    return instance;
+}
+
+/**
+ * Resolves an item or instance into full displayable data
+ * Handles both base items and instances with rolled stats
+ * Never mutates input - returns new object
+ * @param {Object} itemOrInstance - Base item or item instance
+ * @returns {Object} Complete resolved item data with base + rolled properties
+ */
+function resolveItemData(itemOrInstance) {
+    if (!itemOrInstance) return null;
+
+    // If already a base item (no baseId), return as-is for backward compatibility
+    if (!itemOrInstance.baseId) {
+        return itemOrInstance;
+    }
+
+    // Resolve instance: merge base item with rolled stats
+    const baseItem = getItemById(itemOrInstance.baseId);
+    if (!baseItem) {
+        console.warn(`Base item not found for instance with baseId: ${itemOrInstance.baseId}`);
+        return itemOrInstance; // Fallback to instance if base not found
+    }
+
+    // Create new merged object - never mutate base item or instance
+    const resolved = {
+        // Copy all base item properties
+        ...baseItem,
+        // Override with instance-specific properties
+        rotationIndex: itemOrInstance.rotationIndex || 0,
+        // Apply rolled stats if present
+        ...(itemOrInstance.rolledStats ? {
+            damage: itemOrInstance.rolledStats.damage !== undefined ? itemOrInstance.rolledStats.damage : baseItem.damage,
+            defense: itemOrInstance.rolledStats.defense !== undefined ? itemOrInstance.rolledStats.defense : baseItem.defense,
+            evasion: itemOrInstance.rolledStats.evasion !== undefined ? itemOrInstance.rolledStats.evasion : baseItem.evasion,
+            speedBonus: itemOrInstance.rolledStats.speedBonus !== undefined ? itemOrInstance.rolledStats.speedBonus : baseItem.speedBonus,
+            xpBonus: itemOrInstance.rolledStats.xpBonus !== undefined ? itemOrInstance.rolledStats.xpBonus : baseItem.xpBonus
+        } : {}),
+        // Mark as resolved for debugging
+        _isResolved: true
+    };
+
+    return resolved;
+}
+
+/**
  * Filtert alle Items, die im Shop kaufbar sein sollen.
  * (Uses itemRegistry.js if available)
  */

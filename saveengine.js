@@ -5,6 +5,38 @@
 
 const SAVE_KEY = "LoadoutLegends_v1";
 
+function getStorageAdapter() {
+    if (typeof window !== "undefined" && window.PlatformBridge && window.PlatformBridge.storage) {
+        return window.PlatformBridge.storage;
+    }
+
+    return {
+        getItem(key) {
+            try {
+                return localStorage.getItem(key);
+            } catch (err) {
+                return null;
+            }
+        },
+        setItem(key, value) {
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch (err) {
+                return false;
+            }
+        },
+        removeItem(key) {
+            try {
+                localStorage.removeItem(key);
+                return true;
+            } catch (err) {
+                return false;
+            }
+        }
+    };
+}
+
 function normalizeGridInstances(grid, cols) {
     if (!grid) return {};
     if (typeof getItemById !== 'function' || typeof placeItemIntoGrid !== 'function') {
@@ -38,12 +70,18 @@ function normalizeGridInstances(grid, cols) {
 }
 
 function saveGame() {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(gameData));
-    console.log("Spielstand automatisch gespeichert.");
+    const storage = getStorageAdapter();
+    const saved = storage.setItem(SAVE_KEY, JSON.stringify(gameData));
+    if (saved) {
+        console.log("Spielstand automatisch gespeichert.");
+    } else {
+        console.error("Speichern fehlgeschlagen: Storage nicht verfügbar.");
+    }
 }
 
 function loadGame() {
-    const saved = localStorage.getItem(SAVE_KEY);
+    const storage = getStorageAdapter();
+    const saved = storage.getItem(SAVE_KEY);
     if (saved) {
         try {
             const loadedData = JSON.parse(saved);
@@ -94,7 +132,8 @@ function loadGame() {
  */
 function resetGame() {
     if (confirm("Möchtest du wirklich alles löschen? Fortschritt geht verloren!")) {
-        localStorage.removeItem(SAVE_KEY);
+        const storage = getStorageAdapter();
+        storage.removeItem(SAVE_KEY);
         location.reload();
     }
 }
