@@ -26,6 +26,9 @@ let gameData = {
     currentMonsterIndex: 0,
     monsterDefeats: {},
     itemInstances: {},
+    settings: {
+        itemTooltipsEnabled: true
+    },
     character: (typeof createDefaultCharacterState === "function")
         ? createDefaultCharacterState()
         : null
@@ -38,7 +41,6 @@ const FOCUS_DURATION = 60 * 60 * 1000;
 
 let currentWorkshop = null;
 let lastMonsterAttack = Date.now();
-let tooltip = null;
 let characterHubActiveSetup = 'farm';
 
 // Resolve static item values via centralized item definitions.
@@ -318,33 +320,6 @@ function renderItemMutatorSummary(workshopType) {
 
     host.innerHTML = rows || '<div class="workshop-summary-empty">Keine Item-Mods aktiv</div>';
 }
-
-// ===== ALT-KEY TRACKING FOR AURA VISIBILITY =====
-window.altKeyPressed = false;
-
-document.addEventListener('keydown', (e) => {
-    if (e.altKey) {
-        window.altKeyPressed = true;
-        // Zeige alle aura-overlays wenn Alt gedrückt wird
-        document.querySelectorAll('.aura-overlay').forEach(aura => {
-            aura.style.opacity = '1';
-        });
-    }
-    // R-Taste für Rotation (bereits in anderen Engines implementiert)
-});
-
-document.addEventListener('keyup', (e) => {
-    if (!e.altKey) {
-        window.altKeyPressed = false;
-        // Verstecke aura-overlays wenn Alt losgelassen wird (wenn nicht gehover)
-        document.querySelectorAll('.aura-overlay').forEach(aura => {
-            const itemEl = aura.closest('.item');
-            if (itemEl && !itemEl.matches(':hover')) {
-                aura.style.opacity = '0';
-            }
-        });
-    }
-});
 
 // ==========================================
 // NAVIGATION & EQUIPMENT HUB (VORSCHAU-FIX)
@@ -698,6 +673,16 @@ function renderPreviewGrid(containerId, gridKey) {
                         itemEl.appendChild(txt);
                     }
 
+                    if (window.ItemTooltip && typeof window.ItemTooltip.bindItemElement === 'function') {
+                        window.ItemTooltip.bindItemElement(itemEl, () => ({
+                            source: 'preview',
+                            gridKey,
+                            index: i,
+                            cell: gameData[gridKey] && gameData[gridKey][i] ? gameData[gridKey][i] : cellData,
+                            itemDef: item
+                        }));
+                    }
+
                     slot.appendChild(itemEl);
                 }
             }
@@ -1031,8 +1016,14 @@ function renderShop() {
             </button>
         `;
         
-        card.addEventListener('mouseenter', (e) => showTooltip(e, item));
-        card.addEventListener('mouseleave', hideTooltip);
+        if (window.ItemTooltip && typeof window.ItemTooltip.bindItemElement === 'function') {
+            window.ItemTooltip.bindItemElement(card, () => ({
+                source: 'shop',
+                itemDef: item,
+                itemId: item.id,
+                itemLevel: Math.max(1, Number.isFinite(gameData.level) ? gameData.level : 1)
+            }));
+        }
         
         container.appendChild(card);
     });
@@ -1226,34 +1217,26 @@ function queueRenderWorkshopGrids() {
 // ==========================================
 
 function showTooltip(e, item) {
-    const tooltipEl = document.getElementById('tooltip');
-    if (!tooltipEl) return;
-    
-    let content = `<strong>${item.name}</strong>`;
-    content += `<br>Rarity: ${item.rarity}`;
-    content += `<br>Price: ${item.price} Gold`;
-    
-    if (item.damage) content += `<br>Damage: +${item.damage}`;
-    if (item.speedBonus) content += `<br>Speed: +${Math.floor((item.speedBonus - 1) * 100)}%`;
-    if (item.xpBonus) content += `<br>XP: +${Math.floor((item.xpBonus - 1) * 100)}%`;
-    
-    content += `<br><br>${item.desc || ''}`;
-    
-    tooltipEl.innerHTML = content;
-    tooltipEl.classList.remove('hidden');
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    tooltipEl.style.left = (rect.right + 10) + 'px';
-    tooltipEl.style.top = rect.top + 'px';
+    if (!window.ItemTooltip || typeof window.ItemTooltip.showForContext !== 'function') return;
+    const anchor = e && e.currentTarget ? e.currentTarget : null;
+    if (!anchor) return;
+    window.ItemTooltip.showForContext(anchor, {
+        source: 'legacy',
+        itemDef: item,
+        itemLevel: Math.max(1, Number.isFinite(gameData.level) ? gameData.level : 1)
+    }, e || null);
 }
 
 function hideTooltip() {
-    const tooltipEl = document.getElementById('tooltip');
-    if (tooltipEl) tooltipEl.classList.add('hidden');
+    if (window.ItemTooltip && typeof window.ItemTooltip.hide === 'function') {
+        window.ItemTooltip.hide();
+    }
 }
 
 function initTooltipListeners() {
-    // Tooltips for items will be added dynamically when rendered
+    if (window.ItemTooltip && typeof window.ItemTooltip.init === 'function') {
+        window.ItemTooltip.init();
+    }
 }
 
 // ==========================================

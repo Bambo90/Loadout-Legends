@@ -93,6 +93,7 @@ function createSlot(container, location, index, cols) {
     itemEl.dataset.itemId = item.id;
     itemEl.dataset.fromLocation = location;
     itemEl.dataset.fromIndex = index;
+    itemEl.dataset.instanceId = cell.instanceId || '';
 
     // Dimensionen berechnen basierend auf Laufzeit-Grid-Geometrie
     const geo = (typeof getCellGeometry === 'function') ? getCellGeometry(container, cols) : { slotSize: 64, gap: 8, cellW: 72, cellH: 72 };
@@ -174,6 +175,20 @@ function createSlot(container, location, index, cols) {
         if (storageState.selectedItems.has(cell.instanceId)) {
             itemEl.classList.add('item-selected');
         }
+    }
+
+    if (window.ItemTooltip && typeof window.ItemTooltip.bindItemElement === 'function') {
+        window.ItemTooltip.bindItemElement(itemEl, () => {
+            const liveGrid = gameData[location] && typeof gameData[location] === 'object' ? gameData[location] : null;
+            const liveCell = liveGrid && liveGrid[index] ? liveGrid[index] : cell;
+            return {
+                source: 'grid',
+                location,
+                index,
+                cell: liveCell || cell,
+                itemDef: item
+            };
+        });
     }
     
     // Right-click handler for item locking (works in all workshop modes)

@@ -353,7 +353,15 @@ function registerItemInstance(gameData, instanceId, baseItemId, itemLevel, optio
     if (!gameData || typeof gameData !== "object" || !instanceId || !baseItemId) return null;
     const store = ensureItemInstanceStore(gameData);
     if (store[instanceId] && store[instanceId].itemId === baseItemId) {
-        return store[instanceId];
+        const rawExisting = store[instanceId];
+        const existing = sanitizeItemInstanceRecord(store[instanceId]);
+        if (existing) {
+            if (!_isFiniteNumber(rawExisting && rawExisting.itemLevel) || rawExisting.itemLevel < 1) {
+                existing.itemLevel = Math.max(1, Math.floor(_isFiniteNumber(itemLevel) ? itemLevel : 1));
+                store[instanceId] = existing;
+            }
+            return store[instanceId];
+        }
     }
 
     let generated = null;
@@ -370,6 +378,81 @@ function registerItemInstance(gameData, instanceId, baseItemId, itemLevel, optio
         };
     }
     return setItemInstanceData(gameData, instanceId, generated);
+}
+
+function _inferInstanceItemLevel(gameData, cell) {
+    const charLevel = gameData &&
+        gameData.character &&
+        gameData.character.base &&
+        _isFiniteNumber(gameData.character.base.level)
+        ? gameData.character.base.level
+        : null;
+    const fallback = _isFiniteNumber(charLevel)
+        ? charLevel
+        : (_isFiniteNumber(gameData && gameData.level) ? gameData.level : 1);
+    const candidates = [
+        cell && cell.itemLevel,
+        cell && cell.level,
+        fallback
+    ];
+    for (let i = 0; i < candidates.length; i++) {
+        const value = candidates[i];
+        if (_isFiniteNumber(value)) return Math.max(1, Math.floor(value));
+    }
+    return 1;
+}
+
+function ensureItemInstanceIntegrity(gameData) {
+    if (!gameData || typeof gameData !== "object") return {};
+    const store = ensureItemInstanceStore(gameData);
+
+    ["bank", "farmGrid", "pveGrid", "pvpGrid"].forEach((gridKey) => {
+        const grid = gameData[gridKey];
+        if (!grid || typeof grid !== "object") return;
+
+        Object.keys(grid).forEach((slotKey) => {
+            const cell = grid[slotKey];
+            if (!cell || typeof cell !== "object" || !cell.root || !cell.itemId || !cell.instanceId) return;
+
+            const rawExisting = store[cell.instanceId];
+            const existing = sanitizeItemInstanceRecord(rawExisting);
+            const inferredLevel = _inferInstanceItemLevel(gameData, cell);
+            if (!existing) {
+                store[cell.instanceId] = {
+                    itemId: cell.itemId,
+                    itemLevel: inferredLevel,
+                    implicits: [],
+                    prefixes: [],
+                    suffixes: []
+                };
+                return;
+            }
+
+            store[cell.instanceId] = {
+                itemId: cell.itemId,
+                itemLevel: _isFiniteNumber(rawExisting && rawExisting.itemLevel) && rawExisting.itemLevel >= 1
+                    ? Math.floor(rawExisting.itemLevel)
+                    : inferredLevel,
+                implicits: Array.isArray(existing.implicits) ? existing.implicits : [],
+                prefixes: Array.isArray(existing.prefixes) ? existing.prefixes : [],
+                suffixes: Array.isArray(existing.suffixes) ? existing.suffixes : []
+            };
+        });
+    });
+
+    Object.keys(store).forEach((instanceId) => {
+        const sanitized = sanitizeItemInstanceRecord(store[instanceId]);
+        if (!sanitized) {
+            delete store[instanceId];
+            return;
+        }
+        if (!_isFiniteNumber(sanitized.itemLevel) || sanitized.itemLevel < 1) {
+            sanitized.itemLevel = 1;
+        }
+        store[instanceId] = sanitized;
+    });
+
+    return store;
 }
 
 function _affixRollToModifier(rollEntry) {
@@ -525,6 +608,7 @@ function sanitizeSaveDataForPersistence(data) {
 function sanitizeLoadedSaveData(data) {
     const sanitized = sanitizeSaveDataForPersistence(data);
     if (!sanitized.itemInstances) sanitized.itemInstances = {};
+    ensureItemInstanceIntegrity(sanitized);
     return sanitized;
 }
 
@@ -544,6 +628,7 @@ if (typeof window !== "undefined") {
     window.setItemInstanceData = setItemInstanceData;
     window.removeItemInstanceData = removeItemInstanceData;
     window.registerItemInstance = registerItemInstance;
+    window.ensureItemInstanceIntegrity = ensureItemInstanceIntegrity;
     window.resolveRuntimeItemFromCell = resolveRuntimeItemFromCell;
     window.getRuntimeItemDefinition = getRuntimeItemDefinition;
 }
@@ -564,6 +649,7 @@ if (typeof module !== "undefined" && module.exports) {
         setItemInstanceData,
         removeItemInstanceData,
         registerItemInstance,
+        ensureItemInstanceIntegrity,
         resolveRuntimeItemFromCell,
         getRuntimeItemDefinition
     };

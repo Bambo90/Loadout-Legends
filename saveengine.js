@@ -1,10 +1,10 @@
-// ==========================================
+﻿// ==========================================
 // SAVE ENGINE (saveengine.js)
 // Handhabt LocalStorage und Daten-Integrität
 // ==========================================
 
 const SAVE_KEY = "LoadoutLegends_v1";
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 function getStorageAdapter() {
     if (typeof window !== "undefined" && window.PlatformBridge && window.PlatformBridge.storage) {
@@ -98,6 +98,18 @@ function migrateSave(data, version) {
                 currentVersion = 2;
                 break;
             }
+            case 2: {
+                // v2 -> v3:
+                // Add explicit settings container for global UI toggles (e.g. item tooltips).
+                if (!migrated.settings || typeof migrated.settings !== "object" || Array.isArray(migrated.settings)) {
+                    migrated.settings = {};
+                }
+                if (typeof migrated.settings.itemTooltipsEnabled !== "boolean") {
+                    migrated.settings.itemTooltipsEnabled = true;
+                }
+                currentVersion = 3;
+                break;
+            }
             default: {
                 console.warn(`Unbekannte Save-Version ${currentVersion}. Migration wird auf aktuelle Version gesetzt.`);
                 currentVersion = SAVE_VERSION;
@@ -148,6 +160,15 @@ function normalizeGridInstances(grid, cols) {
 
 function saveGame() {
     const storage = getStorageAdapter();
+    if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
+        gameData.settings = {};
+    }
+    if (typeof gameData.settings.itemTooltipsEnabled !== "boolean") {
+        gameData.settings.itemTooltipsEnabled = true;
+    }
+    if (typeof ensureItemInstanceIntegrity === "function") {
+        ensureItemInstanceIntegrity(gameData);
+    }
     if (typeof ensureCharacterModelOnGameData === "function") {
         ensureCharacterModelOnGameData(gameData);
     }
@@ -222,10 +243,19 @@ function loadGame() {
             if (!gameData.pvpGrid) gameData.pvpGrid = {};
             if (!gameData.monsterDefeats) gameData.monsterDefeats = {};
             if (!gameData.currentMonsterIndex) gameData.currentMonsterIndex = 0;
+            if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
+                gameData.settings = {};
+            }
+            if (typeof gameData.settings.itemTooltipsEnabled !== "boolean") {
+                gameData.settings.itemTooltipsEnabled = true;
+            }
 
             // Sync instance ID counter from loaded grids
             if (typeof syncInstanceIdCounterFromGrids === 'function') {
                 syncInstanceIdCounterFromGrids([gameData.bank, gameData.farmGrid, gameData.pveGrid, gameData.pvpGrid]);
+            }
+            if (typeof ensureItemInstanceIntegrity === "function") {
+                ensureItemInstanceIntegrity(gameData);
             }
 
             if (typeof ensureCharacterModelOnGameData === "function") {
@@ -250,6 +280,15 @@ function loadGame() {
         gameData.pveGrid = {};
         gameData.pvpGrid = {};
         gameData.monsterDefeats = {};
+        if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
+            gameData.settings = {};
+        }
+        if (typeof gameData.settings.itemTooltipsEnabled !== "boolean") {
+            gameData.settings.itemTooltipsEnabled = true;
+        }
+        if (typeof ensureItemInstanceIntegrity === "function") {
+            ensureItemInstanceIntegrity(gameData);
+        }
         if (typeof ensureCharacterModelOnGameData === "function") {
             ensureCharacterModelOnGameData(gameData);
         }
