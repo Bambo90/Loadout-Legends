@@ -42,7 +42,9 @@
     width: 100%;
     grid-column: 1;
     grid-row: 1;
-    margin-bottom: clamp(12px, 1.1vw, 20px);
+    min-height: var(--workshop-panel-header-height, clamp(48px, 4.2vh, 60px));
+    align-content: center;
+    margin-bottom: 15px;
 }
 
 #active-setup-grid {

@@ -29,6 +29,24 @@ if saveVersion == 2:
     convert v2 -> v3
 
 
+##### CSS Variablen Syntax ####
+
+Gold: Selector / Selektor
+z.B. .workshop-summary-column
+
+Blau: Property name / Eigenschaft
+z.B. width, display, border-radius, padding
+
+Rot: Keyword / value keywords (oft auch „CSS keywords“)
+z.B. flex, column (auch solid, none, auto, inherit je nach Theme)
+
+Grün: Number / dimension / unit (Zahlen, Längen, Einheiten)
+z.B. 270px, 15vw, 0, 16px, 0.42
+
+Hellgelb: Function + color values (Funktionen, Farbwerte, Strings je nach Theme)
+z.B. clamp(...), linear-gradient(...), rgba(...)
+(manche Themes färben Funktionen gelb und Farbangaben/Strings ebenfalls gelblich)
+
 
 ⚠️ Kritische Design-Regeln
 

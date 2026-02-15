@@ -20,7 +20,11 @@ function getItemById(id) {
         }
         return item;
     }
-    // Legacy fallback
+    // Fallback to globally aggregated definitions if registry was not initialized yet.
+    if (typeof ITEMS_ALL_DEFS !== 'undefined' && Array.isArray(ITEMS_ALL_DEFS)) {
+        return ITEMS_ALL_DEFS.find(i => i.id === id) || null;
+    }
+    // Final compatibility fallback.
     const legacyItems = [...(TOOL_ITEMS || []), ...(WEAPON_ITEMS || []), ...(JEWELRY_ITEMS || [])];
     return legacyItems.find(i => i.id === id) || null;
 }
@@ -312,6 +316,9 @@ function resolveItemData(itemOrInstance) {
 function getShopItems() {
     if (typeof ALL_ITEMS !== 'undefined' && typeof ALL_ITEMS === 'object') {
         return Object.values(ALL_ITEMS).filter(item => item.inShop === true);
+    }
+    if (typeof ITEMS_ALL_DEFS !== 'undefined' && Array.isArray(ITEMS_ALL_DEFS)) {
+        return ITEMS_ALL_DEFS.filter(item => item && item.inShop === true);
     }
     // Legacy fallback
     const legacyItems = [...(TOOL_ITEMS || []), ...(WEAPON_ITEMS || []), ...(JEWELRY_ITEMS || [])];

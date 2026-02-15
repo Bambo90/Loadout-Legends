@@ -449,13 +449,14 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(42, 82, 152, 0.5);
 }
-.workshop-content {
+.workshop-content { 
     display: flex;
     gap: var(--workshop-gap);
     justify-content: flex-start;
     align-items: flex-start;
     padding: var(--workshop-padding);
     overflow-y: auto;
+    --workshop-panel-header-height: clamp(48px, 4.2vh, 60px);
 }
 
 .workshop-content.storage-mode .active-grid-section { display: none !important; }
@@ -469,7 +470,6 @@ body {
 .active-grid-section {
     display: flex;
     flex-direction: column;
-    gap: 15px;
     background: linear-gradient(145deg, rgba(14, 16, 22, 0.52), rgba(8, 10, 14, 0.28));
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 18px;
@@ -503,6 +503,8 @@ body {
 
 .storage-header {
     display: flex; justify-content: space-between; align-items: center; padding: 10px 0; gap: 15px;
+    min-height: var(--workshop-panel-header-height);
+    box-sizing: border-box;
 }
 .storage-header h3 { margin: 0; color: #fff; }
 
@@ -667,6 +669,7 @@ body {
     height: calc(10 * var(--slot-size) + 9 * var(--grid-gap) + 2 * var(--grid-padding) + 5px) !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
+    margin-top: 0;
 }
 
 .grid-slot { width: var(--slot-size); height: var(--slot-size); background: #1a1a1a; border: 1px solid #222; border-radius: 6px; position: relative; }

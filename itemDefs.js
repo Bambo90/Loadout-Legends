@@ -88,6 +88,14 @@ function _countBodyCellsFromItem(item) {
 
 function _collectItemArrays() {
     const arrays = [];
+    if (typeof ITEMS_ALL_DEFS !== "undefined") arrays.push(ITEMS_ALL_DEFS);
+    if (typeof ITEMS_WEAPONS_ALL !== "undefined") arrays.push(ITEMS_WEAPONS_ALL);
+    if (typeof ITEMS_OFFHANDS_ALL !== "undefined") arrays.push(ITEMS_OFFHANDS_ALL);
+    if (typeof ITEMS_ARMOR_ALL !== "undefined") arrays.push(ITEMS_ARMOR_ALL);
+    if (typeof ITEMS_ACCESSORIES_ALL !== "undefined") arrays.push(ITEMS_ACCESSORIES_ALL);
+    if (typeof ITEMS_ENHANCEMENTS_ALL !== "undefined") arrays.push(ITEMS_ENHANCEMENTS_ALL);
+    if (typeof ITEMS_CONSUMABLES_ALL !== "undefined") arrays.push(ITEMS_CONSUMABLES_ALL);
+
     if (typeof TOOL_ITEMS !== "undefined") arrays.push(TOOL_ITEMS);
     if (typeof SWORD_ITEMS !== "undefined") arrays.push(SWORD_ITEMS);
     if (typeof BOW_ITEMS !== "undefined") arrays.push(BOW_ITEMS);
