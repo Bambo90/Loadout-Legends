@@ -61,7 +61,9 @@ function createSlot(container, location, index, cols) {
         return;
     }
 
-    const item = getItemById(cell.itemId);
+    const item = (typeof getItemDefById === 'function')
+        ? getItemDefById(cell.itemId)
+        : getItemById(cell.itemId);
     if (!item) {
         container.appendChild(slot);
         return;

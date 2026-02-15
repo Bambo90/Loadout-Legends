@@ -1,137 +1,127 @@
 /**
- * Combat Engine - Pure combat calculations
- * No global access, no DOM, no state mutations
- * All data passed as parameters
+ * Combat Engine - pure and reusable combat/stat calculations.
+ * Runtime state should be provided by callers.
  */
 
+function calculateCharacterDamageValue(characterStats) {
+    if (characterStats && typeof getCharacterDamageValueFromDerived === "function") {
+        return getCharacterDamageValueFromDerived(characterStats);
+    }
+
+    if (!characterStats || !characterStats.finalDamage || typeof characterStats.finalDamage !== "object") {
+        return 0;
+    }
+
+    let totalAverage = 0;
+    Object.keys(characterStats.finalDamage).forEach((damageType) => {
+        const bucket = characterStats.finalDamage[damageType] || {};
+        const min = typeof bucket.min === "number" ? bucket.min : 0;
+        const max = typeof bucket.max === "number" ? bucket.max : 0;
+        totalAverage += (min + max) / 2;
+    });
+    return Math.max(0, totalAverage);
+}
+
 /**
- * Calculate total player damage from level and equipment
- * Pure function - no globals
- * @param {number} playerLevel - Current player level
- * @param {Array} equippedItems - Array of equipped items with damage property
- * @returns {number} Total damage value
+ * Legacy-compatible wrapper.
+ * Preferred call path is to pass `characterStats` and consume derived stats.
  */
-function calculatePlayerDamageWithEquipment(playerLevel, equippedItems) {
+function calculatePlayerDamageWithEquipment(playerLevel, equippedItems, characterStats) {
+    if (characterStats && characterStats.finalDamage) {
+        return calculateCharacterDamageValue(characterStats);
+    }
+
+    // Legacy fallback formula
     const baseDamage = 2 + (playerLevel * 0.5);
     let damageBonus = 1.0;
-    
+
     if (equippedItems && Array.isArray(equippedItems)) {
-        equippedItems.forEach(item => {
+        equippedItems.forEach((item) => {
             if (item && item.damage) {
                 damageBonus += item.damage * 0.1;
             }
         });
     }
-    
+
     return baseDamage * damageBonus;
 }
 
 /**
- * Calculate equipment bonus multiplier for a specific bonus type
- * Pure function - no globals
- * @param {Array} equippedItems - Array of equipped items
- * @param {string} bonusType - Type of bonus: 'damage', 'speed', 'xp'
- * @returns {number} Multiplier bonus (1.0 = no bonus)
+ * Generic equipment bonus getter.
+ * If `characterStats` is passed, it consumes final derived values.
  */
-function calculateEquipmentBonusValue(equippedItems, bonusType) {
+function calculateEquipmentBonusValue(equippedItems, bonusType, characterStats) {
+    if (characterStats && typeof characterStats === "object") {
+        if (bonusType === "speed") return Math.max(0.1, characterStats.attackSpeed || 1.0);
+        if (bonusType === "xp") return Math.max(0.1, characterStats.xpGainMultiplier || 1.0);
+        if (bonusType === "damage") return Math.max(0, calculateCharacterDamageValue(characterStats));
+        return 1.0;
+    }
+
+    // Legacy fallback formula
     let bonus = 1.0;
-    
+
     if (!equippedItems || !Array.isArray(equippedItems)) {
         return bonus;
     }
-    
-    equippedItems.forEach(item => {
+
+    equippedItems.forEach((item) => {
         if (!item) return;
-        
-        if (bonusType === 'damage' && item.damage) {
+
+        if (bonusType === "damage" && item.damage) {
             bonus += item.damage * 0.1;
-        } else if (bonusType === 'speed' && item.speedBonus) {
+        } else if (bonusType === "speed" && item.speedBonus) {
             bonus *= item.speedBonus;
-        } else if (bonusType === 'xp' && item.xpBonus) {
+        } else if (bonusType === "xp" && item.xpBonus) {
             bonus *= item.xpBonus;
         }
     });
-    
+
     return bonus;
 }
 
 /**
- * Calculate XP requirement for next level
- * Pure function - formula only
- * @param {number} currentLevel - Current player level (1-indexed)
- * @returns {number} XP needed to reach next level
+ * Exponential XP requirement.
+ * Uses central character config when available.
  */
 function calculateNextLevelXpRequirement(currentLevel) {
+    if (typeof calculateXpToNextLevel === "function") {
+        return calculateXpToNextLevel(currentLevel);
+    }
     return Math.floor(500 * Math.pow(1.4, currentLevel - 1));
 }
 
-/**
- * Calculate loot reward (gold) from defeating a monster
- * Uses Math.random() - note this is non-deterministic
- * TODO: Accept RNG parameter for seeded randomness
- * @param {number} goldMin - Minimum gold reward
- * @param {number} goldMax - Maximum gold reward (inclusive)
- * @returns {number} Gold reward amount
- */
 function calculateLootReward(goldMin, goldMax) {
     return Math.floor(Math.random() * (goldMax - goldMin + 1)) + goldMin;
 }
 
-/**
- * Determine if a monster is unlocked for the player
- * Pure function - level comparison only
- * @param {number} playerLevel - Player's current level
- * @param {number} monsterLevel - Monster's required level
- * @returns {boolean} True if monster is unlocked
- */
 function isMonsterUnlocked(playerLevel, monsterLevel) {
     return playerLevel >= monsterLevel;
 }
 
-/**
- * Find the highest unlocked monster index from a monster array
- * Pure function - no globals
- * @param {number} playerLevel - Player's current level
- * @param {Array} allMonsters - Array of all monster templates
- * @returns {number} Index of the highest unlocked monster (or 0 if none)
- */
 function getHighestUnlockedMonsterIndex(playerLevel, allMonsters) {
     if (!allMonsters || allMonsters.length === 0) {
         return 0;
     }
-    
-    // Find all unlocked monsters
+
     const unlockedIndices = [];
     for (let i = 0; i < allMonsters.length; i++) {
         if (isMonsterUnlocked(playerLevel, allMonsters[i].level)) {
             unlockedIndices.push(i);
         }
     }
-    
-    // Return the highest unlocked, or 0 if none unlocked
+
     if (unlockedIndices.length === 0) {
         return 0;
     }
-    
+
     return unlockedIndices[unlockedIndices.length - 1];
 }
 
-/**
- * Calculate base monster damage (without equipment scaling)
- * Pure function - formula only
- * @param {number} monsterDamage - Monster's base damage stat
- * @returns {number} Damage dealt
- */
 function calculateMonsterBaseDamage(monsterDamage) {
     return monsterDamage;
 }
 
-/**
- * Calculate max HP for a player at a given level
- * Pure function - formula only
- * @param {number} level - Player level
- * @returns {number} Maximum HP
- */
 function calculateMaxHp(level) {
     return 100 + (level * 10);
 }

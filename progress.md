@@ -8,4 +8,133 @@ Original prompt: Du warst grade dabei irgendwas für das zukünftige Wrapping mi
 - 2026-02-13: Zone submenu (Kuestenpfad) CTA fix: `Kampf starten` no longer slides sideways on hover; kept highlight behavior by overriding hover transform for `.zone-start-btn`.
 - 2026-02-13: Kuestenpfad monster stats overlay now unfolds from the right edge of the monster container with a 5px gap (`.zone-stats-panel` anchored via `left: calc(100% + 5px)` and slide-in transform on hover).
 - 2026-02-13: Verification attempt repeated; skill Playwright client still blocked by missing module resolution (`ERR_MODULE_NOT_FOUND: playwright`) from the skill script path.
+- 2026-02-13: World submenu layout adjusted upward: reduced top spacing for world header and world adventure hub so Akt cards/text blocks start higher on screen.
+- 2026-02-13: Post-change verification attempt blocked again: skill Playwright client still fails with `ERR_MODULE_NOT_FOUND: playwright`.
+- 2026-02-13: Added `Akt 3 - Coming Soon` as locked act card in `worldData.js` for world submenu visibility.
+- 2026-02-13: Post-change verification attempt for the act update also blocked by the same Playwright resolver issue (`ERR_MODULE_NOT_FOUND: playwright`).
+- 2026-02-13: Documentation audit executed for all `.md`/`.txt` files. Updated `README.md`, `GAME_DESIGN.md`, `DRAG_DROP_ARCHITECTURE.md`, and `ITEM_SYSTEM_GUIDE.md` to reflect current architecture/state.
+- 2026-02-13: Post-doc-update verification attempt still blocked: skill Playwright client cannot resolve `playwright` module (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Implemented save versioning and migration in `saveengine.js`:
+  - Added wrapper save format `{ saveVersion, data }`.
+  - Added sequential `migrateSave(data, version)` with v0->v1 migration (`gold` moved to `currencies.gold`).
+  - Added backward compatibility for legacy unversioned saves (treated as version 0).
+  - Added runtime bridge to keep `gameData.gold` in sync from migrated `currencies.gold` while existing systems still consume `gold`.
+- 2026-02-13: Post-save-migration verification attempt with skill client still blocked by missing module resolution (`ERR_MODULE_NOT_FOUND: playwright`).
+- 2026-02-13: Refactor item-definition pipeline:
+  - Added `itemDefs.js` as centralized static definition access layer (`getItemDefById`) and save sanitization utilities.
+  - Updated `index.html` script order to load `itemDefs.js` after `itemRegistry.js`.
+  - Updated runtime lookups (`script.js`, `workshopEngine.js`, `saveengine.js`) to resolve gameplay values via item definitions by `itemId`.
+  - Updated save persistence to sanitize grid cells and strip static item fields from saves.
+  - Added legacy migration in `migrateSave` for embedded item payloads (`item/baseId` -> `itemId`).
+- 2026-02-13: Node smoke tests passed for save wrapper, migration, and static-field stripping from saved grid cells.
+- 2026-02-13: Post-itemDefs verification attempt with skill client still blocked by missing module resolution (`ERR_MODULE_NOT_FOUND: playwright`).
+- 2026-02-13: Re-validated syntax after refactor (`node --check` for `itemDefs.js`, `saveengine.js`, `script.js`, `workshopEngine.js`, `storageEngine.js`) with no syntax errors.
+- 2026-02-13: Executed additional VM smoke test for backward compatibility:
+  - Legacy unwrapped save payload loaded successfully.
+  - v0 migration restored `itemId` from embedded `item.id`.
+  - Static fields (e.g. `damage`) were stripped from persisted grid-cell save data.
+  - Currency migration (`gold` -> `currencies.gold`) and runtime gold bridge verified.
+- 2026-02-13: Skill client re-check still blocked: `web_game_playwright_client.js` fails immediately due missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Hardening tweak in `saveengine.js`:
+  - `normalizeGridInstances` now allows either `getItemDefById` or `getItemById` as valid lookup source (prevents unnecessary early return in future registry refactors).
+- 2026-02-13: Re-ran syntax and migration smoke test after hardening tweak; checks still pass (`SMOKE_OK`).
+- 2026-02-13: Fixed missing world/zone scene backgrounds:
+  - Added CSS fallback backgrounds for `#tab-grind.world-view` and `#tab-grind.world-view.zone-view`.
+  - Normalized runtime scene image URLs in `script.js` to `./Media/...` paths.
+- 2026-02-13: Added global resolution compensation scaling in `style.css`:
+  - New root variables `--resolution-ui-scale-fhd` (default `1.14`) and `--resolution-ui-scale`.
+  - On `@media (max-width: 1920px)`, app uses the FHD scale factor.
+  - `#app-container` now applies `transform: scale(...)` with inverse width/height compensation so 2560x1440 remains unchanged while Full HD can match visual size.
+- 2026-02-13: Fixed workshop fullscreen regression under global scaling:
+  - `#workshop-overlay` changed from `position: fixed; width: 100vw; height: 100vh;` to container-relative fullscreen (`position: absolute; inset: 0; width: 100%; height: 100%;`).
+  - Prevents right/bottom background leakage when `#app-container` uses `transform: scale(...)`.
+- 2026-02-13: Playwright skill check attempted again; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Added two new coast monsters in `monsters.js` with initial placeholder balance:
+  - `captain_1` / "Ertrunkener Kapitän" using `Media/Images/Monster/Drunken_Captain.png`.
+  - `thief_1` / "Wegelagerer" using `Media/Images/Monster/Thief_B.png`.
+  - Both tagged with `["coast"]` and empty `dropTable` for later balancing.
+- 2026-02-13: Syntax check passed for `monsters.js` (`node --check`).
+- 2026-02-13: Playwright skill run attempted after monster update; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Added PVE workshop background integration:
+  - `openWorkshop(type)` now applies overlay mode classes (`workshop-farm`, `workshop-pve`, `workshop-storage`).
+  - `closeWorkshop()` clears those classes.
+  - New CSS rule `#workshop-overlay.workshop-pve` uses `Media/Images/World/PVE_Workshop.png` with dark overlay gradient for readability.
+- 2026-02-13: Syntax check passed for `script.js` after workshop class changes.
+- 2026-02-13: Playwright skill check attempted again; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Removed extra dark layer from PVE workshop background (`#workshop-overlay.workshop-pve`) and disabled blur for that mode.
+- 2026-02-13: Added farm workshop background rule:
+  - `#workshop-overlay.workshop-farm` now uses `Media/Images/World/Farm_Workshop.png` (cover/center/no-repeat) with `backdrop-filter: none`.
+- 2026-02-13: Playwright skill check attempted after farm background update; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Changed workshop background sizing from `cover` to `contain` for both farm and pve modes so full image is visible without crop.
+- 2026-02-13: Playwright skill check attempted after `contain` change; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Switched workshop backgrounds back to `cover` with explicit focus point:
+  - `#workshop-overlay.workshop-farm` now uses `background-position: 50% 42%`.
+  - `#workshop-overlay.workshop-pve` now uses `background-position: 50% 42%`.
+  - Keeps full-frame fill while allowing controlled crop via focus tuning.
+- 2026-02-13: Playwright skill check attempted after cover/focus update; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Updated farm workshop background source to `Media/Images/World/Farm_WorkshopA.png` for user comparison.
+- 2026-02-13: Checked `Farm_WorkshopA.png` dimensions from disk: `1536x1024` (not `1331x679`).
+- 2026-02-13: Playwright skill check attempted after farm background source swap; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Switched farm workshop background source to `Media/Images/World/Farm_Workshop_B.png` (user requested A/B comparison).
+- 2026-02-13: Checked `Farm_Workshop_B.png` dimensions from disk: `1536x1024`.
+- 2026-02-13: Playwright skill check attempted after B-source swap; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Switched farm workshop background source to `Media/Images/World/Farm_Workshop_C.png` (user requested further comparison).
+- 2026-02-13: Checked `Farm_Workshop_C.png` dimensions from disk: `1536x1024`.
+- 2026-02-13: Playwright skill check attempted after C-source swap; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
+- 2026-02-13: Implemented scalable character/stat architecture with a new central module `character.js`:
+  - Added persistent `character.base` model (level/xp/base attributes/base resources/base damage/weight data).
+  - Added derived stat pipeline `computeCharacterStats()` with strict order:
+    1) base load
+    2) attribute + level scaling
+    3) item flat modifiers
+    4) item percent modifiers
+    5) weight effects
+    6) finalize derived stats
+  - Added extendable damage-type mapping (`slash`, `pierce`, `blunt`) for both damage and armor maps.
+  - Added generic modifier format `{ statPath, type, value }` and legacy-item-to-modifier conversion layer.
+  - Added hard-cap item deactivation by weight and soft stamina-cost penalty from carried weight.
+  - Added exponential XP function `calculateXpToNextLevel(baseXP * growthFactor^level)`.
+  - Added runtime cache/dirty model so derived computation runs on invalidation events, not every render pass.
+- 2026-02-13: Integrated character architecture into existing systems:
+  - `index.html`: inserted `character.js` before `saveengine.js` / combat systems.
+  - `saveengine.js`:
+    - bumped `SAVE_VERSION` to `2`,
+    - added migration `v1 -> v2` for legacy top-level character fields into `character.base`,
+    - save pipeline now persists base character only (`sanitizeCharacterForSave` removes derived + legacy mirrors),
+    - load path now ensures character model, invalidates, and recomputes derived stats.
+  - `combatEngine.js` refactored to consume derived character stats (fallback-safe legacy wrappers preserved).
+  - `script.js` refactored gameplay flow to use derived character stats for speed/xp bonuses/damage and centralized XP progression via `grantCharacterXP`.
+  - `pvp.js` now reads character level/life from model and awards XP via character API.
+- 2026-02-13: Backward-compatibility validation:
+  - Node checks passed: `character.js`, `saveengine.js`, `combatEngine.js`, `script.js`, `pvp.js`.
+  - Character module smoke test passed (`CHARACTER_SMOKE_OK`).
+  - Save migration smoke test passed (`SAVE_V2_SMOKE_OK`): v1 wrapped save migrates to v2 with `character.base`; derived stats are not persisted; legacy top-level stat fields removed from saved payload.
+- 2026-02-13: Playwright skill check attempted after architecture refactor; still blocked by missing `playwright` package (`ERR_MODULE_NOT_FOUND`).
 - TODO: Run visual regression check in browser/Playwright to confirm dropdowns are fully visible on hover for Chroniken/Arena/Ressourcen and no side effects in world/zone view.
+- 2026-02-13: Added scalable PoE-style item architecture (no UI changes):
+  - New `affixDefs.js` with centralized affix schema (`implicit|prefix|suffix`, statPath, type, tier ranges + requiredIlvl).
+  - New `generator.js` with `generateItem(baseItemId, itemLevel)` for tier eligibility, tier selection, value rolls, implicit optionality, and prefix/suffix slot limits.
+  - Reworked `itemDefs.js` to normalize base item schema (`baseType`, `weight`, `baseStats`, `implicitPool`, `prefixSlots`, `suffixSlots`) while preserving legacy fields.
+  - Added runtime instance model store (`gameData.itemInstances`) and helpers for register/get/sanitize instance records.
+  - Added runtime modifier composition: BaseStats + implicit/prefix/suffix rolls, with fallback to legacy `item.modifiers`.
+  - Save compatibility retained: grid cells still store only dynamic placement data; `itemInstances` sanitized/pruned by active instance IDs in save sanitizer.
+  - Integrated runtime resolver in stat path: `character.collectEquippedItemEntries` now passes full cell context to resolver.
+  - Integrated generation hooks in `script.js`: shop buys and monster drops register item instances by `instanceId`.
+  - Updated `index.html` script order to include `affixDefs.js` and `generator.js`.
+- 2026-02-13: Validation:
+  - `node --check` passed for `affixDefs.js`, `generator.js`, `itemDefs.js`, `character.js`, `script.js`.
+  - Smoke test passed for base schema normalization, item generation, runtime modifier composition, and save sanitization of `itemInstances`.
+- 2026-02-13: Playwright skill client re-check still blocked by missing dependency (ERR_MODULE_NOT_FOUND: playwright).
+- 2026-02-14: Fixed world menu scroll/layout jitter in style.css by scoping world-menu-only overrides: removed internal dventure-hub scrolling in #tab-grind.world-view:not(.zone-view) and disabled card hover translate there to keep 'Akt 1/2/3' labels static.
+- 2026-02-14: Added modular character panel system (UI-only):
+  - New files: `characterPanel.js`, `characterPanel.css`.
+  - Added compact + expandable breakdown panel (Damage/Defense/Attributes/Weight), generic object-key rendering.
+  - Added new nav tab `Charakter` with centered overview panel (`#tab-character`).
+  - Integrated workshop layout wrapper (`.workshop-grid-panel-layout`) with panel host beside active setup grid.
+  - Added recompute UI hook in `character.js`: emits `character:stats-updated` after `recomputeCharacterDerivedStats`.
+  - Script hooks in `script.js`:
+    - `buildCharacterPanelPayload(...)` reads compute outputs and base snapshot without moving combat logic.
+    - `mountCharacterPanels()` mounts workshop compact panel + full overview panel.
+    - `refreshCharacterPanels()` called on workshop open/close, character-tab activation, initial load.
+  - No render-loop panel updates; updates are event-driven via recompute event and explicit UI hooks.
+- 2026-02-14: Playwright skill client run blocked again (`ERR_MODULE_NOT_FOUND: playwright`).

@@ -44,6 +44,38 @@ const MONSTERS = [
         dropTable: []
     },
     { 
+        id: "captain_1", 
+        name: "Ertrunkener Kapitän", 
+        hp: 105, 
+        maxHp: 105, 
+        damage: 5, 
+        attackSpeed: 2600, 
+        goldMin: 16, 
+        goldMax: 28, 
+        xp: 78, 
+        icon: "☠️",
+        sprite: "Media/Images/Monster/Drunken_Captain.png",
+        level: 3,
+        tags: ["coast"],
+        dropTable: []
+    },
+    { 
+        id: "thief_1", 
+        name: "Wegelagerer", 
+        hp: 92, 
+        maxHp: 92, 
+        damage: 6, 
+        attackSpeed: 1850, 
+        goldMin: 18, 
+        goldMax: 34, 
+        xp: 92, 
+        icon: "🗡️",
+        sprite: "Media/Images/Monster/Thief_B.png",
+        level: 4,
+        tags: ["coast"],
+        dropTable: []
+    },
+    { 
         id: "spider_1", 
         name: "Riesige Spinne", 
         hp: 150, 

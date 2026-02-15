@@ -1,3 +1,49 @@
+
+Regel 1:
+Simulation ist immer rein logisch.
+
+Regel 2:
+Item-Instanz ist immer serialisierbar.
+
+Regel 3:
+UI darf nur anzeigen, nie rechnen.
+
+Regel 4: 
+
+Keine Spielwerte hart im Code verteilen.
+ITEMS = {
+  sword_1: { damage: 12, crit: 0.1 }
+}
+
+
+Regel 5
+Version ins Save schreiben, Beim Laden Migration durchführen
+{
+  "saveVersion": 3,
+  "gold": 150,
+  "items": [...]
+}
+if saveVersion == 1:
+    convert v1 -> v2
+if saveVersion == 2:
+    convert v2 -> v3
+
+
+
+⚠️ Kritische Design-Regeln
+
+Item speichert niemals fertige Modifier.
+
+Modifier wird aus Affix-Definition generiert.
+
+Tiers sind datengetrieben.
+
+Keine Switch-Statements im Code.
+
+DamageTypes kommen aus Mapping, nicht fix.
+
+
+
 backup-stable-2026-02-12.
 
 Backup Powershell cmd
@@ -10,3 +56,10 @@ Backup Stoppen
 schtasks /Delete /TN "LoadoutLegends-AutoBackup" /F
 
 Steinkrabbe, Riesenkranken(Boss), Ertrunkener, Geister Pirat, Horde Schiffbrüchiger,
+
+
+
+Inventar:
+FARM PVE PVP zusammenlegen, Rechts davon Anzeige der Itemmutatoren, Aüsrüstung um ein Sub menu Verringern. 
+
+Charakter Sheet.

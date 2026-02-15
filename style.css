@@ -15,6 +15,20 @@
     --grid-padding: clamp(10px, 1.2vh, 15px);
     --workshop-gap: clamp(16px, min(3vw, 4vh), 60px);
     --workshop-padding: clamp(16px, min(3vw, 4vh), 60px);
+    /* Global UI scaling baseline:
+       - 1.00 = native size (used on 2560x1440+)
+       - increase to make lower resolutions look larger
+       Tweak this value if Full HD is still too small/big. */
+    --resolution-ui-scale-fhd: 0.8;
+    --resolution-ui-scale: 1;
+}
+
+/* Apply global upscaling on Full HD and below.
+   Keeps 2560x1440 unchanged while making 1920x1080 visually larger. */
+@media (max-width: 1920px) {
+    :root {
+        --resolution-ui-scale: var(--resolution-ui-scale-fhd);
+    }
 }
 
 body { 
@@ -26,7 +40,14 @@ body {
     height: 100vh;
 }
 
-#app-container { display: flex; height: 100vh; width: 100vw; position: relative; }
+#app-container {
+    display: flex;
+    position: relative;
+    transform-origin: top left;
+    transform: scale(var(--resolution-ui-scale));
+    width: calc(100vw / var(--resolution-ui-scale));
+    height: calc(100vh / var(--resolution-ui-scale));
+}
 
 /* =========================================
    2. SIDEBAR
@@ -380,9 +401,34 @@ body {
    6. WORKSHOP & GRIDS
    ========================================= */
 #workshop-overlay {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    /* Use container-relative fullscreen instead of viewport-fixed:
+       fixed + transformed ancestor causes cropped overlays on scaled layouts. */
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     background: rgba(5, 5, 5, 0.98); z-index: 1000;
     backdrop-filter: blur(10px); display: flex; flex-direction: column;
+}
+
+/* PVE workshop scene background */
+#workshop-overlay.workshop-farm {
+    background-image: url('./Media/Images/World/Farm_Workshop_C.png');
+    background-size: cover;
+    /* Focus point: X Y (adjust here if needed) */
+    background-position: 50% 42%;
+    background-repeat: no-repeat;
+    backdrop-filter: none;
+}
+
+/* PVE workshop scene background */
+#workshop-overlay.workshop-pve {
+    background-image: url('./Media/Images/World/PVE_Workshop.png');
+    background-size: cover;
+    /* Focus point: X Y (adjust here if needed) */
+    background-position: 50% 42%;
+    background-repeat: no-repeat;
+    backdrop-filter: none;
 }
 .workshop-header { padding: 25px 50px; background: #111; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; }
 .close-workshop { 
@@ -403,7 +449,14 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(42, 82, 152, 0.5);
 }
-.workshop-content { display: flex; gap: var(--workshop-gap); justify-content: center; align-items: flex-start; padding: var(--workshop-padding); overflow-y: auto; }
+.workshop-content {
+    display: flex;
+    gap: var(--workshop-gap);
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: var(--workshop-padding);
+    overflow-y: auto;
+}
 
 .workshop-content.storage-mode .active-grid-section { display: none !important; }
 .workshop-content.storage-mode #bank-grid { grid-template-columns: repeat(10, var(--slot-size)) !important; }
@@ -417,16 +470,35 @@ body {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    background: #0f0f0f;
-    border: 5px solid #333;
-    border-radius: 16px;
-    padding: clamp(12px, 1.6vh, 20px);
-    align-items: center;
+    background: linear-gradient(145deg, rgba(14, 16, 22, 0.52), rgba(8, 10, 14, 0.28));
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 18px;
+    padding: clamp(14px, 1.7vh, 22px);
+    align-items: stretch;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 0 28px rgba(0, 0, 0, 0.5),
+        0 14px 30px rgba(0, 0, 0, 0.42);
+    backdrop-filter: saturate(155%) blur(6px);
 }
 
-.bank-section > .storage-header,
-.active-grid-section > h3 {
+.bank-section > .storage-header {
     align-self: stretch;
+}
+
+.workshop-active-layout {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(12px, 1.1vw, 20px);
+    align-items: start;
+    width: max-content;
+    max-width: 100%;
+}
+
+.active-grid-section {
+    width: max-content;
+    max-width: 100%;
+    align-self: flex-start;
 }
 
 .storage-header {
@@ -699,6 +771,19 @@ body.dragging .aura-overlay { opacity: 0.35 !important; }
 .world-view {
     position: relative;
 }
+
+/* Scene backgrounds as CSS fallback.
+   Keeps world/zone images visible even if inline background styles are reset. */
+#tab-grind.world-view {
+    background-image: url('./Media/Images/World/Welt_A.png') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+}
+
+#tab-grind.world-view.zone-view {
+    background-image: url('./Media/Images/World/Kuestenpfad_A.png') !important;
+}
 .world-view::before {
     content: '';
     position: absolute;
@@ -740,6 +825,39 @@ body.dragging .aura-overlay { opacity: 0.35 !important; }
     box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 
+/* Pull act cards and their text blocks higher in world submenu. */
+.world-view .hub-header {
+    margin-bottom: 0;
+}
+
+.world-view .hub-header h3 {
+    margin-top: 0;
+    margin-bottom: 6px;
+}
+
+.world-view .hub-header p {
+    margin: 0;
+}
+
+#tab-grind.world-view:not(.zone-view) .adventure-hub {
+    margin-top: 8px;
+    padding-top: 8px;
+    align-content: start;
+    max-height: none;
+    overflow: visible;
+}
+
+/* World layout must be static and non-scrollable. */
+#tab-grind.world-view:not(.zone-view) {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Keep only top-level act cards static; inner zone cards can animate on hover. */
+#tab-grind.world-view:not(.zone-view) .adventure-hub > .adventure-card,
+#tab-grind.world-view:not(.zone-view) .adventure-hub > .adventure-card:hover {
+    transform: none;
+}
 /* Zone (Küstenpfad) view layout - Fullscreen game scene */
 .zone-view {
     position: relative;

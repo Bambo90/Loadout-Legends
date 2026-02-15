@@ -5,6 +5,7 @@
 
 let gameData = {
     gold: 500,
+    // Legacy mirrors are kept for compatibility; source of truth is character.base.
     level: 1,
     xp: 0,
     xpNextLevel: 500,
@@ -23,7 +24,11 @@ let gameData = {
     totalXP: 0,
     currentMonster: null,
     currentMonsterIndex: 0,
-    monsterDefeats: {}
+    monsterDefeats: {},
+    itemInstances: {},
+    character: (typeof createDefaultCharacterState === "function")
+        ? createDefaultCharacterState()
+        : null
 };
 
 const BANK_SLOTS = 200;
@@ -34,6 +39,285 @@ const FOCUS_DURATION = 60 * 60 * 1000;
 let currentWorkshop = null;
 let lastMonsterAttack = Date.now();
 let tooltip = null;
+let characterHubActiveSetup = 'farm';
+
+// Resolve static item values via centralized item definitions.
+function getItemDefinition(itemId, cell) {
+    if (cell && typeof getRuntimeItemDefinition === "function") {
+        const runtimeItem = getRuntimeItemDefinition(gameData, itemId, cell);
+        if (runtimeItem) return runtimeItem;
+    }
+    if (typeof getItemDefById === 'function') {
+        const def = getItemDefById(itemId);
+        if (def) return def;
+    }
+    if (typeof getItemById === 'function') {
+        return getItemById(itemId);
+    }
+    return null;
+}
+
+function getDerivedCharacterStats(gridKey = 'farmGrid') {
+    if (typeof ensureCharacterModelOnGameData === 'function') {
+        ensureCharacterModelOnGameData(gameData);
+    }
+    if (typeof getCharacterDerivedStats === 'function') {
+        return getCharacterDerivedStats(gameData, {
+            gridKey,
+            resolver: (itemId, cell) => getItemDefinition(itemId, cell)
+        });
+    }
+    return null;
+}
+
+function markCharacterDirty() {
+    if (typeof markCharacterStatsDirty === 'function') {
+        markCharacterStatsDirty(gameData);
+    }
+}
+
+function awardCharacterXP(amount, gridKey = 'farmGrid') {
+    const xpAmount = Number.isFinite(amount) ? amount : 0;
+    if (xpAmount <= 0) return { levelsGained: 0, leveledUp: false };
+
+    if (typeof grantCharacterXP === 'function') {
+        return grantCharacterXP(gameData, xpAmount, {
+            gridKey,
+            resolver: getItemDefinition
+        });
+    }
+
+    gameData.xp += xpAmount;
+    if (gameData.xp >= gameData.xpNextLevel) {
+        gameData.xp -= gameData.xpNextLevel;
+        gameData.level += 1;
+        gameData.maxHp = calculateMaxHp(gameData.level);
+        gameData.hp = gameData.maxHp;
+        gameData.xpNextLevel = calculateNextLevelXpRequirement(gameData.level);
+        return { levelsGained: 1, leveledUp: true };
+    }
+    return { levelsGained: 0, leveledUp: false };
+}
+
+function getWorkshopGridKey(workshopType) {
+    if (workshopType === 'pve') return 'pveGrid';
+    if (workshopType === 'pvp') return 'pvpGrid';
+    return 'farmGrid';
+}
+
+function getCharacterHubGridKey() {
+    return getWorkshopGridKey(characterHubActiveSetup);
+}
+
+function buildCharacterPanelPayload(gridKey) {
+    if (!gameData || typeof gameData !== 'object') return null;
+    if (typeof ensureCharacterModelOnGameData === 'function') {
+        ensureCharacterModelOnGameData(gameData);
+    }
+
+    const key = (typeof gridKey === 'string' && gridKey) ? gridKey : 'farmGrid';
+    const base = gameData.character && gameData.character.base ? gameData.character.base : null;
+    if (!base) return null;
+
+    if (key === 'farmGrid') {
+        const derived = (gameData.character && gameData.character.derived) || getDerivedCharacterStats('farmGrid');
+        return { gridKey: key, base, derived };
+    }
+
+    if (typeof computeCharacterStats === 'function' && typeof collectEquippedItemEntries === 'function') {
+        const equippedGrid = gameData[key] && typeof gameData[key] === 'object' ? gameData[key] : {};
+        const equippedItemEntries = collectEquippedItemEntries(equippedGrid, (itemId, cell) => getItemDefinition(itemId, cell));
+        const derived = computeCharacterStats({
+            base,
+            equippedItemEntries
+        });
+        return { gridKey: key, base, derived };
+    }
+
+    return { gridKey: key, base, derived: null };
+}
+
+function mountCharacterPanels() {
+    if (typeof CharacterPanel === 'undefined' || typeof CharacterPanel.mountPanel !== 'function') return;
+
+    CharacterPanel.mountPanel('#workshop-character-panel-host', {
+        panelId: 'workshop-character-panel',
+        mode: 'compact',
+        title: 'Charakter',
+        getGridKey: () => getWorkshopGridKey(currentWorkshop),
+        getPayload: ({ gridKey }) => buildCharacterPanelPayload(gridKey)
+    });
+
+    CharacterPanel.mountPanel('#character-tab-panel-host', {
+        panelId: 'character-overview-panel',
+        mode: 'full',
+        title: 'Charakter Overview',
+        getGridKey: () => getCharacterHubGridKey(),
+        getPayload: ({ gridKey }) => buildCharacterPanelPayload(gridKey)
+    });
+}
+
+function refreshCharacterPanels() {
+    if (typeof CharacterPanel !== 'undefined' && typeof CharacterPanel.refreshAll === 'function') {
+        CharacterPanel.refreshAll();
+    }
+}
+
+function syncCharacterHubSetupButtons() {
+    const buttons = document.querySelectorAll('.character-setup-btn');
+    buttons.forEach((btn) => {
+        const setup = btn.dataset && btn.dataset.setup ? btn.dataset.setup : '';
+        btn.classList.toggle('active', setup === characterHubActiveSetup);
+    });
+}
+
+function renderCharacterHubGrid() {
+    const gridContainer = document.getElementById('character-setup-grid');
+    if (!gridContainer) return;
+    
+    const gridKey = getCharacterHubGridKey();
+    
+    // Stelle sicher, dass Grids existieren
+    if (!gameData[gridKey]) gameData[gridKey] = {};
+    
+    // Clear und render das Equipment-Grid (kein Storage/Bank)
+    gridContainer.innerHTML = '';
+    gridContainer.style.overflow = 'hidden';
+    
+    const totalSlots = GRID_SIZE * GRID_ROWS;
+    for (let i = 0; i < totalSlots; i++) {
+        createSlot(gridContainer, gridKey, i, GRID_SIZE);
+    }
+    
+    // Render drag preview
+    renderDragPreviewForGrid(gridContainer, gridKey, GRID_SIZE, totalSlots);
+}
+
+function setCharacterHubSetup(setupType) {
+    if (!['farm', 'pve', 'pvp'].includes(setupType)) return;
+    
+    characterHubActiveSetup = setupType;
+    
+    // Sync button states
+    syncCharacterHubSetupButtons();
+    
+    // Render grid für neues Setup
+    renderCharacterHubGrid();
+    
+    // Update character panel
+    refreshCharacterPanels();
+    
+    // Dispatch event für externe Systeme
+    dispatchCharacterStatsUpdated(getCharacterHubGridKey());
+}
+
+function dispatchCharacterStatsUpdated(gridKey) {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+        const payload = buildCharacterPanelPayload(gridKey || getCharacterHubGridKey());
+        window.dispatchEvent(new CustomEvent('character:stats-updated', {
+            detail: payload || { gridKey: (gridKey || getCharacterHubGridKey()) }
+        }));
+    }
+}
+
+function _formatStatLabel(statPath) {
+    if (typeof statPath !== 'string') return '';
+    return statPath.replace(/\./g, ' ').toUpperCase();
+}
+
+function _formatMutatorValue(entry) {
+    const parts = [];
+    if (_isFiniteNumber(entry.flat)) {
+        const formatted = (entry.flat > 0 ? '+' : '') + entry.flat.toFixed(2);
+        parts.push(formatted.replace(/\+?-0\.00/, '0.00'));
+    }
+    if (_isFiniteNumber(entry.percent)) {
+        const percent = entry.percent * 100;
+        const sign = percent > 0 ? '+' : '';
+        parts.push(`${sign}${percent.toFixed(2)}%`);
+    }
+    if (parts.length === 0) {
+        return '0';
+    }
+    return parts.join(' / ');
+}
+
+function _getMutatorValueClass(entry) {
+    const flat = _isFiniteNumber(entry && entry.flat) ? entry.flat : 0;
+    const percent = _isFiniteNumber(entry && entry.percent) ? entry.percent : 0;
+    const epsilon = 0.000001;
+
+    if (Math.abs(flat) <= epsilon && Math.abs(percent) <= epsilon) {
+        return 'stat-zero';
+    }
+
+    if ((flat > epsilon && percent >= -epsilon) || (percent > epsilon && flat >= -epsilon)) {
+        return 'stat-pos';
+    }
+
+    if ((flat < -epsilon && percent <= epsilon) || (percent < -epsilon && flat <= epsilon)) {
+        return 'stat-neg';
+    }
+
+    return 'stat-zero';
+}
+
+function collectActiveItemModifierTotals(workshopType) {
+    if (!gameData || typeof gameData !== 'object') return [];
+    ensureCharacterModelOnGameData(gameData);
+    const base = gameData.character && gameData.character.base ? gameData.character.base : null;
+    if (!base) return [];
+
+    const normalizedBase = normalizeCharacterBase(base);
+    const attributeModifiers = _buildAttributeModifiers(normalizedBase.baseAttributes);
+    const levelModifiers = _buildLevelModifiers(normalizedBase.level);
+    const progressionModifiers = [...attributeModifiers, ...levelModifiers];
+
+    const activationPreview = _createRuntimeStatsFromBase(normalizedBase);
+    const activationSplit = _splitModifiersByType(progressionModifiers);
+    _applyModifierPhases(activationPreview, activationSplit.flatModifiers, activationSplit.percentModifiers);
+    activationPreview.weightLimit = Math.max(
+        1,
+        _num(activationPreview.weightLimit, _calculateWeightLimitFromStrength(normalizedBase.baseAttributes.str))
+    );
+
+    const gridKey = getWorkshopGridKey(workshopType);
+    const grid = (gridKey && typeof gameData[gridKey] === 'object') ? gameData[gridKey] : {};
+    const equippedEntries = collectEquippedItemEntries(grid, (itemId, cell) => getItemDefinition(itemId, cell));
+    const weightClass = _classifyWeightActivation(equippedEntries, activationPreview.weightLimit);
+    const totals = new Map();
+
+    weightClass.active.forEach((entry) => {
+        extractItemModifiers(entry.item).forEach((modifier) => {
+            if (!modifier || typeof modifier.statPath !== 'string' || !CHARACTER_MODIFIER_TYPES.includes(modifier.type)) return;
+            const record = totals.get(modifier.statPath) || { statPath: modifier.statPath, flat: 0, percent: 0 };
+            record[modifier.type] += modifier.value;
+            totals.set(modifier.statPath, record);
+        });
+    });
+
+    return Array.from(totals.values()).sort((a, b) => {
+        const aScore = Math.abs(a.flat) + Math.abs(a.percent) * 100;
+        const bScore = Math.abs(b.flat) + Math.abs(b.percent) * 100;
+        if (bScore !== aScore) return bScore - aScore;
+        return a.statPath.localeCompare(b.statPath);
+    });
+}
+
+function renderItemMutatorSummary(workshopType) {
+    const host = document.getElementById('item-mutator-summary-host');
+    if (!host) return;
+
+    const totals = collectActiveItemModifierTotals(workshopType);
+    const rows = totals.map((entry) => (
+        `<div class="workshop-summary-row">` +
+            `<span class="workshop-summary-key">${_formatStatLabel(entry.statPath)}</span>` +
+            `<span class="workshop-summary-value ${_getMutatorValueClass(entry)}">${_formatMutatorValue(entry)}</span>` +
+        `</div>`
+    )).join('');
+
+    host.innerHTML = rows || '<div class="workshop-summary-empty">Keine Item-Mods aktiv</div>';
+}
 
 // ===== ALT-KEY TRACKING FOR AURA VISIBILITY =====
 window.altKeyPressed = false;
@@ -87,7 +371,15 @@ function switchTab(tabId) {
         .find(btn => btn.getAttribute('onclick')?.includes(tabId));
     if (activeBtn) activeBtn.classList.add('active');
 
-    if (tabId === 'equipment') renderEquipmentHub();
+    if (tabId === 'equipment') {
+        renderEquipmentHub();
+        openWorkshop('farm');
+    }
+    if (tabId === 'character') {
+        syncCharacterHubSetupButtons();
+        renderCharacterHubGrid();
+        refreshCharacterPanels();
+    }
 }
 
 let _worldViewBackup = null;
@@ -114,7 +406,7 @@ function renderWorldView() {
     }
 
     grindTab.innerHTML = '';
-    grindTab.style.backgroundImage = "url('Media/Images/World/Welt_A.png')";
+    grindTab.style.backgroundImage = "url('./Media/Images/World/Welt_A.png')";
     grindTab.style.backgroundSize = 'cover';
     grindTab.style.backgroundPosition = 'center';
     grindTab.style.backgroundRepeat = 'no-repeat';
@@ -209,7 +501,7 @@ function renderZoneView(zoneId) {
     }
 
     grindTab.innerHTML = '';
-    grindTab.style.backgroundImage = "url('Media/Images/World/Kuestenpfad_A.png')";
+    grindTab.style.backgroundImage = "url('./Media/Images/World/Kuestenpfad_A.png')";
     grindTab.style.backgroundSize = 'cover';
     grindTab.style.backgroundPosition = 'center';
     grindTab.style.backgroundRepeat = 'no-repeat';
@@ -371,7 +663,7 @@ function renderPreviewGrid(containerId, gridKey) {
         if (cellData && cellData.itemId) {
             // Wir rendern in der Vorschau nur das Root/Anchor-Symbol
             if (cellData.root || i === 0) {
-                const item = getItemById(cellData.itemId);
+                const item = getItemDefinition(cellData.itemId);
                 if (item) {
                     const itemEl = document.createElement('div');
                     itemEl.classList.add('item', item.rarity);
@@ -422,6 +714,8 @@ function openWorkshop(type) {
     currentWorkshop = type;
     const overlay = document.getElementById('workshop-overlay');
     if (overlay) {
+        overlay.classList.remove('workshop-farm', 'workshop-pve', 'workshop-pvp', 'workshop-storage');
+        overlay.classList.add(`workshop-${type}`);
         overlay.classList.remove('hidden');
         overlay.style.display = 'flex';
         const title = document.getElementById('workshop-title');
@@ -451,16 +745,21 @@ function openWorkshop(type) {
         } else {
             console.error("renderWorkshopGrids nicht gefunden! Prüfe index.html Ladereihenfolge.");
         }
+        refreshCharacterPanels();
     }, 10);
 }
 
 function closeWorkshop() {
     currentWorkshop = null;
     const overlay = document.getElementById('workshop-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('workshop-farm', 'workshop-pve', 'workshop-pvp', 'workshop-storage');
+    }
     
     if (typeof saveGame === 'function') saveGame();
     renderEquipmentHub();
+    refreshCharacterPanels();
 }
 
 // ==========================================
@@ -468,7 +767,7 @@ function closeWorkshop() {
 // ==========================================
 
 function buyItem(itemId) {
-    const item = getItemById(itemId);
+    const item = getItemDefinition(itemId);
     if (!item || gameData.gold < item.price) return;
 
     // Freien Slot in der Bank suchen
@@ -481,7 +780,10 @@ function buyItem(itemId) {
                     ? getItemBodyMatrix(item, 0)
                     : (item.body || [[1]]);
                 const bodyCopy = baseBody.map(r => [...r]);
-                    placeItemIntoGrid(gameData.bank, i, item, bodyCopy, getBankCols(), null, null, null, 0);
+                const instanceId = placeItemIntoGrid(gameData.bank, i, item, bodyCopy, getBankCols(), null, null, null, 0);
+                if (instanceId && typeof registerItemInstance === 'function') {
+                    registerItemInstance(gameData, instanceId, item.id, Math.max(1, gameData.level), { source: 'shop' });
+                }
             }
             if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
             updateUI();
@@ -501,12 +803,26 @@ function updateLogic() {
     const dt = (now - gameData.lastUpdate) / 1000;
     gameData.lastUpdate = now;
 
-    if (gameData.hp < gameData.maxHp) {
+    const characterStats = getDerivedCharacterStats('farmGrid');
+
+    if (characterStats && gameData.character && gameData.character.base) {
+        const base = gameData.character.base;
+        const lifeRegen = (typeof characterStats.lifeRegen === 'number') ? characterStats.lifeRegen : gameData.hpRegen;
+        if (typeof base.currentLife !== 'number') {
+            base.currentLife = characterStats.life;
+        }
+        if (base.currentLife < characterStats.life) {
+            base.currentLife = Math.min(characterStats.life, base.currentLife + (lifeRegen * dt));
+        }
+        if (typeof syncLegacyCharacterFields === 'function') {
+            syncLegacyCharacterFields(gameData, characterStats);
+        }
+    } else if (gameData.hp < gameData.maxHp) {
         gameData.hp = Math.min(gameData.maxHp, gameData.hp + gameData.hpRegen * dt);
     }
 
     const focusMultiplier = (now < gameData.focusUntil) ? 1.3 : 1.0;
-    const speedBonus = calculateEquipmentBonus('farmGrid', 'speed');
+    const speedBonus = characterStats ? characterStats.attackSpeed : calculateEquipmentBonus('farmGrid', 'speed');
     const baseWorkRate = 50 * focusMultiplier * speedBonus;
     
     gameData.workProgress += baseWorkRate * dt;
@@ -517,17 +833,20 @@ function updateLogic() {
         // Base rewards
         const goldReward = 10;
         const xpReward = 50;
-        const xpBonus = calculateEquipmentBonus('farmGrid', 'xp');
+        const xpBonus = characterStats ? characterStats.xpGainMultiplier : calculateEquipmentBonus('farmGrid', 'xp');
         
         gameData.gold += goldReward;
         gameData.totalGold += goldReward;
-        gameData.xp += xpReward * xpBonus;
-        gameData.totalXP += xpReward * xpBonus;
+        const gainedBaseXp = xpReward * xpBonus;
+        awardCharacterXP(gainedBaseXp, 'farmGrid');
+        gameData.totalXP += gainedBaseXp;
         
         // Monster damage
         if (gameData.currentMonster) {
             const equipped = getEquippedItems('farmGrid');
-            const damage = calculatePlayerDamageWithEquipment(gameData.level, equipped);
+            const damage = characterStats
+                ? calculateCharacterDamageValue(characterStats)
+                : calculatePlayerDamageWithEquipment(gameData.level, equipped);
             gameData.currentMonster.hp -= damage;
             
             if (gameData.currentMonster.hp <= 0) {
@@ -535,8 +854,9 @@ function updateLogic() {
                 const goldBonus = calculateLootReward(gameData.currentMonster.goldMin, gameData.currentMonster.goldMax);
                 gameData.gold += goldBonus;
                 gameData.totalGold += goldBonus;
-                gameData.xp += gameData.currentMonster.xp * xpBonus;
-                gameData.totalXP += gameData.currentMonster.xp * xpBonus;
+                const gainedMonsterXp = gameData.currentMonster.xp * xpBonus;
+                awardCharacterXP(gainedMonsterXp, 'farmGrid');
+                gameData.totalXP += gainedMonsterXp;
                 gameData.monsterDefeats[gameData.currentMonster.id]++;
                 
                 // Roll for item drop
@@ -544,7 +864,7 @@ function updateLogic() {
                     const dropChance = 0.15; // 15% chance per drop item
                     gameData.currentMonster.dropTable.forEach(itemId => {
                         if (Math.random() < dropChance) {
-                            addItemToBank(itemId);
+                            addItemToBank(itemId, gameData.currentMonster.level || gameData.level);
                         }
                     });
                 }
@@ -552,21 +872,13 @@ function updateLogic() {
                 spawnMonster(gameData.currentMonsterIndex);
             }
         }
-        
-        // Level up check
-        if (gameData.xp >= gameData.xpNextLevel) {
-            gameData.xp -= gameData.xpNextLevel;
-            gameData.level++;
-            gameData.maxHp = calculateMaxHp(gameData.level);
-            gameData.hp = gameData.maxHp;
-            gameData.xpNextLevel = calculateNextLevelXpRequirement(gameData.level);
-        }
     }
 }
 
 function updateUI() {
     const setT = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
     const setW = (id, val) => { const el = document.getElementById(id); if (el) el.style.width = val + "%"; };
+    const characterStats = getDerivedCharacterStats('farmGrid');
 
     setT('gold-display', Math.floor(gameData.gold).toLocaleString());
     setT('level-display', gameData.level);
@@ -578,9 +890,12 @@ function updateUI() {
     setW('xp-fill-header', (gameData.xp / gameData.xpNextLevel) * 100);
     
     // Update bonus display
-    const equippedFarm = getEquippedItems('farmGrid');
-    const speedBonus = calculateEquipmentBonusValue(equippedFarm, 'speed');
-    const xpBonus = calculateEquipmentBonusValue(equippedFarm, 'xp');
+    const speedBonus = characterStats
+        ? characterStats.attackSpeed
+        : calculateEquipmentBonusValue(getEquippedItems('farmGrid'), 'speed');
+    const xpBonus = characterStats
+        ? characterStats.xpGainMultiplier
+        : calculateEquipmentBonusValue(getEquippedItems('farmGrid'), 'xp');
     const combinedBonus = speedBonus * xpBonus;
     setT('bonus-display', combinedBonus.toFixed(2) + 'x');
     
@@ -658,8 +973,8 @@ function changeMonster(direction) {
 // INVENTORY MANAGEMENT
 // ==========================================
 
-function addItemToBank(itemId) {
-    const item = getItemById(itemId);
+function addItemToBank(itemId, itemLevel) {
+    const item = getItemDefinition(itemId);
     if (!item) return false;
     
     // Find first empty slot
@@ -670,7 +985,11 @@ function addItemToBank(itemId) {
                     ? getItemBodyMatrix(item, 0)
                     : (item.body || [[1]]);
                 const bodyCopy = baseBody.map(r => [...r]);
-                placeItemIntoGrid(gameData.bank, i, item, bodyCopy, getBankCols(), null, null, null, 0);
+                const instanceId = placeItemIntoGrid(gameData.bank, i, item, bodyCopy, getBankCols(), null, null, null, 0);
+                if (instanceId && typeof registerItemInstance === 'function') {
+                    const ilvl = Number.isFinite(itemLevel) ? itemLevel : Math.max(1, gameData.level);
+                    registerItemInstance(gameData, instanceId, item.id, ilvl, { source: 'drop' });
+                }
                 return true;
             }
         }
@@ -837,7 +1156,8 @@ function renderWorkshopGrids() {
     // Active Grid (Farm or PvE)
     activeGrid.innerHTML = '';
     const gridType = currentWorkshop === 'farm' ? 'farmGrid' : 
-                    currentWorkshop === 'pve' ? 'pveGrid' : 'farmGrid';
+                    currentWorkshop === 'pve' ? 'pveGrid' :
+                    currentWorkshop === 'pvp' ? 'pvpGrid' : 'farmGrid';
     
     const totalSlots = GRID_SIZE * GRID_ROWS;
     for (let i = 0; i < totalSlots; i++) {
@@ -886,6 +1206,8 @@ function renderWorkshopGrids() {
     if (typeof applyStorageFilters === 'function') {
         applyStorageFilters();
     }
+
+    renderItemMutatorSummary(currentWorkshop);
 }
 
 // Queueing render to avoid re-render storms during drag operations
@@ -945,7 +1267,8 @@ function getEquippedItems(gridType) {
     Object.keys(grid).forEach(key => {
         const cell = grid[key];
         if (cell && cell.root) {
-            const item = getItemById(cell.itemId);
+            // Runtime stats are always resolved from static item definitions by itemId.
+            const item = getItemDefinition(cell.itemId, cell);
             if (item) equipped.push(item);
         }
     });
@@ -954,11 +1277,23 @@ function getEquippedItems(gridType) {
 }
 
 function calculateEquipmentBonus(gridType, bonusType) {
+    if (gridType === 'farmGrid') {
+        const characterStats = getDerivedCharacterStats(gridType);
+        if (characterStats) {
+            if (bonusType === 'speed') return characterStats.attackSpeed;
+            if (bonusType === 'xp') return characterStats.xpGainMultiplier;
+            if (bonusType === 'damage') return calculateCharacterDamageValue(characterStats);
+        }
+    }
     const equipped = getEquippedItems(gridType);
     return calculateEquipmentBonusValue(equipped, bonusType);
 }
 
 function calculatePlayerDamage() {
+    const characterStats = getDerivedCharacterStats('farmGrid');
+    if (characterStats) {
+        return calculateCharacterDamageValue(characterStats);
+    }
     const equipped = getEquippedItems('farmGrid');
     return calculatePlayerDamageWithEquipment(gameData.level, equipped);
 }
@@ -983,6 +1318,13 @@ window.onload = () => {
     if (typeof initializeItemRegistry === 'function') {
         initializeItemRegistry();
     }
+
+    if (typeof ensureCharacterModelOnGameData === 'function') {
+        ensureCharacterModelOnGameData(gameData);
+    }
+    markCharacterDirty();
+    getDerivedCharacterStats('farmGrid');
+    mountCharacterPanels();
     
     // 3. Initiales UI Rendering
     spawnMonster(0);
@@ -1001,6 +1343,8 @@ window.onload = () => {
     
     // 6. Final UI update
     updateUI();
+    refreshCharacterPanels();
     
     console.log("Loadout Legends ready!");
 };
+

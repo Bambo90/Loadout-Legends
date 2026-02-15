@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loadout Legends</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="characterPanel.css">
 </head>
 <body>
     <div id="app-container">
@@ -17,6 +18,7 @@
                 <button class="nav-btn active" onclick="switchTab('grind')">⚔️ Abenteuer</button>
                 <button class="nav-btn" onclick="switchTab('equipment')">🛡️ Ausrüstung</button>
                 <button class="nav-btn" onclick="switchTab('shop')">💰 Shop</button>
+                <button class="nav-btn" onclick="switchTab('character')">Charakter</button>
                 <button class="nav-btn" onclick="switchTab('stats')">📊 Stats</button>
             </nav>
             <div class="sidebar-footer">
@@ -112,6 +114,21 @@
                     <h3>Marktplatz</h3>
                     <div id="shop-container" class="shop-grid"></div>
                 </div>
+                <div id="tab-character" class="tab-content">
+                    <div class="character-tab-layout">
+                        <div id="character-tab-panel-host" class="character-panel-host character-panel-host--overview"></div>
+                        <section class="character-hub-setup-section">
+                            <div class="character-hub-setup-switch" role="tablist" aria-label="Setup Auswahl">
+                                <button class="character-setup-btn active" data-setup="farm" onclick="setCharacterHubSetup('farm')">FARM</button>
+                                <button class="character-setup-btn" data-setup="pve" onclick="setCharacterHubSetup('pve')">PVE</button>
+                                <button class="character-setup-btn" data-setup="pvp" onclick="setCharacterHubSetup('pvp')">PVP</button>
+                            </div>
+                            <div class="character-hub-grid-wrap">
+                                <div id="character-setup-grid" class="inventory-grid"></div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
 
                 <div id="tab-stats" class="tab-content">
                     <h3>Statistiken</h3>
@@ -126,7 +143,6 @@
 
         <div id="workshop-overlay" class="hidden">
             <div class="workshop-header">
-                <h2 id="workshop-title">Workshop</h2>
                 <div style="flex: 1;"></div>
                 <button class="close-workshop" onclick="closeWorkshop()">💾 Speichern</button>
             </div>
@@ -163,8 +179,22 @@
                     </div>
                 </div>
                 <div class="active-grid-section">
-                    <h3>Ausrüstung</h3>
-                    <div id="active-setup-grid" class="inventory-grid"></div>
+                    <div class="workshop-active-layout">
+                        <div class="workshop-grid-and-controls">
+                            <div class="workshop-grid-column">
+                                <div id="workshop-setup-buttons" class="workshop-setup-buttons">
+                                    <button onclick="openWorkshop('farm')" class="character-setup-btn">Farm</button>
+                                    <button onclick="openWorkshop('pve')" class="character-setup-btn">PvE</button>
+                                    <button onclick="openWorkshop('pvp')" class="character-setup-btn">PvP</button>
+                                </div>
+                                <div id="active-setup-grid" class="inventory-grid"></div>
+                            </div>
+                            <div class="workshop-summary-column">
+                                <div class="workshop-summary-title">Item-Stats</div>
+                                <div id="item-mutator-summary-host" class="workshop-summary-list"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -179,6 +209,9 @@
 <script src="shields.js"></script>
 <script src="accessories.js"></script>
 <script src="itemRegistry.js"></script>
+<script src="affixDefs.js"></script>
+<script src="itemDefs.js"></script>
+<script src="generator.js"></script>
 <!-- Legacy item files (keep for now, gradual migration) -->
 <script src="weapons.js"></script>
 <script src="jewelry.js"></script>
@@ -193,6 +226,8 @@
 <script src="storageEngine.js"></script>
 
 <script src="platformBridge.js"></script>
+<script src="character.js"></script>
+<script src="characterPanel.js"></script>
 <script src="saveengine.js"></script>
 <script src="combatEngine.js"></script>
 <script src="pvp.js"></script>
@@ -203,3 +238,8 @@
 
 </body>
 </html>
+
+
+
+
+

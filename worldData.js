@@ -1,4 +1,4 @@
-const WORLD_DATA = {
+﻿const WORLD_DATA = {
     acts: [
         {
             id: "act1",
@@ -12,7 +12,13 @@ const WORLD_DATA = {
         },
         {
             id: "act2",
-            name: "Akt 2 – Coming Soon",
+            name: "Akt 2 - Coming Soon",
+            unlocked: false,
+            zones: []
+        },
+        {
+            id: "act3",
+            name: "Akt 3 - Coming Soon",
             unlocked: false,
             zones: []
         }

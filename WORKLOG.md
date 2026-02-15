@@ -111,3 +111,5 @@ Session Close Checklist (what assistant will remind you to do besides saving):
 - 2026-02-12 19:02 - Auto: merge 475ce55
 - 2026-02-12 19:16 - Auto: commit 1809152
 - 2026-02-12 21:29 - Auto: commit 7d76802
+- 2026-02-13 15:43 - Auto: commit ed98e87
+- 2026-02-13 16:31 - Doc audit: README, GAME_DESIGN, DRAG_DROP_ARCHITECTURE, ITEM_SYSTEM_GUIDE refreshed for current runtime architecture and grid dimensions.

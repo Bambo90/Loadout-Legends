@@ -24,9 +24,12 @@ function getPVPStorageAdapter() {
  * Creates a snapshot of player's current state for PvP
  */
 function createPlayerSnapshot() {
+    const snapshotLevel = (gameData.character && gameData.character.base)
+        ? gameData.character.base.level
+        : gameData.level;
     return {
-        name: `Player_${gameData.level}`,
-        level: gameData.level,
+        name: `Player_${snapshotLevel}`,
+        level: snapshotLevel,
         timestamp: Date.now(),
         farmGridSnapshot: JSON.parse(JSON.stringify(gameData.farmGrid)),
         pveGridSnapshot: JSON.parse(JSON.stringify(gameData.pveGrid)),
@@ -77,7 +80,9 @@ function simulatePVPBattle(opponentSnapshot) {
     const playerDamage = calculatePlayerDamage();
     const opponentDamage = 5 + (opponentSnapshot.level * 0.5);
     
-    let playerHP = gameData.hp;
+    let playerHP = (gameData.character && gameData.character.base && typeof gameData.character.base.currentLife === 'number')
+        ? gameData.character.base.currentLife
+        : gameData.hp;
     let opponentHP = 100 + (opponentSnapshot.level * 10);
     
     let rounds = 0;
@@ -121,7 +126,11 @@ function challengePlayer(opponentIndex) {
     
     if (result.won) {
         gameData.gold += result.goldReward;
-        gameData.xp += result.xpReward;
+        if (typeof grantCharacterXP === 'function') {
+            grantCharacterXP(gameData, result.xpReward, { gridKey: 'farmGrid' });
+        } else {
+            gameData.xp += result.xpReward;
+        }
         gameData.totalGold += result.goldReward;
         gameData.totalXP += result.xpReward;
     }

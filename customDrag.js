@@ -101,7 +101,7 @@ function applyRotation(dir) {
         if (typeof window._updateFollowElementPosition === 'function' && window._dragLastPos) {
             window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
         }
-        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+        renderAllActiveGrids();
         return;
     }
 
@@ -185,7 +185,7 @@ function applyRotationCanonical(dir) {
         }
     }
     // Update grid preview to show new rotation
-    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+    renderAllActiveGrids();
 }
 
 // ===== GRID UTILITIES =====
@@ -296,7 +296,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
     // remove item from grid for preview
     clearItemFromGrid(gameData[fromLocation], instanceId);
-    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+    renderAllActiveGrids();
 
     // create follow element
     _customFollowEl = document.createElement('div');
@@ -322,8 +322,13 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     const cellW2 = geo.cellW;
     const cellH2 = geo.cellH;
     // (debug logging removed)
-    _customFollowEl.style.width = (cols * cellW2 - gap) + 'px';
-    _customFollowEl.style.height = (rows * cellH2 - gap) + 'px';
+    
+    // Compute total follow-element dimensions: rows/cols * slotSize with gaps between
+    const followElWidth = cols * slotSize + (cols > 1 ? (cols - 1) * gap : 0);
+    const followElHeight = rows * slotSize + (rows > 1 ? (rows - 1) * gap : 0);
+    
+    _customFollowEl.style.width = followElWidth + 'px';
+    _customFollowEl.style.height = followElHeight + 'px';
     
     // CRITICAL: Use relative positioning to allow absolute children (aura, icon)
     _customFollowEl.style.position = 'fixed'; 
@@ -339,6 +344,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     gridWrapper.style.gap = gap + 'px';
     gridWrapper.style.position = 'relative';
     gridWrapper.style.boxSizing = 'border-box';
+    gridWrapper.style.width = followElWidth + 'px';
+    gridWrapper.style.height = followElHeight + 'px';
     gridWrapper.style.alignItems = 'start';
     gridWrapper.style.justifyItems = 'start';
 
@@ -734,11 +741,11 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 if (!draggedItem.hoverTarget || draggedItem.hoverTarget.location !== loc || draggedItem.hoverTarget.index !== idx) {
                     draggedItem.hoverTarget = { location: loc, index: idx };
                     draggedItem._lastValidSlot = slot; // store the actual slot for fallback at drop
-                    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+                    renderAllActiveGrids();
                 }
             } else if (draggedItem.hoverTarget) {
                 delete draggedItem.hoverTarget;
-                try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+                renderAllActiveGrids();
             }
         } catch (err) {
             // ignore
@@ -788,7 +795,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                         _perfLastFrameTime = 0;
                     }
                     
-                    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+                    renderAllActiveGrids();
                 }, 10);
                 return;
             }
@@ -876,7 +883,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                     );
                 }
                 draggedItem = null;
-                try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+                renderAllActiveGrids();
             }
             document.body.classList.remove('dragging','drop-allowed','drop-invalid');
         }, 10);

@@ -3,6 +3,30 @@
 // Handhabt das Ablegen mit Offset
 // ================================
 
+/**
+ * Render all active grids (Workshop and/or Character-Hub)
+ * Called after drop, rotation, or other grid-changing operations
+ */
+function renderAllActiveGrids() {
+    // Update Workshop if open
+    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+    
+    // If Character-Hub is visible, also update its grid
+    const tabCharacter = document.getElementById('tab-character');
+    if (tabCharacter && tabCharacter.classList.contains('active')) {
+        if (typeof renderCharacterHubGrid === 'function') {
+            renderCharacterHubGrid();
+        }
+    }
+}
+
+/**
+ * Post-drop render: Update both Workshop and Character-Hub grids if visible
+ */
+function postDropRender() {
+    renderAllActiveGrids();
+}
+
 function handleDropInSlot(e) {
     e.preventDefault();
     const draggedItem = DragSystem.getDraggedItem();
@@ -39,7 +63,7 @@ function handleDropInSlot(e) {
             draggedItem.rotationIndex
         );
         DragSystem.clearDraggedItem();
-        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+        postDropRender();
         return;
     }
 
@@ -146,7 +170,7 @@ function handleDropInSlot(e) {
             draggedItem.rotationIndex
         );
         DragSystem.clearDraggedItem();
-        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+        postDropRender();
         return;
     }
 
@@ -225,7 +249,7 @@ function handleDropInSlot(e) {
             draggedItem.rotationIndex
         );
         DragSystem.clearDraggedItem();
-        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+        postDropRender();
         return;
     }
 
@@ -244,7 +268,7 @@ function handleDropInSlot(e) {
     );
     console.log('✅ PLACED ITEM', { itemId: draggedItem.item.id, instance: draggedItem.instanceId, location, index: chosenIndex });
     DragSystem.clearDraggedItem();
-    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+    postDropRender();
     
     if (typeof saveGame === 'function') {
         saveGame();
