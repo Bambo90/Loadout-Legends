@@ -138,3 +138,39 @@ Original prompt: Du warst grade dabei irgendwas für das zukünftige Wrapping mi
     - `refreshCharacterPanels()` called on workshop open/close, character-tab activation, initial load.
   - No render-loop panel updates; updates are event-driven via recompute event and explicit UI hooks.
 - 2026-02-14: Playwright skill client run blocked again (`ERR_MODULE_NOT_FOUND: playwright`).
+- 2026-02-17: Added UI SFX wiring for button/menu/shop/storage actions:
+  - `script.js`: added central `playUISound(...)` loader/cache for `Back_A`, `Click_A`, `Item_Bought_A`, `Item_Sold_A`, `Mouse_Over_Menu_A`.
+  - `script.js`: added delegated button listeners via `initUISoundBindings()`:
+    - Back/Zurueck buttons -> `Back_A`.
+    - Non-back menu button clicks -> `Click_A`.
+    - Button hover/highlight mouseover -> `Mouse_Over_Menu_A` (throttled, button-only).
+    - Buy and sell-commit buttons excluded from generic click SFX to avoid duplicate playback.
+  - `script.js`: `buyItem(...)` now plays `Item_Bought_A` only after a successful purchase.
+  - `storageEngine.js`: `executeBulkSell(...)` now plays `Item_Sold_A` only after at least one item was sold.
+- 2026-02-17: Verification constraints:
+  - `node --check` could not run in this environment because `node` is not available in PATH.
+  - Playwright skill client was not runnable in this environment for the same reason.
+  - Explicit client start attempt (`web_game_playwright_client.js --help`) failed immediately: `node` command not found.
+- 2026-02-17: Follow-up fix for Storage sell interaction:
+  - `script.js`: UI sound playback made fail-safe (`try/catch`) so audio cannot interrupt click handlers.
+  - `script.js`: button click/hover SFX now deferred via `setTimeout(..., 0)` to decouple sound from action flow.
+  - `script.js`: delegated button listeners switched to default bubbling phase (no capture), preventing pre-target interference.
+  - `script.js`: `_normalizeButtonLabel` hardened to handle environments without `String.prototype.normalize`.
+- 2026-02-17: Storage SELL toggle reliability fix:
+  - `script.js`: mirror `currentWorkshop` to `window.currentWorkshop` on init/open/close.
+  - `storageEngine.js`: added `_getCurrentWorkshopType()` helper with safe fallback to `window.currentWorkshop`.
+  - `storageEngine.js`: switched SELL guard and storage UI enable/visibility checks to `_getCurrentWorkshopType()` so SELL mode can always toggle in storage overlay.
+- 2026-02-17: Storage SELL behavior polish + mode guard hardening:
+  - `storageEngine.js`: SELL button now always keeps label `SELL` (no `VIEW (...)` text swap).
+  - `storageEngine.js`: added `_isStorageModeActive()` using actual overlay classes (`.storage-mode` / `.workshop-storage`) as source of truth.
+  - `storageEngine.js`: `toggleBulkSellMode()` now keys off `_isStorageModeActive()` so button toggles reliably when overlay is in storage mode.
+  - `storageEngine.js`: storage actions visibility and button disabled state now follow `_isStorageModeActive()`.
+  - `storageEngine.js`: render refresh now also runs when storage overlay is active, even if `currentWorkshop` is temporarily unavailable.
+- 2026-02-17: SELL click binding hardening:
+  - `storageEngine.js`: added one-time direct event binding for `#bulk-sell-btn` in `_bindStoragePageControls()`.
+  - `storageEngine.js`: inline `onclick` is removed at runtime and replaced with explicit `addEventListener('click', ...)` to prevent silent no-op or double-trigger conflicts.
+- 2026-02-17: SELL mode expanded to equipment workshop bank + gold-total counter:
+  - `workshopEngine.js`: removed `currentWorkshop === 'storage'` restriction for bank item selection while SELL mode is active.
+  - `workshopEngine.js`: drag-start block in SELL mode now applies to bank items in all workshop types, not storage-only.
+  - `storageEngine.js`: `_isStorageModeActive()` now treats visible workshop overlay + bank grid as valid SELL context (supports left bank in Ausruestung tab).
+  - `storageEngine.js`: added `_getSelectedSellTotalGold()` and changed execute button label to `Sell <gold> Gold` (sum of selected item values, not item count).

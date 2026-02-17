@@ -42,10 +42,157 @@ const BANK_SLOTS = 100;
 const GRID_SIZE = 10;
 const GRID_ROWS = 10;
 const FOCUS_DURATION = 60 * 60 * 1000;
+const UI_SOUND_PATHS = Object.freeze({
+    back: './Sounds/Back_A.mp3',
+    click: './Sounds/Click_A.mp3',
+    itemBought: './Sounds/Item_Bought_A.mp3',
+    itemSold: './Sounds/Item_Sold_A.mp3',
+    menuHover: './Sounds/Mouse_Over_Menu_A.mp3'
+});
 
 let currentWorkshop = null;
 let lastMonsterAttack = Date.now();
 let characterHubActiveSetup = 'farm';
+let _lastHoveredMenuButton = null;
+let _lastMenuHoverSoundAt = 0;
+const _uiSoundBases = Object.create(null);
+
+if (typeof window !== 'undefined') {
+    window.currentWorkshop = currentWorkshop;
+}
+
+function _getUISoundBase(soundKey) {
+    const path = UI_SOUND_PATHS[soundKey];
+    if (!path) return null;
+    if (_uiSoundBases[soundKey]) return _uiSoundBases[soundKey];
+
+    const audio = new Audio(path);
+    audio.preload = 'auto';
+    _uiSoundBases[soundKey] = audio;
+    return audio;
+}
+
+function playUISound(soundKey) {
+    try {
+        const base = _getUISoundBase(soundKey);
+        if (!base) return;
+
+        const voice = base.cloneNode();
+        voice.currentTime = 0;
+        const playPromise = voice.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {});
+        }
+    } catch (err) {
+        // Audio failures must never block UI actions.
+    }
+}
+window.playUISound = playUISound;
+
+function playUISoundDeferred(soundKey) {
+    setTimeout(() => {
+        playUISound(soundKey);
+    }, 0);
+}
+
+function _normalizeButtonLabel(value) {
+    if (!value) return '';
+    const raw = String(value).toLowerCase();
+    const normalized = (typeof raw.normalize === 'function')
+        ? raw.normalize('NFD')
+        : raw;
+    return normalized
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function _isBackButton(button) {
+    if (!button) return false;
+    if (button.classList.contains('world-back-btn')) return true;
+
+    const label = _normalizeButtonLabel(button.textContent);
+    return label.includes('zuruck') || /\bback\b/.test(label);
+}
+
+function _isBuyButton(button) {
+    if (!button) return false;
+    if (button.classList.contains('buy-btn')) return true;
+    const onClick = (button.getAttribute('onclick') || '').toLowerCase();
+    return onClick.includes('buyitem(');
+}
+
+function _isSellCommitButton(button) {
+    if (!button) return false;
+    if (button.id === 'execute-bulk-sell') return true;
+    const onClick = (button.getAttribute('onclick') || '').toLowerCase();
+    return onClick.includes('executebulksell(');
+}
+
+function initUISoundBindings() {
+    if (window.__uiSoundBindingsInitialized) return;
+    window.__uiSoundBindingsInitialized = true;
+
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        const button = target && typeof target.closest === 'function'
+            ? target.closest('button')
+            : null;
+        if (!button || button.disabled) return;
+        if (button.closest('#tooltip')) return;
+
+        if (_isBackButton(button)) {
+            playUISoundDeferred('back');
+            return;
+        }
+
+        // Buy/Sell commit use dedicated SFX in the action handlers.
+        if (_isBuyButton(button) || _isSellCommitButton(button)) {
+            return;
+        }
+
+        playUISoundDeferred('click');
+    });
+
+    document.addEventListener('mouseover', (event) => {
+        const target = event.target;
+        const button = target && typeof target.closest === 'function'
+            ? target.closest('button')
+            : null;
+        if (!button || button.disabled) return;
+        if (button.closest('#tooltip')) return;
+
+        const previous = event.relatedTarget;
+        if (previous && typeof button.contains === 'function' && button.contains(previous)) {
+            return;
+        }
+
+        if (_lastHoveredMenuButton === button) return;
+        _lastHoveredMenuButton = button;
+
+        const now = Date.now();
+        if ((now - _lastMenuHoverSoundAt) < 65) return;
+        _lastMenuHoverSoundAt = now;
+        playUISoundDeferred('menuHover');
+    });
+
+    document.addEventListener('mouseout', (event) => {
+        const target = event.target;
+        const button = target && typeof target.closest === 'function'
+            ? target.closest('button')
+            : null;
+        if (!button) return;
+
+        const next = event.relatedTarget;
+        if (next && typeof button.contains === 'function' && button.contains(next)) {
+            return;
+        }
+
+        if (_lastHoveredMenuButton === button) {
+            _lastHoveredMenuButton = null;
+        }
+    });
+}
 
 if (typeof ensureBankPageData === 'function') {
     ensureBankPageData(gameData);
@@ -716,6 +863,9 @@ function renderPreviewGrid(containerId, gridKey) {
 
 function openWorkshop(type) {
     currentWorkshop = type;
+    if (typeof window !== 'undefined') {
+        window.currentWorkshop = currentWorkshop;
+    }
     if (typeof closeStoragePageEditor === 'function') {
         closeStoragePageEditor();
     }
@@ -770,6 +920,9 @@ function openWorkshop(type) {
 
 function closeWorkshop() {
     currentWorkshop = null;
+    if (typeof window !== 'undefined') {
+        window.currentWorkshop = currentWorkshop;
+    }
     if (typeof closeStoragePageEditor === 'function') {
         closeStoragePageEditor();
     }
@@ -816,6 +969,7 @@ function buyItem(itemId) {
             }
             if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
             updateUI();
+            playUISound('itemBought');
             if (typeof saveGame === 'function') saveGame();
             return;
         }
@@ -1337,6 +1491,7 @@ window.onload = () => {
     if (typeof initGlobalDragListeners === 'function') {
         initGlobalDragListeners();
     }
+    initUISoundBindings();
     
     initTooltipListeners();
     

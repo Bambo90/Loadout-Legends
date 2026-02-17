@@ -299,11 +299,10 @@ function createSlot(container, location, index, cols) {
     
     // Click handler for bulk-sell selection (only active when bulk sell mode enabled)
     itemEl.addEventListener('click', (e) => {
-        // Only handle bank item clicks in storage SELL mode.
+        // Handle bank item clicks in SELL mode across all workshop types.
         if (
             typeof storageState !== 'undefined' &&
             storageState.bulkSellMode &&
-            currentWorkshop === 'storage' &&
             location === 'bank' &&
             cell.instanceId
         ) {
@@ -437,7 +436,6 @@ function createSlot(container, location, index, cols) {
         if (
             typeof storageState !== 'undefined' &&
             storageState.bulkSellMode &&
-            currentWorkshop === 'storage' &&
             location === 'bank'
         ) {
             return;

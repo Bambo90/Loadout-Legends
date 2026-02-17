@@ -31,6 +31,7 @@ const storageState = {
     escListenerBound: false,
     pageSelectorBound: false,
     pageEditorBound: false,
+    bulkSellBtnBound: false,
     pageEditorOpen: false,
     pageEditColor: null
 };
@@ -313,6 +314,17 @@ function _bindStoragePageControls() {
         });
         storageState.pageEditorBound = true;
     }
+
+    const bulkSellBtn = document.getElementById("bulk-sell-btn");
+    if (bulkSellBtn && !storageState.bulkSellBtnBound) {
+        bulkSellBtn.type = "button";
+        bulkSellBtn.removeAttribute("onclick");
+        bulkSellBtn.addEventListener("click", (event) => {
+            event.preventDefault();
+            toggleBulkSellMode();
+        });
+        storageState.bulkSellBtnBound = true;
+    }
 }
 
 function renderStoragePageTabs() {
@@ -544,8 +556,26 @@ function cancelBulkSellMode() {
     updateStorageUI();
 }
 
+function _getCurrentWorkshopType() {
+    if (typeof currentWorkshop !== "undefined") {
+        return currentWorkshop;
+    }
+    if (typeof window !== "undefined" && typeof window.currentWorkshop !== "undefined") {
+        return window.currentWorkshop;
+    }
+    return null;
+}
+
+function _isStorageModeActive() {
+    const overlay = document.getElementById("workshop-overlay");
+    const workshopVisible = !!(overlay && !overlay.classList.contains("hidden"));
+    const hasBankGrid = !!document.getElementById("bank-grid");
+    if (workshopVisible && hasBankGrid) return true;
+    return _getCurrentWorkshopType() === "storage";
+}
+
 function toggleBulkSellMode() {
-    if (currentWorkshop !== "storage") return;
+    if (!_isStorageModeActive()) return;
     storageState.bulkSellMode = !storageState.bulkSellMode;
     storageState.selectedItems.clear();
     updateStorageUI();
@@ -592,6 +622,20 @@ function _getSellPriceForCell(cell) {
     return Math.max(1, Math.floor(baseValue * itemLevel * 0.3));
 }
 
+function _getSelectedSellTotalGold() {
+    const grid = getActiveBankGrid();
+    if (!grid || !storageState.bulkSellMode || storageState.selectedItems.size === 0) return 0;
+
+    let totalGold = 0;
+    Object.keys(grid).forEach((slotKey) => {
+        const cell = grid[slotKey];
+        if (!cell || !cell.root || !cell.instanceId) return;
+        if (!storageState.selectedItems.has(cell.instanceId)) return;
+        totalGold += _getSellPriceForCell(cell);
+    });
+    return Math.max(0, Math.floor(totalGold));
+}
+
 function executeBulkSell() {
     if (!storageState.bulkSellMode || storageState.selectedItems.size === 0) return;
 
@@ -631,35 +675,36 @@ function executeBulkSell() {
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
     }
 
+    if (typeof playUISound === "function") {
+        playUISound("itemSold");
+    }
+
     _showStorageToast(`Sold ${soldIds.length} item(s) for ${totalGold} gold`);
     updateStorageUI();
 }
 
 function updateStorageUI() {
     ensureBankPageData(gameData);
+    const workshopType = _getCurrentWorkshopType();
+    const storageModeActive = _isStorageModeActive();
 
     const bulkBtn = document.getElementById("bulk-sell-btn");
     if (bulkBtn) {
-        const selectedCount = storageState.selectedItems.size;
-        bulkBtn.textContent = storageState.bulkSellMode
-            ? `VIEW (${selectedCount})`
-            : "SELL";
+        bulkBtn.textContent = "SELL";
         bulkBtn.classList.toggle("active", storageState.bulkSellMode);
-        bulkBtn.disabled = currentWorkshop !== "storage";
+        bulkBtn.disabled = !storageModeActive;
     }
 
     const actionsPanel = document.getElementById("bulk-sell-actions");
     if (actionsPanel) {
-        actionsPanel.style.display = (storageState.bulkSellMode && currentWorkshop === "storage") ? "flex" : "none";
+        actionsPanel.style.display = (storageState.bulkSellMode && storageModeActive) ? "flex" : "none";
     }
 
     const executeBtn = document.getElementById("execute-bulk-sell");
     if (executeBtn) {
-        const count = storageState.selectedItems.size;
-        executeBtn.textContent = count > 0
-            ? `Sell ${count}`
-            : "Sell 0";
-        executeBtn.disabled = count === 0;
+        const totalGold = _getSelectedSellTotalGold();
+        executeBtn.textContent = `Sell ${totalGold} Gold`;
+        executeBtn.disabled = totalGold <= 0;
     }
 
     const categoryFilter = document.getElementById("category-filter");
@@ -669,7 +714,7 @@ function updateStorageUI() {
 
     renderStoragePageTabs();
 
-    if (typeof renderWorkshopGrids === "function" && currentWorkshop) {
+    if (typeof renderWorkshopGrids === "function" && (workshopType || storageModeActive)) {
         try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
     }
 }
