@@ -8,7 +8,7 @@
 
 /**
  * Findet ein Item-Template anhand seiner ID
- * (Uses itemRegistry.js if available, falls back to legacy arrays)
+ * (Uses itemRegistry.js if available, falls back to aggregated defs)
  */
 function getItemById(id) {
     // Prefer itemRegistry if available
@@ -24,9 +24,7 @@ function getItemById(id) {
     if (typeof ITEMS_ALL_DEFS !== 'undefined' && Array.isArray(ITEMS_ALL_DEFS)) {
         return ITEMS_ALL_DEFS.find(i => i.id === id) || null;
     }
-    // Final compatibility fallback.
-    const legacyItems = [...(TOOL_ITEMS || []), ...(WEAPON_ITEMS || []), ...(JEWELRY_ITEMS || [])];
-    return legacyItems.find(i => i.id === id) || null;
+    return null;
 }
 
 /**
@@ -320,7 +318,5 @@ function getShopItems() {
     if (typeof ITEMS_ALL_DEFS !== 'undefined' && Array.isArray(ITEMS_ALL_DEFS)) {
         return ITEMS_ALL_DEFS.filter(item => item && item.inShop === true);
     }
-    // Legacy fallback
-    const legacyItems = [...(TOOL_ITEMS || []), ...(WEAPON_ITEMS || []), ...(JEWELRY_ITEMS || [])];
-    return legacyItems.filter(item => item.inShop !== false);
+    return [];
 }

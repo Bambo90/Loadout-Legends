@@ -4,7 +4,7 @@
 // ==========================================
 
 const SAVE_KEY = "LoadoutLegends_v1";
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 5;
 
 function getStorageAdapter() {
     if (typeof window !== "undefined" && window.PlatformBridge && window.PlatformBridge.storage) {
@@ -49,6 +49,43 @@ function cloneSaveData(data) {
     }
 }
 
+function splitLegacyBankIntoPages(legacyBank, totalPages, pageSlots) {
+    const pagesCount = Number.isInteger(totalPages) && totalPages > 0 ? totalPages : 8;
+    const slotsPerPage = Number.isInteger(pageSlots) && pageSlots > 0 ? pageSlots : 100;
+    const pages = Array.from({ length: pagesCount }, () => ({}));
+    if (!legacyBank || typeof legacyBank !== "object" || Array.isArray(legacyBank)) return pages;
+
+    const rootPageByInstanceId = {};
+    Object.keys(legacyBank).forEach((slotKey) => {
+        const slotIndex = parseInt(slotKey, 10);
+        const cell = legacyBank[slotKey];
+        if (!Number.isFinite(slotIndex) || !cell || typeof cell !== "object") return;
+        if (!cell.root || !cell.instanceId) return;
+        const pageIndex = Math.floor(slotIndex / slotsPerPage);
+        if (pageIndex >= 0 && pageIndex < pagesCount) {
+            rootPageByInstanceId[cell.instanceId] = pageIndex;
+        }
+    });
+
+    Object.keys(legacyBank).forEach((slotKey) => {
+        const slotIndex = parseInt(slotKey, 10);
+        const cell = legacyBank[slotKey];
+        if (!Number.isFinite(slotIndex) || !cell || typeof cell !== "object") return;
+
+        const fallbackPage = Math.floor(slotIndex / slotsPerPage);
+        const pageIndex = (cell.instanceId && Number.isInteger(rootPageByInstanceId[cell.instanceId]))
+            ? rootPageByInstanceId[cell.instanceId]
+            : fallbackPage;
+        if (pageIndex < 0 || pageIndex >= pagesCount) return;
+
+        const localIndex = slotIndex - (pageIndex * slotsPerPage);
+        if (localIndex < 0 || localIndex >= slotsPerPage) return;
+        pages[pageIndex][localIndex] = cloneSaveData(cell);
+    });
+
+    return pages;
+}
+
 /**
  * Migrate save data from older versions to SAVE_VERSION.
  * Migrations are applied sequentially.
@@ -72,7 +109,7 @@ function migrateSave(data, version) {
 
                 // Legacy cell migration:
                 // old saves may embed item objects or baseId instead of itemId.
-                ['bank', 'farmGrid', 'pveGrid', 'pvpGrid'].forEach((gridKey) => {
+                ['bank', 'farmGrid', 'pveGrid', 'pvpGrid', 'sortGrid'].forEach((gridKey) => {
                     const grid = migrated[gridKey];
                     if (!grid || typeof grid !== "object") return;
                     Object.keys(grid).forEach((slotKey) => {
@@ -108,6 +145,45 @@ function migrateSave(data, version) {
                     migrated.settings.itemTooltipsEnabled = true;
                 }
                 currentVersion = 3;
+                break;
+            }
+            case 3: {
+                // v3 -> v4:
+                // Introduce paged storage: migrate legacy single bank into bankPages[0].
+                const legacyBank = (migrated.bank && typeof migrated.bank === "object" && !Array.isArray(migrated.bank))
+                    ? migrated.bank
+                    : {};
+                if (!Array.isArray(migrated.bankPages) || migrated.bankPages.length === 0) {
+                    migrated.bankPages = splitLegacyBankIntoPages(legacyBank, 8, 100);
+                } else if (!migrated.bankPages[0] || typeof migrated.bankPages[0] !== "object") {
+                    migrated.bankPages[0] = cloneSaveData(legacyBank);
+                }
+
+                if (!Array.isArray(migrated.pageMeta)) {
+                    migrated.pageMeta = [];
+                }
+                if (!migrated.bankMeta || typeof migrated.bankMeta !== "object" || Array.isArray(migrated.bankMeta)) {
+                    migrated.bankMeta = {};
+                }
+                if (!Number.isInteger(migrated.bankMeta.activePage)) {
+                    migrated.bankMeta.activePage = 0;
+                }
+                if (typeof ensureBankPageData === "function") {
+                    ensureBankPageData(migrated);
+                } else {
+                    migrated.bank = migrated.bankPages[0] || {};
+                }
+
+                currentVersion = 4;
+                break;
+            }
+            case 4: {
+                // v4 -> v5:
+                // Add non-combat staging grid for workshop sorting.
+                if (!migrated.sortGrid || typeof migrated.sortGrid !== "object" || Array.isArray(migrated.sortGrid)) {
+                    migrated.sortGrid = {};
+                }
+                currentVersion = 5;
                 break;
             }
             default: {
@@ -160,6 +236,9 @@ function normalizeGridInstances(grid, cols) {
 
 function saveGame() {
     const storage = getStorageAdapter();
+    if (typeof ensureBankPageData === "function") {
+        ensureBankPageData(gameData);
+    }
     if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
         gameData.settings = {};
     }
@@ -241,6 +320,7 @@ function loadGame() {
             if (!gameData.farmGrid) gameData.farmGrid = {};
             if (!gameData.pveGrid) gameData.pveGrid = {};
             if (!gameData.pvpGrid) gameData.pvpGrid = {};
+            if (!gameData.sortGrid) gameData.sortGrid = {};
             if (!gameData.monsterDefeats) gameData.monsterDefeats = {};
             if (!gameData.currentMonsterIndex) gameData.currentMonsterIndex = 0;
             if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
@@ -249,10 +329,14 @@ function loadGame() {
             if (typeof gameData.settings.itemTooltipsEnabled !== "boolean") {
                 gameData.settings.itemTooltipsEnabled = true;
             }
+            if (typeof ensureBankPageData === "function") {
+                ensureBankPageData(gameData);
+            }
 
             // Sync instance ID counter from loaded grids
             if (typeof syncInstanceIdCounterFromGrids === 'function') {
-                syncInstanceIdCounterFromGrids([gameData.bank, gameData.farmGrid, gameData.pveGrid, gameData.pvpGrid]);
+                const bankGrids = Array.isArray(gameData.bankPages) ? gameData.bankPages : [gameData.bank];
+                syncInstanceIdCounterFromGrids([...bankGrids, gameData.farmGrid, gameData.pveGrid, gameData.pvpGrid, gameData.sortGrid]);
             }
             if (typeof ensureItemInstanceIntegrity === "function") {
                 ensureItemInstanceIntegrity(gameData);
@@ -279,7 +363,11 @@ function loadGame() {
         gameData.farmGrid = {};
         gameData.pveGrid = {};
         gameData.pvpGrid = {};
+        gameData.sortGrid = {};
         gameData.monsterDefeats = {};
+        if (typeof ensureBankPageData === "function") {
+            ensureBankPageData(gameData);
+        }
         if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
             gameData.settings = {};
         }

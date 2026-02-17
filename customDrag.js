@@ -212,7 +212,9 @@ function _getGridSlotFromPoint(clientX, clientY) {
         const clampedCol = Math.max(0, Math.min(GRID_SIZE - 1, col));
         const clampedRow = Math.max(0, Math.min(maxRows - 1, row));
         const index = clampedRow * GRID_SIZE + clampedCol;
-        const location = currentWorkshop === 'pve' ? 'pveGrid' : 'farmGrid';
+        const location = (typeof getWorkshopOverlayGridKey === 'function')
+            ? getWorkshopOverlayGridKey(currentWorkshop)
+            : (currentWorkshop === 'pve' ? 'pveGrid' : (currentWorkshop === 'pvp' ? 'pvpGrid' : (currentWorkshop === 'sort' ? 'sortGrid' : 'farmGrid')));
         const selector = `.grid-slot[data-location="${location}"][data-index="${index}"]`;
         const el = document.querySelector(selector);
         return el ? { element: el, location, index, cols: GRID_SIZE } : null;
@@ -755,51 +757,6 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     _customPointerUp = (ev) => {
         ev.preventDefault();
         try {
-            // Check if dropped on SELL ZONE first
-            const elemsForSell = document.elementsFromPoint(ev.clientX, ev.clientY);
-            const sellZone = elemsForSell && elemsForSell.find(el => el.id === 'sell-zone');
-            
-            if (sellZone && draggedItem) {
-                const item = draggedItem.item;
-                const sellPrice = Math.floor(item.price * 0.5);
-                gameData.gold += sellPrice;
-                // Item already cleared from grid when drag started, so just null draggedItem
-                hideAllAuras(); // Hide aura when drag ends
-                draggedItem = null;
-                updateUI();
-                saveGame();
-                
-                // Cleanup and exit
-                setTimeout(() => {
-                    if (_customFollowEl && _customFollowEl.parentNode) _customFollowEl.parentNode.removeChild(_customFollowEl);
-                    _customFollowEl = null;
-                    window.removeEventListener('pointermove', _customPointerMove);
-                    window.removeEventListener('pointerup', _customPointerUp);
-                    if (_rotationKeyHandler) window.removeEventListener('keydown', _rotationKeyHandler);
-                    if (_rotationWheelHandler) window.removeEventListener('wheel', _rotationWheelHandler);
-                    _customPointerMove = null;
-                    _customPointerUp = null;
-                    _rotationKeyHandler = null;
-                    _rotationWheelHandler = null;
-                    document.body.style.cursor = '';
-                    document.body.classList.remove('dragging','drop-allowed','drop-invalid');
-                    
-                    // Performance report
-                    if (_perfEnabled && _perfFrameTimes.length > 0) {
-                        const avg = _perfFrameTimes.reduce((a,b) => a+b, 0) / _perfFrameTimes.length;
-                        const min = Math.min(..._perfFrameTimes);
-                        const max = Math.max(..._perfFrameTimes);
-                        const fps = 1000 / avg;
-                        console.log(`📈 Drag Performance: avg=${avg.toFixed(2)}ms (${fps.toFixed(1)}fps), min=${min.toFixed(2)}ms, max=${max.toFixed(2)}ms, frames=${_perfFrameTimes.length}`);
-                        _perfFrameTimes = [];
-                        _perfLastFrameTime = 0;
-                    }
-                    
-                    renderAllActiveGrids();
-                }, 10);
-                return;
-            }
-            
             // Try to find slot BEFORE hiding the follow element
             const elemsBefore = document.elementsFromPoint(ev.clientX, ev.clientY);
             const slotBefore = elemsBefore && elemsBefore.find(el => el.classList && el.classList.contains('grid-slot')) || null;

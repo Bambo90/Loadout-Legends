@@ -414,8 +414,7 @@
             _renderSection(_label("baseStats"), _renderModifierRows(baseStats)),
             _renderSection(_label("implicit"), _renderAffixRows(implicitRows)),
             _renderSection(_label("prefixes"), _renderAffixRows(prefixRows)),
-            _renderSection(_label("suffixes"), _renderAffixRows(suffixRows)),
-            _renderSection(_label("effective"), _renderModifierRows(effectiveModifiers, sourceByKey))
+            _renderSection(_label("suffixes"), _renderAffixRows(suffixRows))
         ];
 
         if (legacyModifiers.length > 0) {

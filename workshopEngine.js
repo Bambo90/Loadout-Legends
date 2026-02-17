@@ -3,6 +3,98 @@
 // Handles workshop grid rendering & updates
 // ==========================================
 
+function _resolveActiveWorkshopGridLocation() {
+    if (typeof getWorkshopOverlayGridKey === 'function') {
+        return getWorkshopOverlayGridKey(currentWorkshop);
+    }
+    if (currentWorkshop === 'pve') return 'pveGrid';
+    if (currentWorkshop === 'pvp') return 'pvpGrid';
+    if (currentWorkshop === 'sort') return 'sortGrid';
+    return 'farmGrid';
+}
+
+function _getGridDimensions(location) {
+    if (location === 'bank') {
+        const cols = (typeof getBankCols === 'function') ? getBankCols() : 10;
+        return {
+            cols,
+            rows: Math.ceil(BANK_SLOTS / cols)
+        };
+    }
+    return {
+        cols: GRID_SIZE,
+        rows: GRID_ROWS
+    };
+}
+
+function _findFirstPlacementIndex(grid, shape, cols, rows) {
+    const maxSlots = cols * rows;
+    for (let i = 0; i < maxSlots; i++) {
+        if (canPlaceItem(grid, i, shape, cols, rows)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+function quickTransferItemBetweenStorageAndActive(location, cell) {
+    if (!cell || !cell.root || !cell.instanceId || !location) return false;
+
+    const activeGridLocation = _resolveActiveWorkshopGridLocation();
+    let targetLocation = null;
+    if (location === 'bank') {
+        if (currentWorkshop === 'storage') return false;
+        targetLocation = activeGridLocation;
+    } else if (location === activeGridLocation) {
+        targetLocation = 'bank';
+    }
+    if (!targetLocation || location === targetLocation) return false;
+
+    const sourceGrid = gameData[location];
+    const targetGrid = gameData[targetLocation];
+    if (!sourceGrid || !targetGrid) return false;
+
+    const item = (typeof getItemDefById === 'function')
+        ? getItemDefById(cell.itemId)
+        : getItemById(cell.itemId);
+    if (!item) return false;
+
+    const rotationIndex = typeof cell.rotationIndex === 'number' ? cell.rotationIndex : 0;
+    const bodyShape = (typeof getItemBodyMatrix === 'function')
+        ? getItemBodyMatrix(item, rotationIndex)
+        : (cell.shape || item.body || [[1]]);
+    const shapeCopy = Array.isArray(bodyShape) ? bodyShape.map((row) => [...row]) : [[1]];
+    const targetDims = _getGridDimensions(targetLocation);
+    const targetIndex = _findFirstPlacementIndex(targetGrid, shapeCopy, targetDims.cols, targetDims.rows);
+
+    if (targetIndex < 0) {
+        if (typeof window !== 'undefined' && typeof window.showStorageToast === 'function') {
+            window.showStorageToast('No space');
+        }
+        return true;
+    }
+
+    clearItemFromGrid(sourceGrid, cell.instanceId);
+    placeItemIntoGrid(
+        targetGrid,
+        targetIndex,
+        item,
+        shapeCopy,
+        targetDims.cols,
+        cell.instanceId,
+        targetDims.rows,
+        cell.rotatedAura || null,
+        rotationIndex
+    );
+
+    if (typeof saveGame === 'function') saveGame();
+    if (typeof renderWorkshopGrids === 'function') {
+        try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
+    }
+
+    return true;
+}
+
 /**
  * Creates a single grid slot and renders items if present
  */
@@ -207,8 +299,14 @@ function createSlot(container, location, index, cols) {
     
     // Click handler for bulk-sell selection (only active when bulk sell mode enabled)
     itemEl.addEventListener('click', (e) => {
-        // Only handle clicks when bulk sell mode is active
-        if (typeof storageState !== 'undefined' && storageState.bulkSellMode && cell.instanceId) {
+        // Only handle bank item clicks in storage SELL mode.
+        if (
+            typeof storageState !== 'undefined' &&
+            storageState.bulkSellMode &&
+            currentWorkshop === 'storage' &&
+            location === 'bank' &&
+            cell.instanceId
+        ) {
             e.preventDefault();
             e.stopPropagation();
             
@@ -336,6 +434,22 @@ function createSlot(container, location, index, cols) {
 
     // Pointer-based drag start (uses customDrag.startCustomDrag)
     itemEl.addEventListener('pointerdown', (e) => {
+        if (
+            typeof storageState !== 'undefined' &&
+            storageState.bulkSellMode &&
+            currentWorkshop === 'storage' &&
+            location === 'bank'
+        ) {
+            return;
+        }
+        if (e && e.button === 0 && e.ctrlKey && itemEl.closest('#workshop-overlay')) {
+            const moved = quickTransferItemBetweenStorageAndActive(location, cell);
+            if (moved) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+        }
         e.preventDefault();
         const rect = itemEl.getBoundingClientRect();
         const tileW = geo.cellW;

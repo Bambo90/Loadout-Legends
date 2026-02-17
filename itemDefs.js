@@ -88,22 +88,16 @@ function _countBodyCellsFromItem(item) {
 
 function _collectItemArrays() {
     const arrays = [];
-    if (typeof ITEMS_ALL_DEFS !== "undefined") arrays.push(ITEMS_ALL_DEFS);
+    if (typeof ITEMS_ALL_DEFS !== "undefined" && Array.isArray(ITEMS_ALL_DEFS)) {
+        arrays.push(ITEMS_ALL_DEFS);
+        return arrays;
+    }
     if (typeof ITEMS_WEAPONS_ALL !== "undefined") arrays.push(ITEMS_WEAPONS_ALL);
     if (typeof ITEMS_OFFHANDS_ALL !== "undefined") arrays.push(ITEMS_OFFHANDS_ALL);
     if (typeof ITEMS_ARMOR_ALL !== "undefined") arrays.push(ITEMS_ARMOR_ALL);
     if (typeof ITEMS_ACCESSORIES_ALL !== "undefined") arrays.push(ITEMS_ACCESSORIES_ALL);
     if (typeof ITEMS_ENHANCEMENTS_ALL !== "undefined") arrays.push(ITEMS_ENHANCEMENTS_ALL);
     if (typeof ITEMS_CONSUMABLES_ALL !== "undefined") arrays.push(ITEMS_CONSUMABLES_ALL);
-
-    if (typeof TOOL_ITEMS !== "undefined") arrays.push(TOOL_ITEMS);
-    if (typeof SWORD_ITEMS !== "undefined") arrays.push(SWORD_ITEMS);
-    if (typeof BOW_ITEMS !== "undefined") arrays.push(BOW_ITEMS);
-    if (typeof ARMOR_ITEMS !== "undefined") arrays.push(ARMOR_ITEMS);
-    if (typeof SHIELD_ITEMS !== "undefined") arrays.push(SHIELD_ITEMS);
-    if (typeof ACCESSORY_ITEMS !== "undefined") arrays.push(ACCESSORY_ITEMS);
-    if (typeof WEAPON_ITEMS !== "undefined") arrays.push(WEAPON_ITEMS); // legacy
-    if (typeof JEWELRY_ITEMS !== "undefined") arrays.push(JEWELRY_ITEMS); // legacy
     return arrays;
 }
 
@@ -410,14 +404,26 @@ function _inferInstanceItemLevel(gameData, cell) {
     return 1;
 }
 
+function _forEachTrackedGrid(data, visitor) {
+    if (!data || typeof data !== "object" || typeof visitor !== "function") return;
+    ["bank", "farmGrid", "pveGrid", "pvpGrid", "sortGrid"].forEach((gridKey) => {
+        const grid = data[gridKey];
+        if (!grid || typeof grid !== "object") return;
+        visitor(grid, gridKey);
+    });
+    if (Array.isArray(data.bankPages)) {
+        data.bankPages.forEach((pageGrid, pageIndex) => {
+            if (!pageGrid || typeof pageGrid !== "object") return;
+            visitor(pageGrid, "bankPages", pageIndex);
+        });
+    }
+}
+
 function ensureItemInstanceIntegrity(gameData) {
     if (!gameData || typeof gameData !== "object") return {};
     const store = ensureItemInstanceStore(gameData);
 
-    ["bank", "farmGrid", "pveGrid", "pvpGrid"].forEach((gridKey) => {
-        const grid = gameData[gridKey];
-        if (!grid || typeof grid !== "object") return;
-
+    _forEachTrackedGrid(gameData, (grid) => {
         Object.keys(grid).forEach((slotKey) => {
             const cell = grid[slotKey];
             if (!cell || typeof cell !== "object" || !cell.root || !cell.itemId || !cell.instanceId) return;
@@ -576,9 +582,7 @@ function sanitizeGridForSave(grid) {
 
 function _collectGridInstanceIds(data) {
     const ids = new Set();
-    ["bank", "farmGrid", "pveGrid", "pvpGrid"].forEach((gridKey) => {
-        const grid = data[gridKey];
-        if (!grid || typeof grid !== "object") return;
+    _forEachTrackedGrid(data, (grid) => {
         Object.keys(grid).forEach((slotKey) => {
             const cell = grid[slotKey];
             if (!cell || typeof cell !== "object" || !cell.instanceId) return;
@@ -592,11 +596,22 @@ function sanitizeSaveDataForPersistence(data) {
     const cloned = _deepClone(data);
     if (!cloned || typeof cloned !== "object" || Array.isArray(cloned)) return {};
 
-    ["bank", "farmGrid", "pveGrid", "pvpGrid"].forEach((gridKey) => {
+    ["bank", "farmGrid", "pveGrid", "pvpGrid", "sortGrid"].forEach((gridKey) => {
         if (cloned[gridKey] && typeof cloned[gridKey] === "object") {
             cloned[gridKey] = sanitizeGridForSave(cloned[gridKey]);
         }
     });
+    if (Array.isArray(cloned.bankPages)) {
+        cloned.bankPages = cloned.bankPages.map((pageGrid) => (
+            pageGrid && typeof pageGrid === "object" ? sanitizeGridForSave(pageGrid) : {}
+        ));
+        const activePage = cloned.bankMeta && Number.isInteger(cloned.bankMeta.activePage)
+            ? cloned.bankMeta.activePage
+            : 0;
+        if (cloned.bankPages[activePage]) {
+            cloned.bank = cloned.bankPages[activePage];
+        }
+    }
 
     const activeIds = _collectGridInstanceIds(cloned);
     const sanitizedStore = sanitizeItemInstanceStore(cloned.itemInstances);

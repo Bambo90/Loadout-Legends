@@ -20,11 +20,15 @@ let gameData = {
     farmGrid: {},
     pveGrid: {},
     pvpGrid: {},
+    sortGrid: {},
     totalGold: 0,
     totalXP: 0,
     currentMonster: null,
     currentMonsterIndex: 0,
     monsterDefeats: {},
+    bankPages: [],
+    pageMeta: [],
+    bankMeta: {},
     itemInstances: {},
     settings: {
         itemTooltipsEnabled: true
@@ -34,7 +38,7 @@ let gameData = {
         : null
 };
 
-const BANK_SLOTS = 200;
+const BANK_SLOTS = 100;
 const GRID_SIZE = 10;
 const GRID_ROWS = 10;
 const FOCUS_DURATION = 60 * 60 * 1000;
@@ -42,6 +46,10 @@ const FOCUS_DURATION = 60 * 60 * 1000;
 let currentWorkshop = null;
 let lastMonsterAttack = Date.now();
 let characterHubActiveSetup = 'farm';
+
+if (typeof ensureBankPageData === 'function') {
+    ensureBankPageData(gameData);
+}
 
 // Resolve static item values via centralized item definitions.
 function getItemDefinition(itemId, cell) {
@@ -104,6 +112,13 @@ function awardCharacterXP(amount, gridKey = 'farmGrid') {
 function getWorkshopGridKey(workshopType) {
     if (workshopType === 'pve') return 'pveGrid';
     if (workshopType === 'pvp') return 'pvpGrid';
+    return 'farmGrid';
+}
+
+function getWorkshopOverlayGridKey(workshopType) {
+    if (workshopType === 'pve') return 'pveGrid';
+    if (workshopType === 'pvp') return 'pvpGrid';
+    if (workshopType === 'sort') return 'sortGrid';
     return 'farmGrid';
 }
 
@@ -266,6 +281,7 @@ function _getMutatorValueClass(entry) {
 
 function collectActiveItemModifierTotals(workshopType) {
     if (!gameData || typeof gameData !== 'object') return [];
+    if (workshopType === 'sort') return [];
     ensureCharacterModelOnGameData(gameData);
     const base = gameData.character && gameData.character.base ? gameData.character.base : null;
     if (!base) return [];
@@ -622,6 +638,9 @@ function renderEquipmentHub() {
 function renderPreviewGrid(containerId, gridKey) {
     const container = document.getElementById(containerId);
     if (!container) return;
+    if (gridKey === 'bank' && typeof ensureBankPageData === 'function') {
+        ensureBankPageData(gameData);
+    }
     container.innerHTML = '';
     
     // Prevent aura overflow from creating scrollbars - clip aura at grid edges
@@ -697,9 +716,15 @@ function renderPreviewGrid(containerId, gridKey) {
 
 function openWorkshop(type) {
     currentWorkshop = type;
+    if (typeof closeStoragePageEditor === 'function') {
+        closeStoragePageEditor();
+    }
+    if (typeof ensureBankPageData === 'function') {
+        ensureBankPageData(gameData);
+    }
     const overlay = document.getElementById('workshop-overlay');
     if (overlay) {
-        overlay.classList.remove('workshop-farm', 'workshop-pve', 'workshop-pvp', 'workshop-storage');
+        overlay.classList.remove('workshop-farm', 'workshop-pve', 'workshop-pvp', 'workshop-sort', 'workshop-storage');
         overlay.classList.add(`workshop-${type}`);
         overlay.classList.remove('hidden');
         overlay.style.display = 'flex';
@@ -717,9 +742,18 @@ function openWorkshop(type) {
         if (workshopContent) {
             if (type === 'storage') {
                 workshopContent.classList.add('storage-mode');
+                if (typeof updateStorageUI === 'function') {
+                    updateStorageUI();
+                }
             } else {
                 workshopContent.classList.remove('storage-mode');
+                if (typeof cancelBulkSellMode === 'function') {
+                    cancelBulkSellMode();
+                }
             }
+        }
+        if (typeof renderStoragePageTabs === 'function') {
+            renderStoragePageTabs();
         }
     }
     
@@ -736,10 +770,16 @@ function openWorkshop(type) {
 
 function closeWorkshop() {
     currentWorkshop = null;
+    if (typeof closeStoragePageEditor === 'function') {
+        closeStoragePageEditor();
+    }
+    if (typeof cancelBulkSellMode === 'function') {
+        cancelBulkSellMode();
+    }
     const overlay = document.getElementById('workshop-overlay');
     if (overlay) {
         overlay.classList.add('hidden');
-        overlay.classList.remove('workshop-farm', 'workshop-pve', 'workshop-pvp', 'workshop-storage');
+        overlay.classList.remove('workshop-farm', 'workshop-pve', 'workshop-pvp', 'workshop-sort', 'workshop-storage');
     }
     
     if (typeof saveGame === 'function') saveGame();
@@ -754,10 +794,14 @@ function closeWorkshop() {
 function buyItem(itemId) {
     const item = getItemDefinition(itemId);
     if (!item || gameData.gold < item.price) return;
+    if (typeof ensureBankPageData === 'function') {
+        ensureBankPageData(gameData);
+    }
+    const bankGrid = gameData.bank;
 
     // Freien Slot in der Bank suchen
     for (let i = 0; i < BANK_SLOTS; i++) {
-        if (!gameData.bank[i]) {
+        if (!bankGrid[i]) {
             gameData.gold -= item.price;
             // Nutzt die Gridengine.js (pass a copy of item.body)
             if (typeof placeItemIntoGrid === 'function') {
@@ -765,7 +809,7 @@ function buyItem(itemId) {
                     ? getItemBodyMatrix(item, 0)
                     : (item.body || [[1]]);
                 const bodyCopy = baseBody.map(r => [...r]);
-                const instanceId = placeItemIntoGrid(gameData.bank, i, item, bodyCopy, getBankCols(), null, null, null, 0);
+                const instanceId = placeItemIntoGrid(bankGrid, i, item, bodyCopy, getBankCols(), null, null, null, 0);
                 if (instanceId && typeof registerItemInstance === 'function') {
                     registerItemInstance(gameData, instanceId, item.id, Math.max(1, gameData.level), { source: 'shop' });
                 }
@@ -961,16 +1005,20 @@ function changeMonster(direction) {
 function addItemToBank(itemId, itemLevel) {
     const item = getItemDefinition(itemId);
     if (!item) return false;
+    if (typeof ensureBankPageData === 'function') {
+        ensureBankPageData(gameData);
+    }
+    const bankGrid = gameData.bank;
     
     // Find first empty slot
     for (let i = 0; i < BANK_SLOTS; i++) {
-        if (!gameData.bank[i]) {
+        if (!bankGrid[i]) {
             if (typeof placeItemIntoGrid === 'function') {
                 const baseBody = (typeof getItemBodyMatrix === 'function')
                     ? getItemBodyMatrix(item, 0)
                     : (item.body || [[1]]);
                 const bodyCopy = baseBody.map(r => [...r]);
-                const instanceId = placeItemIntoGrid(gameData.bank, i, item, bodyCopy, getBankCols(), null, null, null, 0);
+                const instanceId = placeItemIntoGrid(bankGrid, i, item, bodyCopy, getBankCols(), null, null, null, 0);
                 if (instanceId && typeof registerItemInstance === 'function') {
                     const ilvl = Number.isFinite(itemLevel) ? itemLevel : Math.max(1, gameData.level);
                     registerItemInstance(gameData, instanceId, item.id, ilvl, { source: 'drop' });
@@ -1105,6 +1153,9 @@ function renderDragPreviewForGrid(container, location, cols, totalSlots) {
 
 function renderWorkshopGrids() {
     if (!currentWorkshop) return;
+    if (typeof ensureBankPageData === 'function') {
+        ensureBankPageData(gameData);
+    }
     
     const overlay = document.getElementById('workshop-overlay');
     if (!overlay) {
@@ -1128,6 +1179,8 @@ function renderWorkshopGrids() {
     if (!gameData.bank) gameData.bank = {};
     if (!gameData.farmGrid) gameData.farmGrid = {};
     if (!gameData.pveGrid) gameData.pveGrid = {};
+    if (!gameData.pvpGrid) gameData.pvpGrid = {};
+    if (!gameData.sortGrid) gameData.sortGrid = {};
     
     console.log("Rendering workshop grids for:", currentWorkshop);
     
@@ -1146,9 +1199,7 @@ function renderWorkshopGrids() {
     
     // Active Grid (Farm or PvE)
     activeGrid.innerHTML = '';
-    const gridType = currentWorkshop === 'farm' ? 'farmGrid' : 
-                    currentWorkshop === 'pve' ? 'pveGrid' :
-                    currentWorkshop === 'pvp' ? 'pvpGrid' : 'farmGrid';
+    const gridType = getWorkshopOverlayGridKey(currentWorkshop);
     
     const totalSlots = GRID_SIZE * GRID_ROWS;
     for (let i = 0; i < totalSlots; i++) {
@@ -1157,40 +1208,8 @@ function renderWorkshopGrids() {
     // Render drag preview for active grid
     renderDragPreviewForGrid(activeGrid, gridType, GRID_SIZE, totalSlots);
     
-    // Sell zone handlers
-    const sellZone = document.getElementById('sell-zone');
-    if (sellZone) {
-        sellZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            sellZone.classList.add('drag-over');
-        });
-        
-        sellZone.addEventListener('dragleave', () => {
-            sellZone.classList.remove('drag-over');
-        });
-        
-        sellZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            sellZone.classList.remove('drag-over');
-            const draggedItem = DragSystem.getDraggedItem();
-            if (draggedItem) {
-                console.log('💰 SELL ATTEMPT', { itemId: draggedItem.item.id, instanceId: draggedItem.instanceId, fromLocation: draggedItem.fromLocation, item: draggedItem.item });
-                const item = draggedItem.item;
-                const sellPrice = Math.floor(item.price * 0.5);
-                console.log('  Price:', item.price, '→ Sell for:', sellPrice);
-                gameData.gold += sellPrice;
-                console.log('  Gold now:', gameData.gold);
-                console.log('  Clearing from grid:', gameData[draggedItem.fromLocation]);
-                clearItemFromGrid(gameData[draggedItem.fromLocation], draggedItem.instanceId);
-                DragSystem.clearDraggedItem();
-                    try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
-                updateUI();
-                saveGame();
-                console.log('  ✅ SELL COMPLETE');
-            } else {
-                console.log('⚠️ SELL DROP but no draggedItem!');
-            }
-        });
+    if (typeof renderStoragePageTabs === 'function') {
+        renderStoragePageTabs();
     }
     
     // Apply storage filters after rendering (if in storage mode)
