@@ -852,7 +852,11 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     // Attach rotation listeners (active only during drag)
     _rotationKeyHandler = (e) => {
         if (!draggedItem) return;
-        if (e.key.toLowerCase() !== 'r') return;
+        if (typeof window.isKeybindCaptureActive === 'function' && window.isKeybindCaptureActive()) return;
+        const isRotateKey = (typeof window.matchesActionKeybinding === 'function')
+            ? window.matchesActionKeybinding('rotateItem', e)
+            : (!!e && typeof e.key === 'string' && e.key.toLowerCase() === 'r');
+        if (!isRotateKey) return;
         const now = Date.now();
         if (now - _lastKeyRotate < 150) return; // debounce: ignore rapid repeats
         _lastKeyRotate = now;

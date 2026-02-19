@@ -4,7 +4,80 @@
 // ==========================================
 
 const SAVE_KEY = "LoadoutLegends_v1";
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 7;
+const DEFAULT_SETTINGS_AUDIO = Object.freeze({
+    menu: 80,
+    music: 70,
+    ambient: 70
+});
+const DEFAULT_SETTINGS_KEYBINDS = Object.freeze({
+    rotateItem: "KeyR",
+    toggleTooltips: "Alt",
+    cancelAction: "Escape"
+});
+const SAVEENGINE_BATTLEFIELD_MAX_PAGES = 9;
+const SAVEENGINE_BATTLEFIELD_DEFAULT_UNLOCKED_PAGES = 2;
+
+function _clampVolumePercent(value, fallbackValue) {
+    const fallback = Number.isFinite(fallbackValue) ? fallbackValue : 100;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return Math.max(0, Math.min(100, Math.round(fallback)));
+    return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function ensureSettingsDefaultsInData(target) {
+    if (!target || typeof target !== "object") return target;
+    if (!target.settings || typeof target.settings !== "object" || Array.isArray(target.settings)) {
+        target.settings = {};
+    }
+    if (typeof target.settings.itemTooltipsEnabled !== "boolean") {
+        target.settings.itemTooltipsEnabled = true;
+    }
+    if (!target.settings.keybinds || typeof target.settings.keybinds !== "object" || Array.isArray(target.settings.keybinds)) {
+        target.settings.keybinds = {};
+    }
+    Object.keys(DEFAULT_SETTINGS_KEYBINDS).forEach((actionId) => {
+        const value = target.settings.keybinds[actionId];
+        if (typeof value !== "string" || !value.trim()) {
+            delete target.settings.keybinds[actionId];
+        } else {
+            target.settings.keybinds[actionId] = value.trim();
+        }
+    });
+    if (!target.settings.audio || typeof target.settings.audio !== "object" || Array.isArray(target.settings.audio)) {
+        target.settings.audio = {};
+    }
+    target.settings.audio.menu = _clampVolumePercent(target.settings.audio.menu, DEFAULT_SETTINGS_AUDIO.menu);
+    target.settings.audio.music = _clampVolumePercent(target.settings.audio.music, DEFAULT_SETTINGS_AUDIO.music);
+    target.settings.audio.ambient = _clampVolumePercent(target.settings.audio.ambient, DEFAULT_SETTINGS_AUDIO.ambient);
+    return target;
+}
+
+function ensureBattlefieldDefaultsInData(target) {
+    if (!target || typeof target !== "object") return target;
+    if (!target.battlefield || typeof target.battlefield !== "object" || Array.isArray(target.battlefield)) {
+        target.battlefield = { pages: {}, unlockedPages: SAVEENGINE_BATTLEFIELD_DEFAULT_UNLOCKED_PAGES, activePage: 1 };
+    }
+
+    const battlefield = target.battlefield;
+    if (!battlefield.pages || typeof battlefield.pages !== "object" || Array.isArray(battlefield.pages)) {
+        battlefield.pages = {};
+    }
+
+    for (let i = 1; i <= SAVEENGINE_BATTLEFIELD_MAX_PAGES; i++) {
+        const key = String(i);
+        if (!battlefield.pages[key] || typeof battlefield.pages[key] !== "object" || Array.isArray(battlefield.pages[key])) {
+            battlefield.pages[key] = {};
+        }
+    }
+
+    const unlocked = Number.isFinite(battlefield.unlockedPages) ? Math.floor(battlefield.unlockedPages) : SAVEENGINE_BATTLEFIELD_DEFAULT_UNLOCKED_PAGES;
+    battlefield.unlockedPages = Math.max(1, Math.min(SAVEENGINE_BATTLEFIELD_MAX_PAGES, unlocked));
+
+    const active = Number.isFinite(battlefield.activePage) ? Math.floor(battlefield.activePage) : 1;
+    battlefield.activePage = Math.max(1, Math.min(battlefield.unlockedPages, active));
+    return target;
+}
 
 function getStorageAdapter() {
     if (typeof window !== "undefined" && window.PlatformBridge && window.PlatformBridge.storage) {
@@ -186,6 +259,20 @@ function migrateSave(data, version) {
                 currentVersion = 5;
                 break;
             }
+            case 5: {
+                // v5 -> v6:
+                // Add Optionen settings for keybinds and audio mixer channels.
+                ensureSettingsDefaultsInData(migrated);
+                currentVersion = 6;
+                break;
+            }
+            case 6: {
+                // v6 -> v7:
+                // Add battlefield container pages for zone combat drops.
+                ensureBattlefieldDefaultsInData(migrated);
+                currentVersion = 7;
+                break;
+            }
             default: {
                 console.warn(`Unbekannte Save-Version ${currentVersion}. Migration wird auf aktuelle Version gesetzt.`);
                 currentVersion = SAVE_VERSION;
@@ -239,12 +326,8 @@ function saveGame() {
     if (typeof ensureBankPageData === "function") {
         ensureBankPageData(gameData);
     }
-    if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
-        gameData.settings = {};
-    }
-    if (typeof gameData.settings.itemTooltipsEnabled !== "boolean") {
-        gameData.settings.itemTooltipsEnabled = true;
-    }
+    ensureBattlefieldDefaultsInData(gameData);
+    ensureSettingsDefaultsInData(gameData);
     if (typeof ensureItemInstanceIntegrity === "function") {
         ensureItemInstanceIntegrity(gameData);
     }
@@ -323,12 +406,8 @@ function loadGame() {
             if (!gameData.sortGrid) gameData.sortGrid = {};
             if (!gameData.monsterDefeats) gameData.monsterDefeats = {};
             if (!gameData.currentMonsterIndex) gameData.currentMonsterIndex = 0;
-            if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
-                gameData.settings = {};
-            }
-            if (typeof gameData.settings.itemTooltipsEnabled !== "boolean") {
-                gameData.settings.itemTooltipsEnabled = true;
-            }
+            ensureBattlefieldDefaultsInData(gameData);
+            ensureSettingsDefaultsInData(gameData);
             if (typeof ensureBankPageData === "function") {
                 ensureBankPageData(gameData);
             }
@@ -336,7 +415,13 @@ function loadGame() {
             // Sync instance ID counter from loaded grids
             if (typeof syncInstanceIdCounterFromGrids === 'function') {
                 const bankGrids = Array.isArray(gameData.bankPages) ? gameData.bankPages : [gameData.bank];
-                syncInstanceIdCounterFromGrids([...bankGrids, gameData.farmGrid, gameData.pveGrid, gameData.pvpGrid, gameData.sortGrid]);
+                const battlefieldGrids = [];
+                if (gameData.battlefield && gameData.battlefield.pages && typeof gameData.battlefield.pages === "object") {
+                    Object.keys(gameData.battlefield.pages).forEach((pageKey) => {
+                        battlefieldGrids.push(gameData.battlefield.pages[pageKey]);
+                    });
+                }
+                syncInstanceIdCounterFromGrids([...bankGrids, gameData.farmGrid, gameData.pveGrid, gameData.pvpGrid, gameData.sortGrid, ...battlefieldGrids]);
             }
             if (typeof ensureItemInstanceIntegrity === "function") {
                 ensureItemInstanceIntegrity(gameData);
@@ -365,15 +450,11 @@ function loadGame() {
         gameData.pvpGrid = {};
         gameData.sortGrid = {};
         gameData.monsterDefeats = {};
+        ensureBattlefieldDefaultsInData(gameData);
         if (typeof ensureBankPageData === "function") {
             ensureBankPageData(gameData);
         }
-        if (!gameData.settings || typeof gameData.settings !== "object" || Array.isArray(gameData.settings)) {
-            gameData.settings = {};
-        }
-        if (typeof gameData.settings.itemTooltipsEnabled !== "boolean") {
-            gameData.settings.itemTooltipsEnabled = true;
-        }
+        ensureSettingsDefaultsInData(gameData);
         if (typeof ensureItemInstanceIntegrity === "function") {
             ensureItemInstanceIntegrity(gameData);
         }

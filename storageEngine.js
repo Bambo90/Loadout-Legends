@@ -783,7 +783,12 @@ function applyStorageFilters() {
 }
 
 function _onStorageGlobalKeyDown(event) {
-    if (!event || event.key !== "Escape") return;
+    if (!event) return;
+    if (typeof window.isKeybindCaptureActive === "function" && window.isKeybindCaptureActive()) return;
+    const isCancelKey = (typeof window.matchesActionKeybinding === "function")
+        ? window.matchesActionKeybinding("cancelAction", event)
+        : event.key === "Escape";
+    if (!isCancelKey) return;
     if (storageState.pageEditorOpen) {
         closeStoragePageEditor();
         return;

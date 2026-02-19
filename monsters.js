@@ -33,7 +33,7 @@ const MONSTERS = [
         hp: 70, 
         maxHp: 70, 
         damage: 3, 
-        attackSpeed: 2400, 
+        attackSpeed: 0.05, 
         goldMin: 10, 
         goldMax: 18, 
         xp: 45, 
@@ -41,6 +41,7 @@ const MONSTERS = [
         sprite: "Media/Images/Monster/Stone_Crab_A.png",
         level: 1,
         tags: ["coast"],
+        lootPools: ["coast_common"],
         dropTable: []
     },
     { 
@@ -49,7 +50,7 @@ const MONSTERS = [
         hp: 105, 
         maxHp: 105, 
         damage: 5, 
-        attackSpeed: 2600, 
+        attackSpeed: 0.07, 
         goldMin: 16, 
         goldMax: 28, 
         xp: 78, 
@@ -57,6 +58,7 @@ const MONSTERS = [
         sprite: "Media/Images/Monster/Drunken_Captain.png",
         level: 3,
         tags: ["coast"],
+        lootPools: ["coast_common", "coast_uncommon"],
         dropTable: []
     },
     { 
@@ -64,8 +66,8 @@ const MONSTERS = [
         name: "Wegelagerer", 
         hp: 92, 
         maxHp: 92, 
-        damage: 6, 
-        attackSpeed: 1850, 
+        damage: 10, 
+        attackSpeed: 0.04, 
         goldMin: 18, 
         goldMax: 34, 
         xp: 92, 
@@ -73,6 +75,7 @@ const MONSTERS = [
         sprite: "Media/Images/Monster/Thief_B.png",
         level: 4,
         tags: ["coast"],
+        lootPools: ["coast_common", "coast_uncommon"],
         dropTable: []
     },
     { 

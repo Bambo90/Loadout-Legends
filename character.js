@@ -546,7 +546,7 @@ function _createRuntimeStatsFromBase(base) {
         life: base.baseLife,
         mana: base.baseMana,
         stamina: base.baseStamina,
-        attackSpeed: 1,
+        attackSpeed: 0.01,
         critChance: 0.05,
         staminaRegen: 1,
         staminaCostMultiplier: 1,

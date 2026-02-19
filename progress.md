@@ -174,3 +174,97 @@ Original prompt: Du warst grade dabei irgendwas für das zukünftige Wrapping mi
   - `workshopEngine.js`: drag-start block in SELL mode now applies to bank items in all workshop types, not storage-only.
   - `storageEngine.js`: `_isStorageModeActive()` now treats visible workshop overlay + bank grid as valid SELL context (supports left bank in Ausruestung tab).
   - `storageEngine.js`: added `_getSelectedSellTotalGold()` and changed execute button label to `Sell <gold> Gold` (sum of selected item values, not item count).
+- 2026-02-17: HUD bars now use canonical character stats:
+  - `script.js`: added `_getHudStats()` to read `currentLife`, `maxLife`, `xp`, `xpToNextLevel` from the character model.
+  - `script.js`: HP/XP fills now use `_getHudStats()` ratios, and UI refreshes on `character:stats-updated`.
+- 2026-02-17: Removed legacy idle gold/xp/bonus prototype loop:
+  - `script.js`: `updateLogic()` no longer applies passive work tick, passive gold/xp rewards, or auto monster damage from work progress.
+  - `script.js`: idle-only runtime fields are neutralized each update (`workProgress = 0`, `pendingGold = 0`).
+  - `script.js`: added canonical reward hooks `addGold(amount, reason)` and `grantXP(amount, reason, gridKey)` and exposed them on `window`.
+  - `script.js`: shop purchase now uses `addGold(-price, 'shop_buy')`.
+  - `script.js`: top HUD HP/XP text now shows real character values (`currentLife/maxLife`, `xp/xpToNextLevel`).
+  - `index.html`: removed Bonus HUD block from top bar.
+  - `pvp.js`: reward application now uses canonical hooks when available (`addGold`, `grantXP`).
+- 2026-02-17: Combat Minimum for zone view (Kuestenpfad):
+  - `script.js`: added zone combat runtime state (`zoneCombatState`) and `Start Combat` / `Stop Combat` toggle control in zone panel.
+  - `script.js`: combat ticks only while active via `_tickZoneCombat(now)` inside `updateLogic()`.
+  - `script.js`: per-hit damage uses canonical derived stats from `pveGrid` (`attackSpeed` schedules hit interval, `damageAverage`/`calculateCharacterDamageValue` for hit damage).
+  - `script.js`: each hit updates zone monster HP text + bar immediately.
+  - `script.js`: on kill increments `monsterDefeats`, rewards via `addGold(..., 'combat_kill')` and `grantXP(..., 'combat_kill', 'pveGrid')`, applies existing dropTable roll to bank (`addItemToBank`), then respawns via `spawnMonster(...)`.
+  - `script.js`: zone combat is force-stopped when leaving zone/grind tab to prevent passive progression.
+- 2026-02-17: Zone combat HUD/pacing/UI pass:
+  - `script.js`: moved Start/Stop control below combat log text (same log panel, centered), outside scrollable log body.
+  - `script.js`: restored sprite-first monster rendering with template fallback lookup by monster id.
+  - `script.js`: added compact zone-only combat HUD (bottom-right) with Player/Monster HP + cooldown bars and placeholder Stamina/Mana rows.
+  - `script.js`: attack interval interpretation made explicit and clamped for sane pacing; cooldown bars now visualize the exact timers used by combat loop.
+  - `script.js`: monster cooldown timer is visualized without adding extra player-damage logic in this UI pass.
+  - `style.css`: added minimal zone HUD/control styling (`.zone-combat-hud*`, `.zone-log-controls`, `.zone-combat-toggle-btn`) with responsive adjustments.
+- 2026-02-18: Zone combat UI/loop fixes (minimal):
+  - Moved Start/Stop combat control out of log panel to combat HUD area, centered directly above player HUD block.
+  - Shifted base attack intervals by -3000ms for both player/monster before existing clamps (no new formulas).
+  - Re-enabled monster hit application to canonical player HP source (`character.base.currentLife` fallback `gameData.hp`) and synced HUD-visible HP reduction.
+  - Upgraded combat log to append-line mode (no full rerenders), added concise per-hit lines (`Player dealt X dmg`, `Monster dealt X dmg`), and increased log height for readability.
+- 2026-02-18: Verification limits: `node` is not available in PATH (`NODE_NOT_FOUND`), so no local syntax/browser run was possible in this environment.
+- 2026-02-19: Added Optionen tab/nav in `index.html` with two sections:
+  - Keybind list UI (`#options-keybind-list`) with per-action rebind and reset-to-default button.
+  - Audio sliders for menu/music/ambient volumes (0..100) wired to runtime settings.
+- 2026-02-19: Added settings + keybind runtime manager in `script.js`:
+  - Default keybinds with fallback behavior when unset (`rotateItem`, `toggleTooltips`, `cancelAction`).
+  - Global resolver API (`window.matchesActionKeybinding`) + rebind capture flow + options rendering helpers.
+- 2026-02-19: Added audio mixer/scheduler in `script.js`:
+  - UI SFX paths migrated to `./Sounds/Menu/...` and menu SFX volume applied per playback.
+  - Music channel plays shuffled tracks from `./Sounds/Music/`, with 5s fade in/out and 60s post-track gap.
+  - Ambient channel plays shuffled coast clips from `./Sounds/Ambient/Coast/`, with 5s fade in/out and 40s post-clip gap.
+  - Ambient is tied to active Küstenpfad zone view state and runs independently from music.
+- 2026-02-19: Wired existing hardcoded key handlers to keybind manager:
+  - `customDrag.js` rotation key
+  - `storageEngine.js` cancel/escape handling
+  - `itemTooltip.js` tooltip toggle key
+- 2026-02-19: Save migration/settings update in `saveengine.js`:
+  - bumped `SAVE_VERSION` to `6`
+  - added v5->v6 migration to normalize `settings.audio` + `settings.keybinds`
+  - save/load/new-game normalization now ensures option settings exist.
+- 2026-02-19: Validation limits: `node` is not available in PATH in this environment, so `node --check` and Playwright client execution could not be run.
+- 2026-02-19: UX hardening: leaving Optionen tab now clears pending key-rebind capture to avoid accidental global key capture outside options view.
+- 2026-02-19: PRIO combat foundation fix in `script.js` (minimal, no new balance systems):
+  - Added active combat grid resolver `getActiveCombatGridKey()`:
+    - Uses `pveGrid` in Küstenpfad/zone combat context.
+    - Otherwise resolves to current active setup (workshop type when relevant, else character-hub setup).
+  - Added fresh derived stat read path `_getFreshDerivedCharacterStats(gridKey)` using the character.js compute pipeline (`computeCharacterStats` + `collectEquippedItemEntries`) so combat is not stuck on cached/legacy farm stats.
+  - Zone combat tick now resolves fresh stats each tick from active combat grid key, so swapping PvE gear updates real combat immediately.
+  - Player hit damage now uses derived stats first:
+    - Rolls per-hit damage from derived `finalDamage` total min/max range when present.
+    - Falls back to derived `damageAverage` when range is unavailable.
+    - Uses legacy fallback only if derived damage fields are invalid/missing.
+  - Player attack cadence now uses derived `attackSpeed` APS consistently for interval calculation; legacy speed fallback only if derived APS is missing/invalid.
+  - Added explicit fallback logging with required tag and reason:
+    - `LEGACY_FALLBACK_USED: <reason>` in combat log.
+    - Structured `console.warn` payload includes context + active grid key.
+  - Added combat-start verification hook log with required fields:
+    - `activeGridKey`, `derived.attackSpeed`, `derived.damageAverage`, derived min/max range, computed interval, computed per-hit damage.
+  - Combat log keeps per-hit line format: `Player dealt X dmg`.
+  - Kill XP grant now uses resolved active combat grid key (instead of hardcoded PvE constant path).
+
+- 2026-02-19: Verification attempt after combat fix:
+  - `node --check script.js` failed because `node` is not available in PATH.
+  - Skill-required Playwright client run failed for same reason (`node` not found).
+  - `npx` is also unavailable in PATH (`NPX_NOT_FOUND`).
+- 2026-02-19: Follow-up hardening for the same combat fix:
+  - `updateLogic()` now reads fresh active combat-grid derived stats while zone combat/coast context is active to keep life/max-life sync aligned with PvE setup during combat ticks.
+- 2026-02-19: Added minimal data-driven loot pool extension (no zone/world refactor):
+  - New `lootPools.js` with named weighted pools (`coast_common`, `coast_uncommon`) supporting `rollsMin/rollsMax/perRollChance` and entry selectors (`itemId`, optional `baseType`/`tag`).
+  - `index.html` now loads `lootPools.js` before monster/runtime scripts.
+  - `monsters.js` coast monsters now optionally declare `lootPools` while keeping `dropTable` for backward compatibility.
+  - `script.js` zone kill flow now uses pooled drops via `rollLootForMonster(monster, { itemLevel })` and routes resulting drops into Schlachtfeld insertion logic.
+  - Legacy compatibility kept: if no `lootPools` are present, `dropTable` is internally treated as temporary one-item pools with default 15% per-roll chance.
+  - Combat log now writes per-drop lines with item name + ilvl (and bank-full failure lines).
+
+- 2026-02-19: Implemented data-driven loot pools v1 in lootPools.js with weighted entries, rollsMin/rollsMax, perRollChance, and legacy dropTable mapping via rollLootForMonster(...).
+- 2026-02-19: Added optional lootPools to Kuestenpfad monsters in monsters.js while preserving dropTable fallback compatibility.
+- 2026-02-19: Combat drop destination changed in script.js: zone kill drops now route to Schlachtfeld (addItemToBattlefield) instead of direct bank insertion.
+- 2026-02-19: Added Schlachtfeld v1 data model in gameData plus save defaults/migration (saveengine.js v7, ensureBattlefieldDefaultsInData) and save sanitization/tracking support in itemDefs.js for battlefield.pages.
+- 2026-02-19: Added Kuestenpfad Schlachtfeld UI in script.js + style.css: toggle button with item count, page tabs 1..9, static 15x6 slot grid, Store action, Sell mode selection, and Sell action using floor(baseValue * ilvl * 0.3) plus combat log feedback.
+- 2026-02-19: Combat derived-stat wiring finalized in script.js: zone combat uses active combat grid key (pveGrid in Kuestenpfad context), recalculates derived stats per tick, uses derived APS and derived damage (range roll or average), logs LEGACY_FALLBACK_USED reasons, and logs combat-start stat snapshot plus per-hit damage lines.
+- 2026-02-19: Integration fix in saveengine.js: renamed saveengine battlefield constants to avoid cross-script global const redeclaration with script.js.
+- 2026-02-19: Schlachtfeld UI/layout fix pass: converted Schlachtfeld to single-slot stash model (8x3 per page, one item instance per slot), made actions visible (removed panel clipping/height cap), enlarged slot/icon visuals, added tooltip binding on battlefield item hover, and kept bank/workshop matrix behavior by restoring normal placement when storing to bank.
+- 2026-02-19: Schlachtfeld top-bar UX tweak: moved Store/Sell/Sell mode into a top-right action group beside Schlachtfeld title, reduced action button size significantly, and made Schlachtfeld panel slightly less transparent (more opaque).

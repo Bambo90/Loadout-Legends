@@ -417,6 +417,13 @@ function _forEachTrackedGrid(data, visitor) {
             visitor(pageGrid, "bankPages", pageIndex);
         });
     }
+    if (data.battlefield && typeof data.battlefield === "object" && data.battlefield.pages && typeof data.battlefield.pages === "object") {
+        Object.keys(data.battlefield.pages).forEach((pageKey) => {
+            const pageGrid = data.battlefield.pages[pageKey];
+            if (!pageGrid || typeof pageGrid !== "object") return;
+            visitor(pageGrid, "battlefieldPages", pageKey);
+        });
+    }
 }
 
 function ensureItemInstanceIntegrity(gameData) {
@@ -611,6 +618,16 @@ function sanitizeSaveDataForPersistence(data) {
         if (cloned.bankPages[activePage]) {
             cloned.bank = cloned.bankPages[activePage];
         }
+    }
+    if (cloned.battlefield && typeof cloned.battlefield === "object" && cloned.battlefield.pages && typeof cloned.battlefield.pages === "object") {
+        const sanitizedPages = {};
+        Object.keys(cloned.battlefield.pages).forEach((pageKey) => {
+            const pageGrid = cloned.battlefield.pages[pageKey];
+            sanitizedPages[pageKey] = (pageGrid && typeof pageGrid === "object")
+                ? sanitizeGridForSave(pageGrid)
+                : {};
+        });
+        cloned.battlefield.pages = sanitizedPages;
     }
 
     const activeIds = _collectGridInstanceIds(cloned);

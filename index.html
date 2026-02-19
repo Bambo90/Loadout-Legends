@@ -21,6 +21,7 @@
                 <button class="nav-btn" onclick="switchTab('shop')">💰 Shop</button>
                 <button class="nav-btn" onclick="switchTab('character')">Charakter</button>
                 <button class="nav-btn" onclick="switchTab('stats')">📊 Stats</button>
+                <button class="nav-btn" onclick="switchTab('options')">⚙️ Optionen</button>
             </nav>
             <div class="sidebar-footer">
                 <button id="save-btn" onclick="saveGame()">💾 Speichern</button>
@@ -34,10 +35,6 @@
                 <div class="stat-item"><span class="label">LEVEL</span><span id="level-display" class="value">1</span></div>
                 <div class="hp-header-container"><div id="hp-fill-header"></div><span id="hp-text-header">HP: 100 / 100</span></div>
                 <div class="xp-header-container"><div id="xp-fill-header"></div><span id="xp-text-header">XP: 0 / 500</span></div>
-                <div class="bonus-display">
-                    <span class="label">BONUSES</span>
-                    <span id="bonus-display" class="bonus-value">1.0x</span>
-                </div>
             </header>
 
             <section id="content-area">
@@ -137,6 +134,40 @@
                         <div class="stat-card"><span class="stat-label">Gold / Sek</span><span id="stat-gps" class="stat-value">0</span></div>
                         <div class="stat-card"><span class="stat-label">Gold gesamt</span><span id="stat-total-gold" class="stat-value">0</span></div>
                         <div class="stat-card"><span class="stat-label">XP gesamt</span><span id="stat-total-xp" class="stat-value">0</span></div>
+                    </div>
+                </div>
+
+                <div id="tab-options" class="tab-content">
+                    <div class="hub-header">
+                        <h3>Optionen</h3>
+                        <p>Tastenbelegung und Audio</p>
+                    </div>
+                    <div class="options-layout">
+                        <section class="options-panel">
+                            <h4>Tastenbelegung</h4>
+                            <div id="options-keybind-list" class="options-keybind-list"></div>
+                            <div class="options-actions">
+                                <button type="button" onclick="resetAllKeybinds()">Standards zurücksetzen</button>
+                            </div>
+                        </section>
+                        <section class="options-panel">
+                            <h4>Audio</h4>
+                            <div class="options-audio-row">
+                                <label for="option-volume-menu">Menu SFX</label>
+                                <input id="option-volume-menu" type="range" min="0" max="100" step="1" value="100" oninput="setAudioVolumeSetting('menu', this.value)">
+                                <span id="option-volume-menu-value">100</span>
+                            </div>
+                            <div class="options-audio-row">
+                                <label for="option-volume-music">Music</label>
+                                <input id="option-volume-music" type="range" min="0" max="100" step="1" value="100" oninput="setAudioVolumeSetting('music', this.value)">
+                                <span id="option-volume-music-value">100</span>
+                            </div>
+                            <div class="options-audio-row">
+                                <label for="option-volume-ambient">Ambient</label>
+                                <input id="option-volume-ambient" type="range" min="0" max="100" step="1" value="100" oninput="setAudioVolumeSetting('ambient', this.value)">
+                                <span id="option-volume-ambient-value">100</span>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </section>
@@ -259,6 +290,7 @@
 <script src="affixDefs.js"></script>
 <script src="itemDefs.js"></script>
 <script src="generator.js"></script>
+<script src="lootPools.js"></script>
 <script src="monsters.js"></script>
 
 <script src="itemsEngine.js"></script>
@@ -283,7 +315,6 @@
 
 </body>
 </html>
-
 
 
 

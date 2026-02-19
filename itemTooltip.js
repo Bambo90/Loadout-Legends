@@ -559,7 +559,12 @@
     }
 
     function _onGlobalKeyDown(event) {
-        if (!event || event.key !== "Alt" || event.repeat) return;
+        if (!event || event.repeat) return;
+        if (typeof window.isKeybindCaptureActive === "function" && window.isKeybindCaptureActive()) return;
+        const isToggleKey = (typeof window.matchesActionKeybinding === "function")
+            ? window.matchesActionKeybinding("toggleTooltips", event)
+            : event.key === "Alt";
+        if (!isToggleKey) return;
         // Toggle only once per key press (no hold behavior).
         toggleEnabled({ persist: true, emit: true });
         event.preventDefault();

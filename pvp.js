@@ -125,14 +125,21 @@ function challengePlayer(opponentIndex) {
     const result = simulatePVPBattle(opponent);
     
     if (result.won) {
-        gameData.gold += result.goldReward;
-        if (typeof grantCharacterXP === 'function') {
+        if (typeof addGold === 'function') {
+            addGold(result.goldReward, 'pvp_win');
+        } else {
+            gameData.gold += result.goldReward;
+            gameData.totalGold += result.goldReward;
+        }
+        if (typeof grantXP === 'function') {
+            grantXP(result.xpReward, 'pvp_win', 'farmGrid');
+        } else if (typeof grantCharacterXP === 'function') {
             grantCharacterXP(gameData, result.xpReward, { gridKey: 'farmGrid' });
+            gameData.totalXP += result.xpReward;
         } else {
             gameData.xp += result.xpReward;
+            gameData.totalXP += result.xpReward;
         }
-        gameData.totalGold += result.goldReward;
-        gameData.totalXP += result.xpReward;
     }
     
     alert(result.message + `\nGold: +${result.goldReward}\nXP: +${result.xpReward}`);
