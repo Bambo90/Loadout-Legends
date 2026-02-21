@@ -5,6 +5,20 @@
 
 const CHARACTER_DAMAGE_TYPES = Object.freeze(["slash", "pierce", "blunt"]);
 const CHARACTER_MODIFIER_TYPES = Object.freeze(["flat", "percent"]);
+const CHARACTER_UNARMED_ATTACK_INTERVAL_MS = 5000;
+const CHARACTER_DEFAULT_WEAPON_INTERVAL_MS_BY_TYPE = Object.freeze({
+    dagger: 900,
+    sword: 1400,
+    axe: 1800,
+    mace: 1900,
+    spear: 1700,
+    bow: 1600,
+    crossbow: 2300,
+    wand: 1300,
+    staff: 1800,
+    stave: 1800,
+    weapon: 1600
+});
 
 const CHARACTER_LEVELING_CONFIG = Object.freeze({
     baseXP: 500,
@@ -339,7 +353,6 @@ function _buildLegacyItemModifierFactories() {
             { statPath: "damage.slash.min", type: "flat", value },
             { statPath: "damage.slash.max", type: "flat", value }
         ],
-        attackSpeed: (value) => [{ statPath: "attackSpeed", type: "percent", value: value - 1 }],
         speedBonus: (value) => [{ statPath: "attackSpeed", type: "percent", value: value - 1 }],
         xpBonus: (value) => [{ statPath: "xpGainMultiplier", type: "percent", value: value - 1 }],
         defense: (value) => armorFlatAllTypes(value),
@@ -433,6 +446,60 @@ function getItemWeight(item) {
     return Math.max(1, _countBodyCells(item));
 }
 
+function _resolveItemAttackType(item) {
+    if (!item || typeof item !== "object") return "misc";
+    const baseType = typeof item.baseType === "string" && item.baseType
+        ? item.baseType
+        : null;
+    if (baseType) return baseType;
+    return typeof item.type === "string" && item.type ? item.type : "misc";
+}
+
+function _isAttackWeaponType(type) {
+    return Object.prototype.hasOwnProperty.call(CHARACTER_DEFAULT_WEAPON_INTERVAL_MS_BY_TYPE, type);
+}
+
+function _resolveWeaponBaseAttackIntervalMs(item) {
+    if (!item || typeof item !== "object") return null;
+    const explicitInterval = Number(item.attackIntervalMs);
+    if (Number.isFinite(explicitInterval) && explicitInterval > 0) return explicitInterval;
+    const legacyAttackSpeed = Number(item.attackSpeed);
+    if (Number.isFinite(legacyAttackSpeed) && legacyAttackSpeed > 0) {
+        return 1000 / legacyAttackSpeed;
+    }
+    const attackType = _resolveItemAttackType(item);
+    if (_isAttackWeaponType(attackType)) {
+        return CHARACTER_DEFAULT_WEAPON_INTERVAL_MS_BY_TYPE[attackType];
+    }
+    return null;
+}
+
+function _resolveActiveAttackBaseIntervalMs(activeEntries) {
+    const entries = Array.isArray(activeEntries) ? activeEntries : [];
+    for (let i = 0; i < entries.length; i++) {
+        const item = entries[i] && entries[i].item ? entries[i].item : null;
+        if (!item) continue;
+        const attackType = _resolveItemAttackType(item);
+        if (!_isAttackWeaponType(attackType)) continue;
+        const resolved = _resolveWeaponBaseAttackIntervalMs(item);
+        if (_isFiniteNumber(resolved) && resolved > 0) return resolved;
+    }
+    return CHARACTER_UNARMED_ATTACK_INTERVAL_MS;
+}
+
+function _mapAttackTimingModifier(modifier) {
+    const normalized = _normalizeModifier(modifier);
+    if (!normalized) return null;
+    if (normalized.statPath === "attackSpeed" && normalized.type === "percent") {
+        return {
+            statPath: "attackIntervalMs",
+            type: "percent",
+            value: -normalized.value
+        };
+    }
+    return normalized;
+}
+
 function _applyModifiersInOrder(runtimeStats, modifiers) {
     if (!Array.isArray(modifiers) || modifiers.length === 0) return;
 
@@ -451,9 +518,16 @@ function _applyModifiersInOrder(runtimeStats, modifiers) {
 function _applyModifierPhases(runtimeStats, flatModifiers, percentModifiers) {
     const applyOne = (modifier) => {
         const current = _readNumericPath(runtimeStats, modifier.statPath, 0);
-        const nextValue = modifier.type === "flat"
-            ? (current + modifier.value)
-            : (current * (1 + modifier.value));
+        let nextValue;
+        if (modifier.type === "flat") {
+            nextValue = current + modifier.value;
+        } else {
+            let percentValue = modifier.value;
+            if (modifier.statPath === "attackIntervalMs") {
+                percentValue = _clamp(percentValue, -0.95, 0.95);
+            }
+            nextValue = current * (1 + percentValue);
+        }
         _writeNumericPath(runtimeStats, modifier.statPath, nextValue);
     };
 
@@ -469,7 +543,7 @@ function _splitModifiersByType(modifiers) {
     }
 
     modifiers.forEach((modifier) => {
-        const normalized = _normalizeModifier(modifier);
+        const normalized = _mapAttackTimingModifier(modifier);
         if (!normalized) return;
         if (normalized.type === "flat") flatModifiers.push(normalized);
         if (normalized.type === "percent") percentModifiers.push(normalized);
@@ -546,7 +620,7 @@ function _createRuntimeStatsFromBase(base) {
         life: base.baseLife,
         mana: base.baseMana,
         stamina: base.baseStamina,
-        attackSpeed: 0.01,
+        attackIntervalMs: 0,
         critChance: 0.05,
         staminaRegen: 1,
         staminaCostMultiplier: 1,
@@ -600,6 +674,7 @@ function computeCharacterStats(params) {
     weightClass.active.forEach((entry) => {
         extractItemModifiers(entry.item).forEach((modifier) => activeItemModifiers.push(modifier));
     });
+    runtime.attackIntervalMs = _resolveActiveAttackBaseIntervalMs(weightClass.active);
 
     // 4) Global modifier phase:
     //    - collect ALL sources
@@ -631,7 +706,10 @@ function computeCharacterStats(params) {
     const currentLife = _clamp(_num(base.currentLife, finalLife), 0, finalLife);
     const currentMana = _clamp(_num(base.currentMana, finalMana), 0, finalMana);
     const currentStamina = _clamp(_num(base.currentStamina, finalStamina), 0, finalStamina);
-    const attackSpeed = Math.max(0.1, runtime.attackSpeed);
+    const attackIntervalMs = (_isFiniteNumber(runtime.attackIntervalMs) && runtime.attackIntervalMs > 0)
+        ? runtime.attackIntervalMs
+        : CHARACTER_UNARMED_ATTACK_INTERVAL_MS;
+    const attackSpeed = 1000 / attackIntervalMs;
     const critChance = _clamp(runtime.critChance, 0, 1);
     const staminaRegen = Math.max(0, runtime.staminaRegen);
     const staminaCostMultiplier = Math.max(0.1, runtime.staminaCostMultiplier);
@@ -640,6 +718,7 @@ function computeCharacterStats(params) {
     return {
         finalDamage,
         finalArmor,
+        attackIntervalMs,
         attackSpeed,
         critChance,
         staminaRegen,

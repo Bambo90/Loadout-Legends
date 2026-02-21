@@ -82,6 +82,37 @@ const ZONE_COMBAT_GRID_KEY = 'pveGrid';
 const LEGACY_FALLBACK_TAG = 'LEGACY_FALLBACK_USED';
 const ZONE_COMBAT_MIN_APS = 0.15;
 const ZONE_COMBAT_MAX_APS = 6.0;
+const ZONE_COMBAT_MIN_PLAYER_INTERVAL_MS = Math.round(1000 / ZONE_COMBAT_MAX_APS);
+const ZONE_COMBAT_MAX_PLAYER_INTERVAL_MS = Math.round(1000 / ZONE_COMBAT_MIN_APS);
+const ZONE_COMBAT_UNARMED_INTERVAL_MS = 5000;
+const ZONE_COMBAT_TICK_MS = 50;
+const ZONE_COMBAT_WEAPON_TYPES = Object.freeze({
+    dagger: true,
+    sword: true,
+    axe: true,
+    mace: true,
+    spear: true,
+    bow: true,
+    crossbow: true,
+    wand: true,
+    staff: true,
+    stave: true,
+    weapon: true
+});
+const ZONE_DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE = Object.freeze({
+    dagger: 900,
+    sword: 1400,
+    axe: 1800,
+    mace: 1900,
+    spear: 1700,
+    bow: 1600,
+    crossbow: 2300,
+    wand: 1300,
+    staff: 1800,
+    stave: 1800,
+    weapon: 1600
+});
+const ZONE_DEFAULT_WEAPON_STAMINA_COST = 10;
 const BATTLEFIELD_PAGE_COLS = 8;
 const BATTLEFIELD_PAGE_ROWS = 3;
 const BATTLEFIELD_PAGE_SLOTS = BATTLEFIELD_PAGE_COLS * BATTLEFIELD_PAGE_ROWS;
@@ -121,6 +152,10 @@ const zoneCombatState = {
     monsterLastHitAt: 0,
     playerIntervalMs: 0,
     monsterIntervalMs: 0,
+    monsterTimerMs: 0,
+    itemActionRuntime: {},
+    eventHistory: [],
+    showGridOverlay: false,
     ui: null
 };
 const zoneBattlefieldState = {
@@ -1446,18 +1481,26 @@ function stopZoneCombat(reason = 'manual') {
     zoneCombatState.monsterLastHitAt = 0;
     zoneCombatState.playerIntervalMs = 0;
     zoneCombatState.monsterIntervalMs = 0;
+    zoneCombatState.monsterTimerMs = 0;
+    zoneCombatState.itemActionRuntime = {};
+    zoneCombatState.eventHistory = [];
+    zoneCombatState.showGridOverlay = false;
     if (zoneCombatState.ui && zoneCombatState.ui.toggleBtn) {
         zoneCombatState.ui.toggleBtn.textContent = 'Start Combat';
+    }
+    if (zoneCombatState.ui && zoneCombatState.ui.showGridBtn) {
+        zoneCombatState.ui.showGridBtn.classList.remove('active');
+        zoneCombatState.ui.showGridBtn.textContent = 'Show Grid';
     }
     if (reason !== 'silent' && zoneCombatState.ui && zoneCombatState.ui.logBody) {
         _appendZoneCombatLog('Combat stopped.');
     }
-    _renderZoneCombatHud(performance.now());
+    _renderZoneCombatHud();
 }
 
 function _isZoneCombatUIAlive() {
     const ui = zoneCombatState.ui;
-    if (!ui || !ui.monsterPortrait || !ui.monsterName || !ui.monsterDetails || !ui.statsList || !ui.hpFill || !ui.hpText || !ui.logBody || !ui.toggleBtn || !ui.playerHpText || !ui.playerCdFill || !ui.playerCdText || !ui.monsterHpText || !ui.monsterCdFill || !ui.monsterCdText) return false;
+    if (!ui || !ui.monsterPortrait || !ui.monsterName || !ui.monsterDetails || !ui.statsList || !ui.hpFill || !ui.hpText || !ui.logBody || !ui.toggleBtn || !ui.playerHpText || !ui.playerCdFill || !ui.playerCdText || !ui.monsterHpText || !ui.monsterCdFill || !ui.monsterCdText || !ui.showGridBtn || !ui.gridOverlay || !ui.gridOverlayBody) return false;
     return document.body.contains(ui.monsterName);
 }
 
@@ -1478,9 +1521,415 @@ function _appendZoneCombatLog(line) {
     logBody.scrollTop = logBody.scrollHeight;
 }
 
+function _appendZoneCombatEvent(eventType, payload = {}) {
+    const type = (typeof eventType === 'string' && eventType) ? eventType : 'event';
+    const event = {
+        type,
+        atMs: Date.now(),
+        ...payload
+    };
+    zoneCombatState.eventHistory.push(event);
+    while (zoneCombatState.eventHistory.length > 120) {
+        zoneCombatState.eventHistory.shift();
+    }
+
+    const itemName = payload.itemName || payload.itemId || 'Unknown';
+    const itemId = payload.itemId ? ` [${payload.itemId}]` : '';
+    const summary = payload.summary ? ` | ${payload.summary}` : '';
+    const damage = Number(payload.damage);
+    const damagePart = Number.isFinite(damage) ? ` | dmg ${Math.round(damage)}` : '';
+    const stamina = Number(payload.remainingStamina);
+    const mana = Number(payload.remainingMana);
+    const resourcePart = (Number.isFinite(stamina) || Number.isFinite(mana))
+        ? ` | STA ${Number.isFinite(stamina) ? stamina.toFixed(1) : '--'} | MANA ${Number.isFinite(mana) ? mana.toFixed(1) : '--'}`
+        : '';
+    _appendZoneCombatLog(`[${type}] ${itemName}${itemId}${damagePart}${summary}${resourcePart}`);
+}
+
+function _clampCooldownMs(value) {
+    const raw = Number(value);
+    if (!Number.isFinite(raw) || raw <= 0) return ZONE_COMBAT_UNARMED_INTERVAL_MS;
+    return Math.max(ZONE_COMBAT_MIN_PLAYER_INTERVAL_MS, Math.min(15000, Math.round(raw)));
+}
+
+function _resolveItemType(item) {
+    if (!item || typeof item !== 'object') return 'misc';
+    const baseType = (typeof item.baseType === 'string' && item.baseType) ? item.baseType : null;
+    return baseType || ((typeof item.type === 'string' && item.type) ? item.type : 'misc');
+}
+
+function _isCombatWeaponItem(item) {
+    return !!ZONE_COMBAT_WEAPON_TYPES[_resolveItemType(item)];
+}
+
+function _resolveWeaponActionCooldownMs(item) {
+    if (!item || typeof item !== 'object') return ZONE_COMBAT_UNARMED_INTERVAL_MS;
+    const explicitCooldown = Number(item.attackCooldownMs);
+    if (Number.isFinite(explicitCooldown) && explicitCooldown > 0) return _clampCooldownMs(explicitCooldown);
+    const explicitInterval = Number(item.attackIntervalMs);
+    if (Number.isFinite(explicitInterval) && explicitInterval > 0) return _clampCooldownMs(explicitInterval);
+    const attackSpeed = Number(item.attackSpeed);
+    if (Number.isFinite(attackSpeed) && attackSpeed > 0) return _clampCooldownMs(1000 / attackSpeed);
+    const byType = ZONE_DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE[_resolveItemType(item)];
+    return _clampCooldownMs(Number.isFinite(byType) ? byType : ZONE_COMBAT_UNARMED_INTERVAL_MS);
+}
+
+function _resolveWeaponResourceCost(item) {
+    const parsed = (item && item.resourceCost && typeof item.resourceCost === 'object')
+        ? item.resourceCost
+        : {};
+    const itemStamina = Number(item && item.staminaCost);
+    const itemMana = Number(item && item.manaCost);
+    const objectStamina = Number(parsed.stamina);
+    const objectMana = Number(parsed.mana);
+    return {
+        stamina: Math.max(0, Number.isFinite(objectStamina) ? objectStamina : (Number.isFinite(itemStamina) ? itemStamina : ZONE_DEFAULT_WEAPON_STAMINA_COST)),
+        mana: Math.max(0, Number.isFinite(objectMana) ? objectMana : (Number.isFinite(itemMana) ? itemMana : 0))
+    };
+}
+
+function _readPlayerResourceSnapshot() {
+    const base = (gameData.character && gameData.character.base) ? gameData.character.base : null;
+    if (!base) {
+        return { stamina: 0, mana: 0 };
+    }
+    return {
+        stamina: Math.max(0, Number.isFinite(base.currentStamina) ? base.currentStamina : 0),
+        mana: Math.max(0, Number.isFinite(base.currentMana) ? base.currentMana : 0)
+    };
+}
+
+function _canPayResourceCost(cost, resources) {
+    const safeCost = cost && typeof cost === 'object' ? cost : {};
+    const safeResources = resources && typeof resources === 'object' ? resources : {};
+    const staminaCost = Math.max(0, Number(safeCost.stamina) || 0);
+    const manaCost = Math.max(0, Number(safeCost.mana) || 0);
+    const stamina = Math.max(0, Number(safeResources.stamina) || 0);
+    const mana = Math.max(0, Number(safeResources.mana) || 0);
+    return stamina >= staminaCost && mana >= manaCost;
+}
+
+function _payResourceCost(cost) {
+    const base = (gameData.character && gameData.character.base) ? gameData.character.base : null;
+    if (!base) return;
+    const staminaCost = Math.max(0, Number(cost && cost.stamina) || 0);
+    const manaCost = Math.max(0, Number(cost && cost.mana) || 0);
+    base.currentStamina = Math.max(0, (Number.isFinite(base.currentStamina) ? base.currentStamina : 0) - staminaCost);
+    base.currentMana = Math.max(0, (Number.isFinite(base.currentMana) ? base.currentMana : 0) - manaCost);
+}
+
+function _resolveEquippedEntriesForCombat(activeGridKey) {
+    const grid = (gameData && gameData[activeGridKey] && typeof gameData[activeGridKey] === 'object')
+        ? gameData[activeGridKey]
+        : {};
+    if (typeof collectEquippedItemEntries !== 'function') return [];
+    return collectEquippedItemEntries(grid, (itemId, cell) => getItemDefinition(itemId, cell));
+}
+
+function _resolveActionCooldownScale(stats, activeWeaponEntries) {
+    const entries = Array.isArray(activeWeaponEntries) ? activeWeaponEntries : [];
+    if (!entries.length) return 1;
+    const firstBaseCooldown = _resolveWeaponActionCooldownMs(entries[0].item);
+    const derivedInterval = Number(stats && stats.attackIntervalMs);
+    if (!Number.isFinite(derivedInterval) || derivedInterval <= 0 || !Number.isFinite(firstBaseCooldown) || firstBaseCooldown <= 0) {
+        return 1;
+    }
+    const scale = derivedInterval / firstBaseCooldown;
+    return Math.max(0.1, Math.min(4, scale));
+}
+
+function _buildActionDescriptorsForEquippedItems(stats, activeGridKey) {
+    const entries = _resolveEquippedEntriesForCombat(activeGridKey);
+    const activeIds = new Set(Array.isArray(stats && stats.activeItemInstanceIds) ? stats.activeItemInstanceIds : []);
+    const inactiveIds = new Set(Array.isArray(stats && stats.inactiveItemInstanceIds) ? stats.inactiveItemInstanceIds : []);
+    const hasActivationData = activeIds.size > 0 || inactiveIds.size > 0;
+    const activeEntries = entries.filter((entry) => {
+        if (!hasActivationData) return true;
+        if (!entry || !entry.instanceId) return true;
+        return activeIds.has(entry.instanceId);
+    });
+    const activeWeapons = activeEntries.filter((entry) => _isCombatWeaponItem(entry.item));
+    const cooldownScale = _resolveActionCooldownScale(stats, activeWeapons);
+    const descriptors = [];
+
+    activeEntries.forEach((entry, entryIdx) => {
+        const item = entry && entry.item ? entry.item : null;
+        if (!item) return;
+        const instanceKey = entry.instanceId || `slot_${entry.index}`;
+
+        if (Array.isArray(item.actions) && item.actions.length > 0) {
+            item.actions.forEach((actionDef, actionIdx) => {
+                if (!actionDef || typeof actionDef !== 'object') return;
+                const baseCooldown = _clampCooldownMs(Number(actionDef.cooldownMs));
+                const cooldownMs = _clampCooldownMs(baseCooldown * cooldownScale);
+                const rawCost = actionDef.resourceCost && typeof actionDef.resourceCost === 'object' ? actionDef.resourceCost : {};
+                descriptors.push({
+                    key: `${instanceKey}::${actionDef.id || actionIdx}`,
+                    instanceKey,
+                    instanceId: entry.instanceId || null,
+                    slotIndex: entry.index,
+                    itemId: item.id || null,
+                    itemName: item.name || item.id || 'Unknown',
+                    icon: item.icon || '',
+                    kind: 'effect',
+                    actionId: actionDef.id || `action_${actionIdx}`,
+                    cooldownMs,
+                    resourceCost: {
+                        stamina: Math.max(0, Number(rawCost.stamina) || 0),
+                        mana: Math.max(0, Number(rawCost.mana) || 0)
+                    },
+                    effect: actionDef.effect || null,
+                    order: (entryIdx * 10) + actionIdx
+                });
+            });
+            return;
+        }
+
+        if (!_isCombatWeaponItem(item)) return;
+        const baseCooldown = _resolveWeaponActionCooldownMs(item);
+        const cooldownMs = _clampCooldownMs(baseCooldown * cooldownScale);
+        const damage = Math.max(0, Number(item.damage) || 0);
+        descriptors.push({
+            key: `${instanceKey}::weapon_attack`,
+            instanceKey,
+            instanceId: entry.instanceId || null,
+            slotIndex: entry.index,
+            itemId: item.id || null,
+            itemName: item.name || item.id || 'Unknown',
+            icon: item.icon || '',
+            kind: 'weapon',
+            actionId: 'weapon_attack',
+            cooldownMs,
+            resourceCost: _resolveWeaponResourceCost(item),
+            effect: {
+                type: 'weapon_attack',
+                damage
+            },
+            order: (entryIdx * 10)
+        });
+    });
+
+    return descriptors;
+}
+
+function _syncZoneCombatActionRuntime(stats, activeGridKey) {
+    const descriptors = _buildActionDescriptorsForEquippedItems(stats, activeGridKey);
+    const previous = zoneCombatState.itemActionRuntime && typeof zoneCombatState.itemActionRuntime === 'object'
+        ? zoneCombatState.itemActionRuntime
+        : {};
+    const next = {};
+
+    descriptors.forEach((descriptor) => {
+        const existing = previous[descriptor.key];
+        const nextCooldown = _clampCooldownMs(descriptor.cooldownMs);
+        const ratio = (existing && Number(existing.cooldownMs) > 0)
+            ? Math.max(0, Math.min(1, Number(existing.timerMs) / Number(existing.cooldownMs)))
+            : 1;
+        const timerMs = (existing && Number.isFinite(existing.timerMs))
+            ? Math.max(0, Math.round(nextCooldown * ratio))
+            : nextCooldown;
+        next[descriptor.key] = {
+            ...descriptor,
+            cooldownMs: nextCooldown,
+            timerMs
+        };
+    });
+
+    zoneCombatState.itemActionRuntime = next;
+    const nextAction = Object.values(next).reduce((best, entry) => {
+        if (!best) return entry;
+        return entry.timerMs < best.timerMs ? entry : best;
+    }, null);
+    zoneCombatState.playerIntervalMs = nextAction ? nextAction.cooldownMs : 0;
+    zoneCombatState.playerLastHitAt = 0;
+}
+
+function _getSortedActionRuntimeEntries() {
+    const runtime = zoneCombatState.itemActionRuntime && typeof zoneCombatState.itemActionRuntime === 'object'
+        ? zoneCombatState.itemActionRuntime
+        : {};
+    return Object.keys(runtime)
+        .map((key) => runtime[key])
+        .filter(Boolean)
+        .sort((a, b) => {
+            const orderA = Number.isFinite(a.order) ? a.order : 0;
+            const orderB = Number.isFinite(b.order) ? b.order : 0;
+            if (orderA !== orderB) return orderA - orderB;
+            return String(a.key).localeCompare(String(b.key));
+        });
+}
+
+function _resolveActionRuntimeForCell(cell, index) {
+    const instanceKey = (cell && cell.instanceId) ? cell.instanceId : `slot_${index}`;
+    const entries = _getSortedActionRuntimeEntries();
+    for (let i = 0; i < entries.length; i++) {
+        if (entries[i].instanceKey === instanceKey) return entries[i];
+    }
+    return null;
+}
+
+function _setZoneCombatGridOverlayOpen(shouldOpen) {
+    zoneCombatState.showGridOverlay = !!shouldOpen;
+    if (!_isZoneCombatUIAlive()) return;
+    zoneCombatState.ui.showGridBtn.classList.toggle('active', zoneCombatState.showGridOverlay);
+    zoneCombatState.ui.showGridBtn.textContent = zoneCombatState.showGridOverlay ? 'Hide Grid' : 'Show Grid';
+    _renderZoneCombatGridOverlay();
+}
+
+function _renderZoneCombatGridOverlay() {
+    if (!_isZoneCombatUIAlive()) return;
+    const overlay = zoneCombatState.ui.gridOverlay;
+    const body = zoneCombatState.ui.gridOverlayBody;
+    const shouldOpen = !!zoneCombatState.showGridOverlay;
+    overlay.classList.toggle('hidden', !shouldOpen);
+    if (!shouldOpen) return;
+
+    const gridKey = getActiveCombatGridKey();
+    const grid = (gameData && gameData[gridKey] && typeof gameData[gridKey] === 'object') ? gameData[gridKey] : {};
+    body.innerHTML = '';
+
+    const totalSlots = GRID_SIZE * GRID_ROWS;
+    for (let i = 0; i < totalSlots; i++) {
+        const slot = document.createElement('div');
+        slot.classList.add('zone-combat-grid-cell');
+        const cell = grid[i];
+        if (cell && cell.root && cell.itemId) {
+            slot.classList.add('occupied');
+            const item = getItemDefinition(cell.itemId, cell);
+            const marker = document.createElement('div');
+            marker.classList.add('zone-combat-grid-marker');
+            marker.textContent = (item && item.icon) ? item.icon : '[]';
+            marker.title = item && item.name ? item.name : (item && item.id ? item.id : 'item');
+            slot.appendChild(marker);
+
+            const actionRuntime = _resolveActionRuntimeForCell(cell, i);
+            if (actionRuntime && Number(actionRuntime.cooldownMs) > 0) {
+                const bar = document.createElement('div');
+                bar.classList.add('zone-combat-grid-cd');
+                const fill = document.createElement('div');
+                fill.classList.add('zone-combat-grid-cd-fill');
+                const ratio = Math.max(0, Math.min(1, Number(actionRuntime.timerMs) / Number(actionRuntime.cooldownMs)));
+                fill.style.width = `${Math.round(ratio * 100)}%`;
+                bar.appendChild(fill);
+                slot.appendChild(bar);
+            }
+        }
+        body.appendChild(slot);
+    }
+}
+
+function _processZoneCombatItemActions(stepMs, stats, activeGridKey, monster) {
+    const runtimeEntries = _getSortedActionRuntimeEntries();
+    if (!runtimeEntries.length) return;
+
+    runtimeEntries.forEach((entry) => {
+        if (monster && Number(monster.hp) <= 0) return;
+        const runtime = zoneCombatState.itemActionRuntime[entry.key];
+        if (!runtime) return;
+        runtime.timerMs = Math.max(0, Number(runtime.timerMs) - stepMs);
+        if (runtime.timerMs > 0) return;
+
+        const resources = _readPlayerResourceSnapshot();
+        if (_canPayResourceCost(runtime.resourceCost, resources)) {
+            _payResourceCost(runtime.resourceCost);
+            const remaining = _readPlayerResourceSnapshot();
+            if (runtime.kind === 'weapon') {
+                const damage = Math.max(0, Number(runtime.effect && runtime.effect.damage) || 0);
+                if (monster) {
+                    monster.hp = Math.max(0, (Number.isFinite(monster.hp) ? monster.hp : 0) - damage);
+                }
+                _appendZoneCombatEvent('weapon_attack', {
+                    itemId: runtime.itemId,
+                    itemName: runtime.itemName,
+                    damage,
+                    summary: `cd ${Math.round(runtime.cooldownMs)}ms`,
+                    remainingStamina: remaining.stamina,
+                    remainingMana: remaining.mana
+                });
+                _appendZoneCombatEvent('effect_triggered', {
+                    itemId: runtime.itemId,
+                    itemName: runtime.itemName,
+                    damage,
+                    summary: 'effect=weapon_attack',
+                    remainingStamina: remaining.stamina,
+                    remainingMana: remaining.mana
+                });
+            } else {
+                _appendZoneCombatEvent('effect_triggered', {
+                    itemId: runtime.itemId,
+                    itemName: runtime.itemName,
+                    summary: runtime.actionId || 'custom_effect',
+                    remainingStamina: remaining.stamina,
+                    remainingMana: remaining.mana
+                });
+            }
+        } else {
+            const staminaNeed = Math.max(0, Number(runtime.resourceCost && runtime.resourceCost.stamina) || 0);
+            const manaNeed = Math.max(0, Number(runtime.resourceCost && runtime.resourceCost.mana) || 0);
+            const summary = `wasted need STA ${staminaNeed.toFixed(1)} / MANA ${manaNeed.toFixed(1)}`;
+            const wastedType = runtime.kind === 'weapon' ? 'weapon_wasted' : 'effect_wasted';
+            _appendZoneCombatEvent(wastedType, {
+                itemId: runtime.itemId,
+                itemName: runtime.itemName,
+                summary,
+                remainingStamina: resources.stamina,
+                remainingMana: resources.mana
+            });
+            if (runtime.kind === 'weapon') {
+                _appendZoneCombatEvent('effect_wasted', {
+                    itemId: runtime.itemId,
+                    itemName: runtime.itemName,
+                    summary: 'effect=weapon_attack',
+                    remainingStamina: resources.stamina,
+                    remainingMana: resources.mana
+                });
+            }
+        }
+
+        runtime.timerMs = runtime.cooldownMs;
+    });
+}
+
+function _processZoneCombatMonsterAttack(stepMs, monster, stats) {
+    const intervalMs = _resolveMonsterAttackIntervalMs(monster);
+    zoneCombatState.monsterIntervalMs = intervalMs;
+    if (!Number.isFinite(zoneCombatState.monsterTimerMs) || zoneCombatState.monsterTimerMs <= 0) {
+        zoneCombatState.monsterTimerMs = intervalMs;
+    }
+    zoneCombatState.monsterTimerMs = Math.max(0, zoneCombatState.monsterTimerMs - stepMs);
+    if (zoneCombatState.monsterTimerMs > 0) return;
+
+    const monsterDamage = Math.max(0, Math.floor(Number.isFinite(monster.damage) ? monster.damage : 0));
+    const base = (gameData.character && gameData.character.base) ? gameData.character.base : null;
+    if (base) {
+        const maxLife = Number.isFinite(stats && stats.life) ? Math.max(1, stats.life) : Math.max(1, Number(base.baseLife) || 1);
+        if (!Number.isFinite(base.currentLife)) {
+            base.currentLife = maxLife;
+        }
+        base.currentLife = Math.max(0, base.currentLife - monsterDamage);
+    } else if (Number.isFinite(gameData.hp)) {
+        gameData.hp = Math.max(0, gameData.hp - monsterDamage);
+    }
+    _appendZoneCombatLog(`Monster dealt ${monsterDamage} dmg`);
+    zoneCombatState.monsterTimerMs = intervalMs;
+}
+
+function _refreshZoneMonsterTiming(monster, resetTimer = false) {
+    const intervalMs = _resolveMonsterAttackIntervalMs(monster);
+    zoneCombatState.monsterIntervalMs = intervalMs;
+    if (resetTimer || !Number.isFinite(zoneCombatState.monsterTimerMs) || zoneCombatState.monsterTimerMs <= 0) {
+        zoneCombatState.monsterTimerMs = intervalMs;
+    }
+}
+
 function _clampAps(value) {
     const raw = Number.isFinite(value) ? value : 1;
     return Math.max(ZONE_COMBAT_MIN_APS, Math.min(ZONE_COMBAT_MAX_APS, raw));
+}
+
+function _clampPlayerAttackIntervalMs(value) {
+    const raw = Number.isFinite(value) ? value : ZONE_COMBAT_UNARMED_INTERVAL_MS;
+    return Math.max(ZONE_COMBAT_MIN_PLAYER_INTERVAL_MS, Math.min(ZONE_COMBAT_MAX_PLAYER_INTERVAL_MS, raw));
 }
 
 function _apsToIntervalMs(aps) {
@@ -1488,11 +1937,12 @@ function _apsToIntervalMs(aps) {
 }
 
 function _resolvePlayerAttackIntervalMs(stats, gridKey) {
-    const attackSpeed = Number(stats && stats.attackSpeed);
-    if (Number.isFinite(attackSpeed) && attackSpeed > 0) {
-        const aps = _clampAps(attackSpeed);
+    const attackIntervalMs = Number(stats && stats.attackIntervalMs);
+    if (Number.isFinite(attackIntervalMs) && attackIntervalMs > 0) {
+        const intervalMs = _clampPlayerAttackIntervalMs(attackIntervalMs);
+        const aps = 1000 / intervalMs;
         return {
-            intervalMs: _apsToIntervalMs(aps),
+            intervalMs,
             aps,
             fallbackUsed: false,
             fallbackReason: null
@@ -1503,12 +1953,16 @@ function _resolvePlayerAttackIntervalMs(stats, gridKey) {
     const legacySpeed = (typeof calculateEquipmentBonusValue === 'function')
         ? Number(calculateEquipmentBonusValue(equipped, 'speed'))
         : 1;
-    const fallbackAps = _clampAps((Number.isFinite(legacySpeed) && legacySpeed > 0) ? legacySpeed : 1);
+    const fallbackInterval = (Number.isFinite(legacySpeed) && legacySpeed > 0)
+        ? (ZONE_COMBAT_UNARMED_INTERVAL_MS / legacySpeed)
+        : ZONE_COMBAT_UNARMED_INTERVAL_MS;
+    const intervalMs = _clampPlayerAttackIntervalMs(fallbackInterval);
+    const fallbackAps = 1000 / intervalMs;
     return {
-        intervalMs: _apsToIntervalMs(fallbackAps),
+        intervalMs,
         aps: fallbackAps,
         fallbackUsed: true,
-        fallbackReason: 'derived.attackSpeed_missing_or_invalid'
+        fallbackReason: 'derived.attackIntervalMs_missing_or_invalid'
     };
 }
 
@@ -1557,7 +2011,7 @@ function _getMonsterSprite(monster) {
     return template && template.sprite ? template.sprite : null;
 }
 
-function _renderZoneCombatHud(now) {
+function _renderZoneCombatHud() {
     if (!_isZoneCombatUIAlive()) return;
     const ui = zoneCombatState.ui;
     const hud = _getHudStats();
@@ -1572,16 +2026,31 @@ function _renderZoneCombatHud(now) {
         ui.monsterHpText.textContent = 'HP: -- / --';
     }
 
-    const playerInterval = Math.max(1, zoneCombatState.playerIntervalMs || 1);
+    const playerEntries = _getSortedActionRuntimeEntries();
+    const nextPlayerAction = playerEntries.length
+        ? playerEntries.reduce((best, entry) => (!best || entry.timerMs < best.timerMs ? entry : best), null)
+        : null;
+    const playerInterval = Math.max(1, nextPlayerAction ? Number(nextPlayerAction.cooldownMs) : 1);
+    const playerRemaining = zoneCombatState.active && nextPlayerAction ? Math.max(0, Number(nextPlayerAction.timerMs) || 0) : 0;
     const monsterInterval = Math.max(1, zoneCombatState.monsterIntervalMs || 1);
-    const playerRemaining = zoneCombatState.active ? Math.max(0, playerInterval - (now - zoneCombatState.playerLastHitAt)) : 0;
-    const monsterRemaining = zoneCombatState.active ? Math.max(0, monsterInterval - (now - zoneCombatState.monsterLastHitAt)) : 0;
-    const playerCdPct = zoneCombatState.active ? Math.max(0, Math.min(100, (playerRemaining / playerInterval) * 100)) : 0;
+    const monsterRemaining = zoneCombatState.active ? Math.max(0, zoneCombatState.monsterTimerMs || 0) : 0;
+    const playerCdPct = zoneCombatState.active && nextPlayerAction ? Math.max(0, Math.min(100, (playerRemaining / playerInterval) * 100)) : 0;
     const monsterCdPct = zoneCombatState.active ? Math.max(0, Math.min(100, (monsterRemaining / monsterInterval) * 100)) : 0;
     ui.playerCdFill.style.width = `${playerCdPct}%`;
     ui.monsterCdFill.style.width = `${monsterCdPct}%`;
-    ui.playerCdText.textContent = zoneCombatState.active ? `${(playerRemaining / 1000).toFixed(2)}s` : '--';
-    ui.monsterCdText.textContent = zoneCombatState.active ? `${(monsterRemaining / 1000).toFixed(2)}s` : '--';
+    ui.playerCdText.textContent = (zoneCombatState.active && nextPlayerAction)
+        ? `${(playerRemaining / 1000).toFixed(2)}s (${Math.ceil(playerRemaining)}ms)`
+        : '--';
+    ui.monsterCdText.textContent = zoneCombatState.active ? `${(monsterRemaining / 1000).toFixed(2)}s (${Math.ceil(monsterRemaining)}ms)` : '--';
+
+    const resources = _readPlayerResourceSnapshot();
+    if (ui.staminaText) {
+        ui.staminaText.textContent = `Stamina: ${resources.stamina.toFixed(1)}`;
+    }
+    if (ui.manaText) {
+        ui.manaText.textContent = `Mana: ${resources.mana.toFixed(1)}`;
+    }
+    _renderZoneCombatGridOverlay();
 }
 
 function _renderZoneMonsterUI() {
@@ -1626,10 +2095,8 @@ function _spawnZoneMonsterFromPool() {
     if (!Array.isArray(zoneCombatState.poolIndices) || zoneCombatState.poolIndices.length === 0) return null;
     const randomIdx = Math.floor(Math.random() * zoneCombatState.poolIndices.length);
     const monsterIndex = zoneCombatState.poolIndices[randomIdx];
-    const now = performance.now();
-    zoneCombatState.playerLastHitAt = now;
-    zoneCombatState.monsterLastHitAt = now;
     spawnMonster(monsterIndex);
+    _refreshZoneMonsterTiming(gameData.currentMonster, true);
     return gameData.currentMonster;
 }
 
@@ -1995,7 +2462,7 @@ function _applyZoneMonsterLootDrops(monster) {
     }
 }
 
-function _tickZoneCombat(now) {
+function _tickZoneCombat(stepMs) {
     if (!zoneCombatState.active) return;
     if (!_isZoneCombatUIAlive()) {
         stopZoneCombat('silent');
@@ -2007,47 +2474,18 @@ function _tickZoneCombat(now) {
 
     const activeGridKey = getActiveCombatGridKey();
     const stats = _getFreshDerivedCharacterStats(activeGridKey);
-    const playerTiming = _resolvePlayerAttackIntervalMs(stats, activeGridKey);
-    const playerHitIntervalMs = playerTiming.intervalMs;
-    const monsterHitIntervalMs = _resolveMonsterAttackIntervalMs(monster);
-    zoneCombatState.playerIntervalMs = playerHitIntervalMs;
-    zoneCombatState.monsterIntervalMs = monsterHitIntervalMs;
-
-    if ((now - zoneCombatState.playerLastHitAt) >= playerHitIntervalMs) {
-        zoneCombatState.playerLastHitAt = now;
-        const playerHit = _resolvePlayerCombatDamage(stats, activeGridKey);
-        const hitDamage = playerHit.damage;
-        if (playerHit.fallbackUsed) {
-            _logLegacyFallback(playerHit.fallbackReason, { context: 'zone_player_damage', activeGridKey });
-        }
-        if (playerTiming.fallbackUsed) {
-            _logLegacyFallback(playerTiming.fallbackReason, { context: 'zone_player_attack_speed', activeGridKey });
-        }
-        monster.hp = Math.max(0, (Number.isFinite(monster.hp) ? monster.hp : 0) - hitDamage);
-        _appendZoneCombatLog(`Player dealt ${Math.round(hitDamage)} dmg`);
-    }
-
-    if (monster && (now - zoneCombatState.monsterLastHitAt) >= monsterHitIntervalMs) {
-        zoneCombatState.monsterLastHitAt = now;
-        const monsterDamage = Math.max(0, Math.floor(Number.isFinite(monster.damage) ? monster.damage : 0));
-        const base = (gameData.character && gameData.character.base) ? gameData.character.base : null;
-        if (base) {
-            const maxLife = Number.isFinite(stats && stats.life) ? Math.max(1, stats.life) : Math.max(1, Number(base.baseLife) || 1);
-            if (!Number.isFinite(base.currentLife)) {
-                base.currentLife = maxLife;
-            }
-            base.currentLife = Math.max(0, base.currentLife - monsterDamage);
-        } else if (Number.isFinite(gameData.hp)) {
-            gameData.hp = Math.max(0, gameData.hp - monsterDamage);
-        }
-        _appendZoneCombatLog(`Monster dealt ${monsterDamage} dmg`);
+    const fixedStep = Math.max(1, Number.isFinite(stepMs) ? stepMs : ZONE_COMBAT_TICK_MS);
+    _syncZoneCombatActionRuntime(stats, activeGridKey);
+    _processZoneCombatItemActions(fixedStep, stats, activeGridKey, monster);
+    if (monster && Number(monster.hp) > 0) {
+        _processZoneCombatMonsterAttack(fixedStep, monster, stats);
     }
 
     if (typeof syncLegacyCharacterFields === 'function') {
         syncLegacyCharacterFields(gameData, stats);
     }
     _renderZoneMonsterUI();
-    _renderZoneCombatHud(now);
+    _renderZoneCombatHud();
 
     if (monster.hp > 0) return;
 
@@ -2064,9 +2502,13 @@ function _tickZoneCombat(now) {
 
     _appendZoneCombatLog(`${monster.name} besiegt. +${goldReward} Gold, +${xpReward} XP`);
     updateUI();
-    _spawnZoneMonsterFromPool();
+    const spawned = _spawnZoneMonsterFromPool();
+    if (spawned) {
+        const nextStats = _getFreshDerivedCharacterStats(activeGridKey);
+        _syncZoneCombatActionRuntime(nextStats, activeGridKey);
+    }
     _renderZoneMonsterUI();
-    _renderZoneCombatHud(now);
+    _renderZoneCombatHud();
 }
 
 function restoreWorldView() {
@@ -2318,6 +2760,14 @@ function renderZoneView(zoneId) {
     toggleCombatBtn.classList.add('zone-combat-toggle-btn');
     toggleCombatBtn.textContent = 'Start Combat';
     toggleCombatWrap.appendChild(toggleCombatBtn);
+    const showGridWrap = document.createElement('div');
+    showGridWrap.classList.add('zone-combat-toggle-wrap');
+    const showGridBtn = document.createElement('button');
+    showGridBtn.classList.add('dropdown-item');
+    showGridBtn.classList.add('zone-combat-toggle-btn');
+    showGridBtn.classList.add('zone-combat-grid-toggle-btn');
+    showGridBtn.textContent = 'Show Grid';
+    showGridWrap.appendChild(showGridBtn);
 
     const playerBlock = document.createElement('div');
     playerBlock.classList.add('zone-combat-hud-block');
@@ -2355,8 +2805,19 @@ function renderZoneView(zoneId) {
 
     combatHud.appendChild(battlefieldToggleWrap);
     combatHud.appendChild(toggleCombatWrap);
+    combatHud.appendChild(showGridWrap);
     combatHud.appendChild(playerBlock);
     combatHud.appendChild(monsterBlock);
+
+    const combatGridOverlay = document.createElement('div');
+    combatGridOverlay.classList.add('zone-combat-grid-overlay', 'hidden');
+    const combatGridTitle = document.createElement('div');
+    combatGridTitle.classList.add('zone-combat-grid-title');
+    combatGridTitle.textContent = 'PVE Setup Grid';
+    const combatGridBody = document.createElement('div');
+    combatGridBody.classList.add('zone-combat-grid-body');
+    combatGridOverlay.appendChild(combatGridTitle);
+    combatGridOverlay.appendChild(combatGridBody);
 
     const battlefieldPanel = document.createElement('div');
     battlefieldPanel.classList.add('zone-panel', 'zone-battlefield-panel', 'hidden');
@@ -2401,6 +2862,10 @@ function renderZoneView(zoneId) {
     zoneCombatState.monsterLastHitAt = 0;
     zoneCombatState.playerIntervalMs = 0;
     zoneCombatState.monsterIntervalMs = 0;
+    zoneCombatState.monsterTimerMs = 0;
+    zoneCombatState.itemActionRuntime = {};
+    zoneCombatState.eventHistory = [];
+    zoneCombatState.showGridOverlay = false;
     zoneCombatState.ui = {
         monsterPortrait,
         monsterName,
@@ -2413,9 +2878,14 @@ function renderZoneView(zoneId) {
         playerHpText: playerBlock.querySelector('#zone-hud-player-hp'),
         playerCdFill,
         playerCdText: playerBlock.querySelector('#zone-hud-player-cd-text'),
+        staminaText: staminaRow,
+        manaText: manaRow,
         monsterHpText: monsterBlock.querySelector('#zone-hud-monster-hp'),
         monsterCdFill,
-        monsterCdText: monsterBlock.querySelector('#zone-hud-monster-cd-text')
+        monsterCdText: monsterBlock.querySelector('#zone-hud-monster-cd-text'),
+        showGridBtn,
+        gridOverlay: combatGridOverlay,
+        gridOverlayBody: combatGridBody
     };
     zoneBattlefieldState.open = false;
     zoneBattlefieldState.sellMode = false;
@@ -2443,6 +2913,9 @@ function renderZoneView(zoneId) {
     battlefieldSellModeBtn.addEventListener('click', () => {
         _toggleZoneBattlefieldSellMode();
     });
+    showGridBtn.addEventListener('click', () => {
+        _setZoneCombatGridOverlayOpen(!zoneCombatState.showGridOverlay);
+    });
 
     toggleCombatBtn.addEventListener('click', () => {
         if (zoneCombatState.active) {
@@ -2465,39 +2938,12 @@ function renderZoneView(zoneId) {
         _appendZoneCombatLog(`Ein ${spawned.name} erscheint...`);
         const activeGridKey = getActiveCombatGridKey();
         const startStats = _getFreshDerivedCharacterStats(activeGridKey);
-        const playerTiming = _resolvePlayerAttackIntervalMs(startStats, activeGridKey);
-        const playerHit = _resolvePlayerCombatDamage(startStats, activeGridKey);
-        zoneCombatState.playerIntervalMs = playerTiming.intervalMs;
-        const monsterApsRaw = Number(spawned && spawned.attackSpeed);
-        const monsterAps = _clampAps((Number.isFinite(monsterApsRaw) && monsterApsRaw > 10) ? (1000 / monsterApsRaw) : monsterApsRaw);
-        const monsterIntervalSec = _apsToIntervalMs(monsterAps) / 1000;
-        const monsterDamage = Math.max(0, Math.floor(Number.isFinite(spawned.damage) ? spawned.damage : 0));
-        const derivedAps = Number(startStats && startStats.attackSpeed);
-        const derivedDmgAvg = Number(startStats && startStats.damageAverage);
-        const derivedRange = _resolveDerivedDamageRange(startStats);
-        _appendZoneCombatLog(
-            `Combat start | activeGridKey=${activeGridKey} | derived.attackSpeed=${Number.isFinite(derivedAps) ? derivedAps.toFixed(2) : 'n/a'} | ` +
-            `derived.damageAverage=${Number.isFinite(derivedDmgAvg) ? derivedDmgAvg.toFixed(2) : 'n/a'} | ` +
-            `derived.damageRange=${derivedRange ? `${Math.round(derivedRange.min)}-${Math.round(derivedRange.max)}` : 'n/a'} | ` +
-            `interval=${(playerTiming.intervalMs / 1000).toFixed(2)}s | hit=${Math.round(playerHit.damage)}`
-        );
-        console.log('COMBAT_START_STATS', {
-            activeGridKey,
-            derivedAttackSpeed: Number.isFinite(derivedAps) ? derivedAps : null,
-            derivedDamageAverage: Number.isFinite(derivedDmgAvg) ? derivedDmgAvg : null,
-            derivedDamageRange: derivedRange,
-            computedPlayerIntervalMs: playerTiming.intervalMs,
-            computedPerHitDamage: playerHit.damage
-        });
-        _appendZoneCombatLog(`Monster APS ${monsterAps.toFixed(2)} | ${(monsterIntervalSec).toFixed(2)}s | dmg ${monsterDamage}`);
-        if (playerHit.fallbackUsed) {
-            _logLegacyFallback(playerHit.fallbackReason, { context: 'zone_combat_start_damage', activeGridKey });
-        }
-        if (playerTiming.fallbackUsed) {
-            _logLegacyFallback(playerTiming.fallbackReason, { context: 'zone_combat_start_attack_speed', activeGridKey });
-        }
+        _syncZoneCombatActionRuntime(startStats, activeGridKey);
+        _refreshZoneMonsterTiming(spawned, true);
+        const actionCount = _getSortedActionRuntimeEntries().length;
+        _appendZoneCombatLog(`Combat start | actions=${actionCount} | tick=${ZONE_COMBAT_TICK_MS}ms`);
         _renderZoneMonsterUI();
-        _renderZoneCombatHud(performance.now());
+        _renderZoneCombatHud();
     });
 
     grindTab.appendChild(header);
@@ -2505,10 +2951,12 @@ function renderZoneView(zoneId) {
     grindTab.appendChild(monsterSection);
     grindTab.appendChild(infoGrid);
     grindTab.appendChild(battlefieldPanel);
+    grindTab.appendChild(combatGridOverlay);
     grindTab.appendChild(combatHud);
     _renderZoneBattlefieldPanel();
     _setZoneBattlefieldOpen(false);
-    _renderZoneCombatHud(performance.now());
+    _setZoneCombatGridOverlayOpen(false);
+    _renderZoneCombatHud();
     _syncAmbientLoopState();
 }
 
@@ -2744,7 +3192,7 @@ function updateLogic() {
         gameData.hp = Math.min(gameData.maxHp, gameData.hp + gameData.hpRegen * dt);
     }
 
-    _tickZoneCombat(now);
+    _tickZoneCombat(ZONE_COMBAT_TICK_MS);
 
     // Legacy idle prototype is disabled.
     gameData.workProgress = 0;
@@ -3184,7 +3632,7 @@ function calculatePlayerDamage() {
 // INITIALISIERUNG
 // ==========================================
 
-setInterval(() => { updateLogic(); updateUI(); }, 50);
+setInterval(() => { updateLogic(); updateUI(); }, ZONE_COMBAT_TICK_MS);
 
 window.onload = () => {
     console.log("Loadout Legends initializing...");

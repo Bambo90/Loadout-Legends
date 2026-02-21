@@ -52,7 +52,7 @@ function calculatePlayerDamageWithEquipment(playerLevel, equippedItems, characte
  */
 function calculateEquipmentBonusValue(equippedItems, bonusType, characterStats) {
     if (characterStats && typeof characterStats === "object") {
-        if (bonusType === "speed") return Math.max(0.1, characterStats.attackSpeed || 1.0);
+        if (bonusType === "speed") return Number.isFinite(characterStats.attackSpeed) ? characterStats.attackSpeed : 1.0;
         if (bonusType === "xp") return Math.max(0.1, characterStats.xpGainMultiplier || 1.0);
         if (bonusType === "damage") return Math.max(0, calculateCharacterDamageValue(characterStats));
         return 1.0;

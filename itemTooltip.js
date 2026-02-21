@@ -33,6 +33,7 @@
         "armor.slash": "Slash Armor",
         "armor.pierce": "Pierce Armor",
         "armor.blunt": "Blunt Armor",
+        "attackIntervalMs": "Attack Interval (ms)",
         "attackSpeed": "Attack Speed",
         "xpGainMultiplier": "XP Gain",
         "critChance": "Crit Chance",

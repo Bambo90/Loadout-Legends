@@ -8,12 +8,13 @@ const ITEM_STATIC_FIELDS = Object.freeze([
     // Economy
     "price", "dropChance", "dropSources",
     // Legacy combat / bonus stats
-    "damage", "defense", "attackSpeed", "speedBonus", "xpBonus", "evasion",
+    "damage", "defense", "attackSpeed", "attackIntervalMs", "attackCooldownMs", "speedBonus", "xpBonus", "evasion",
     "life", "mana", "allResist", "lifeLeech", "damageBonus", "magicBonus",
     "magicReduction", "physicalBonus", "physicalReduction", "spectralDefense",
     "accuracy", "piercing", "armorIgnore", "fireBonus", "coldBonus", "chainBonus",
     "blockChance", "blockValue", "counterAttack", "magicAbsorption", "durability",
     "critChance", "critMulti",
+    "actions", "resourceCost", "staminaCost", "manaCost",
     // PoE-style base schema
     "baseType", "weight", "baseStats", "implicitPool", "prefixSlots", "suffixSlots", "prefixPool", "suffixPool",
     // Affix runtime payload (must not be embedded in grid cells)
@@ -30,6 +31,19 @@ const _DEFAULT_SLOT_BY_RARITY = Object.freeze({
     rare: Object.freeze({ prefixSlots: 2, suffixSlots: 2 }),
     unique: Object.freeze({ prefixSlots: 1, suffixSlots: 2 }),
     legendary: Object.freeze({ prefixSlots: 2, suffixSlots: 2 })
+});
+const _DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE = Object.freeze({
+    dagger: 900,
+    sword: 1400,
+    axe: 1800,
+    mace: 1900,
+    spear: 1700,
+    bow: 1600,
+    crossbow: 2300,
+    wand: 1300,
+    staff: 1800,
+    stave: 1800,
+    weapon: 1600
 });
 
 function _isFiniteNumber(value) {
@@ -126,9 +140,6 @@ function _buildLegacyBaseStats(item) {
         add({ statPath: "damage.slash.min", type: "flat", value: item.damage });
         add({ statPath: "damage.slash.max", type: "flat", value: item.damage });
     }
-    if (_isFiniteNumber(item.attackSpeed)) {
-        add({ statPath: "attackSpeed", type: "percent", value: item.attackSpeed - 1 });
-    }
     if (_isFiniteNumber(item.speedBonus)) {
         add({ statPath: "attackSpeed", type: "percent", value: item.speedBonus - 1 });
     }
@@ -218,10 +229,40 @@ function _normalizeSlotValue(rawValue, rarity, slotKey) {
     return byRarity[slotKey];
 }
 
+function _resolveItemTypeForCooldown(item) {
+    if (!item || typeof item !== "object") return "misc";
+    if (typeof item.baseType === "string" && item.baseType) return item.baseType;
+    if (typeof item.type === "string" && item.type) return item.type;
+    return "misc";
+}
+
+function _resolveAttackCooldownMs(item) {
+    if (!item || typeof item !== "object") return null;
+    const explicitCooldown = Number(item.attackCooldownMs);
+    if (_isFiniteNumber(explicitCooldown) && explicitCooldown > 0) return explicitCooldown;
+    const explicitInterval = Number(item.attackIntervalMs);
+    if (_isFiniteNumber(explicitInterval) && explicitInterval > 0) return explicitInterval;
+    const attackSpeed = Number(item.attackSpeed);
+    if (_isFiniteNumber(attackSpeed) && attackSpeed > 0) return 1000 / attackSpeed;
+    const byType = _DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE[_resolveItemTypeForCooldown(item)];
+    if (_isFiniteNumber(byType) && byType > 0) return byType;
+    return null;
+}
+
 function _normalizeItemDefinition(rawItem) {
     if (!rawItem || typeof rawItem !== "object") return null;
     const item = { ...rawItem };
     item.baseType = item.baseType || item.type || "misc";
+    const resolvedCooldown = _resolveAttackCooldownMs(item);
+    if (_isFiniteNumber(resolvedCooldown) && resolvedCooldown > 0) {
+        item.attackCooldownMs = resolvedCooldown;
+    }
+    if (!_isFiniteNumber(item.attackIntervalMs) && _isFiniteNumber(item.attackCooldownMs) && item.attackCooldownMs > 0) {
+        item.attackIntervalMs = item.attackCooldownMs;
+    }
+    if (!_isFiniteNumber(item.attackIntervalMs) && _isFiniteNumber(item.attackSpeed) && item.attackSpeed > 0) {
+        item.attackIntervalMs = 1000 / item.attackSpeed;
+    }
     item.weight = _isFiniteNumber(item.weight) ? Math.max(0, item.weight) : _countBodyCellsFromItem(item);
     item.baseStats = _normalizeBaseStats(item.baseStats, item);
     item.implicitPool = _normalizeAffixPool(item.implicitPool);

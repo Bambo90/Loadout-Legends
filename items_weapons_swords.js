@@ -14,7 +14,7 @@ const ITEMS_WEAPONS_SWORDS = [
         inShop: true,
         req: 1,
         damage: 8,
-        attackSpeed: 1.4,
+        attackSpeed: 0.5,
         desc: "Ein einfaches, aber zuverlässiges Schert für den Anfang.",
         rotations: {
             0: { grid: [["A", "A", "A"], ["A", "B", "A"], ["A", "B", "A"], ["A", "B", "A"]] },
