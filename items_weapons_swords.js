@@ -14,7 +14,8 @@ const ITEMS_WEAPONS_SWORDS = [
         inShop: true,
         req: 1,
         damage: 8,
-        attackSpeed: 0.5,
+        attackSpeed: 8,
+        attackCooldownMs: 5000,
         desc: "Ein einfaches, aber zuverlässiges Schert für den Anfang.",
         rotations: {
             0: { grid: [["A", "A", "A"], ["A", "B", "A"], ["A", "B", "A"], ["A", "B", "A"]] },
@@ -33,7 +34,8 @@ const ITEMS_WEAPONS_SWORDS = [
         inShop: true,
         req: 5,
         damage: 18,
-        attackSpeed: 1.3,
+        attackSpeed: 800,
+        attackCooldownMs: 8000,
         lifeLeech: 0.05,
         desc: "Qualitativ hochwertiger Stahl mit Lebensraub-Eigenschaften.",
         rotations: {
@@ -54,6 +56,7 @@ const ITEMS_WEAPONS_SWORDS = [
         req: 10,
         damage: 35,
         attackSpeed: 0.9,
+        attackCooldownMs: 4200,
         physicalBonus: 1.25,
         desc: "Ein massives Zweihänder mit enormem Schaden, aber langsamer.",
         rotations: {
@@ -76,6 +79,7 @@ const ITEMS_WEAPONS_SWORDS = [
         req: 15,
         damage: 45,
         attackSpeed: 1.2,
+        attackCooldownMs: 3400,
         fireBonus: 1.5,
         desc: "Ein legendäres Schwert, das in Flammen lodert.",
         rotations: {
@@ -98,6 +102,7 @@ const ITEMS_WEAPONS_SWORDS = [
         req: 25,
         damage: 80,
         attackSpeed: 1.5,
+        attackCooldownMs: 2800,
         chainBonus: 2.0,
         desc: "Ein Schwert, das die Grenzen zwischen Welten durchschneidet.",
         rotations: {
@@ -116,6 +121,7 @@ const ITEMS_WEAPONS_SWORDS = [
         price: 100,
         req: 2,
         damage: 5,
+        attackCooldownMs: 3600,
         desc: "Besser als nichts im Kampf.",
         rotations: {
             0: { grid: [["AB", "AB", "A"], ["0", "AB", "A"], ["0", "AB", "0"], ["0", "A", "0"]] },
@@ -133,6 +139,7 @@ const ITEMS_WEAPONS_SWORDS = [
         price: 300,
         req: 5,
         damage: 8,
+        attackCooldownMs: 3400,
         desc: "Solider Stahl mit guter Balance.",
         rotations: {
             0: { grid: [["AB", "AB", "A"], ["0", "AB", "A"], ["0", "AB", "0"], ["0", "A", "0"]] },

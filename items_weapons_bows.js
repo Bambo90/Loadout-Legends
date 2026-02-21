@@ -15,6 +15,7 @@ const ITEMS_WEAPONS_BOWS = [
         req: 2,
         damage: 6,
         attackSpeed: 1.8,
+        attackCooldownMs: 3000,
         accuracy: 0.85,
         desc: "Ein klassischer Holzbogen mit anständiger Reichweite.",
         rotations: {
@@ -35,6 +36,7 @@ const ITEMS_WEAPONS_BOWS = [
         req: 5,
         damage: 13,
         attackSpeed: 1.5,
+        attackCooldownMs: 3400,
         accuracy: 0.92,
         piercing: 0.15,
         desc: "Ein moderner Bogen aus Laminate, sehr präzise.",
@@ -56,6 +58,7 @@ const ITEMS_WEAPONS_BOWS = [
         req: 9,
         damage: 25,
         attackSpeed: 1.2,
+        attackCooldownMs: 3900,
         accuracy: 0.95,
         coldBonus: 1.2,
         armorIgnore: 0.2,
@@ -80,6 +83,7 @@ const ITEMS_WEAPONS_BOWS = [
         req: 14,
         damage: 38,
         attackSpeed: 1.4,
+        attackCooldownMs: 3600,
         fireBonus: 1.8,
         desc: "Ein Bogen aus Phoenixholz, der Pfeile in Flammen verwandelt.",
         rotations: {
@@ -102,6 +106,7 @@ const ITEMS_WEAPONS_BOWS = [
         req: 26,
         damage: 60,
         attackSpeed: 1.6,
+        attackCooldownMs: 3200,
         chainBonus: 2.1,
         desc: "Ein rätselhafter Bogen, der zwischen Dimensionen reht.",
         rotations: {
@@ -120,6 +125,7 @@ const ITEMS_WEAPONS_BOWS = [
         price: 450,
         req: 6,
         damage: 12,
+        attackCooldownMs: 3500,
         desc: "Hält gerade noch so zusammen.",
         rotations: {
             0: { grid: [["A", "AB", "A"], ["0", "AB", "0"], ["0", "AB", "0"], ["0", "AB", "0"], ["0", "A", "0"]] },

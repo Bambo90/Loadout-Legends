@@ -248,7 +248,7 @@ body {
     align-items: center;
     justify-content: flex-start;
     overflow: hidden;
-    background-image: url('Media/Images/Background_A.png');
+    background-image: url('./Media/Images/Background_A.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -266,7 +266,7 @@ body {
     align-items: center;
     justify-content: flex-start;
     overflow: hidden;
-    background-image: url('Media/Images/Background_inventory.png');
+    background-image: url('./Media/Images/Background_inventory.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

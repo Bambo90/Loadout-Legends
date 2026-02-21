@@ -13,6 +13,7 @@ const ITEMS_WEAPONS_AXES = [
         price: 800,
         req: 10,
         damage: 15,
+        attackCooldownMs: 5000,
         desc: "Schwer aber verheerend.",
         rotations: {
             0: { grid: [["A", "AB", "AB", "AB", "A"], ["0", "A", "AB", "A", "0"], ["0", "A", "B", "A", "0"], ["0", "A", "0", "A", "0"]] },

@@ -33,17 +33,17 @@ const _DEFAULT_SLOT_BY_RARITY = Object.freeze({
     legendary: Object.freeze({ prefixSlots: 2, suffixSlots: 2 })
 });
 const _DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE = Object.freeze({
-    dagger: 900,
-    sword: 1400,
-    axe: 1800,
-    mace: 1900,
-    spear: 1700,
-    bow: 1600,
-    crossbow: 2300,
-    wand: 1300,
-    staff: 1800,
-    stave: 1800,
-    weapon: 1600
+    dagger: 2600,
+    sword: 3200,
+    axe: 5000,
+    mace: 5200,
+    spear: 3800,
+    bow: 3400,
+    crossbow: 5800,
+    wand: 3000,
+    staff: 4600,
+    stave: 4600,
+    weapon: 3600
 });
 
 function _isFiniteNumber(value) {
@@ -242,8 +242,6 @@ function _resolveAttackCooldownMs(item) {
     if (_isFiniteNumber(explicitCooldown) && explicitCooldown > 0) return explicitCooldown;
     const explicitInterval = Number(item.attackIntervalMs);
     if (_isFiniteNumber(explicitInterval) && explicitInterval > 0) return explicitInterval;
-    const attackSpeed = Number(item.attackSpeed);
-    if (_isFiniteNumber(attackSpeed) && attackSpeed > 0) return 1000 / attackSpeed;
     const byType = _DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE[_resolveItemTypeForCooldown(item)];
     if (_isFiniteNumber(byType) && byType > 0) return byType;
     return null;
@@ -259,9 +257,6 @@ function _normalizeItemDefinition(rawItem) {
     }
     if (!_isFiniteNumber(item.attackIntervalMs) && _isFiniteNumber(item.attackCooldownMs) && item.attackCooldownMs > 0) {
         item.attackIntervalMs = item.attackCooldownMs;
-    }
-    if (!_isFiniteNumber(item.attackIntervalMs) && _isFiniteNumber(item.attackSpeed) && item.attackSpeed > 0) {
-        item.attackIntervalMs = 1000 / item.attackSpeed;
     }
     item.weight = _isFiniteNumber(item.weight) ? Math.max(0, item.weight) : _countBodyCellsFromItem(item);
     item.baseStats = _normalizeBaseStats(item.baseStats, item);

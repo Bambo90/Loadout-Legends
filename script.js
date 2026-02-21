@@ -144,6 +144,21 @@ const audioRuntime = {
     coastActive: false,
     unlockListenerBound: false
 };
+
+function _resolveAssetUrl(path) {
+    if (typeof path !== 'string' || !path.trim()) return '';
+    const trimmed = path.trim();
+    if (/^(?:https?:|data:|blob:|file:)/i.test(trimmed)) return trimmed;
+    const normalized = (trimmed.startsWith('./') || trimmed.startsWith('../')) ? trimmed : `./${trimmed}`;
+    try {
+        if (typeof window !== 'undefined' && window.location && window.location.href) {
+            return new URL(normalized, window.location.href).href;
+        }
+    } catch (err) {
+        // Fall back to raw normalized path.
+    }
+    return normalized;
+}
 const zoneCombatState = {
     active: false,
     zoneId: null,
@@ -415,7 +430,7 @@ function _playNextMusicTrack() {
         return;
     }
 
-    const track = new Audio(nextTrack);
+    const track = new Audio(_resolveAssetUrl(nextTrack));
     track.preload = 'auto';
     track.loop = false;
     track.volume = 0;
@@ -511,7 +526,7 @@ function _playNextAmbientTrack() {
         return;
     }
 
-    const clip = new Audio(nextTrack);
+    const clip = new Audio(_resolveAssetUrl(nextTrack));
     clip.preload = 'auto';
     clip.loop = false;
     clip.volume = 0;
@@ -668,7 +683,7 @@ function _getUISoundBase(soundKey) {
     if (!path) return null;
     if (_uiSoundBases[soundKey]) return _uiSoundBases[soundKey];
 
-    const audio = new Audio(path);
+    const audio = new Audio(_resolveAssetUrl(path));
     audio.preload = 'auto';
     _uiSoundBases[soundKey] = audio;
     return audio;
@@ -2063,7 +2078,7 @@ function _renderZoneMonsterUI() {
     const spritePath = _getMonsterSprite(monster);
     if (spritePath) {
         const img = document.createElement('img');
-        img.src = spritePath;
+        img.src = _resolveAssetUrl(spritePath);
         img.alt = monster.name || '';
         img.style.width = '100%';
         img.style.height = '100%';
@@ -2232,7 +2247,7 @@ function _renderZoneBattlefieldGrid() {
             if (item && item.rarity) marker.classList.add(item.rarity);
             if (item && item.sprite) {
                 const img = document.createElement('img');
-                img.src = item.sprite;
+                img.src = _resolveAssetUrl(item.sprite);
                 img.alt = item.name || '';
                 marker.appendChild(img);
             } else {
@@ -2538,7 +2553,7 @@ function renderWorldView() {
     }
 
     grindTab.innerHTML = '';
-    grindTab.style.backgroundImage = "url('./Media/Images/World/Welt_A.png')";
+    grindTab.style.backgroundImage = `url('${_resolveAssetUrl('Media/Images/World/Welt_A.png')}')`;
     grindTab.style.backgroundSize = 'cover';
     grindTab.style.backgroundPosition = 'center';
     grindTab.style.backgroundRepeat = 'no-repeat';
@@ -2638,7 +2653,7 @@ function renderZoneView(zoneId) {
     }
 
     grindTab.innerHTML = '';
-    grindTab.style.backgroundImage = "url('./Media/Images/World/Kuestenpfad_A.png')";
+    grindTab.style.backgroundImage = `url('${_resolveAssetUrl('Media/Images/World/Kuestenpfad_A.png')}')`;
     grindTab.style.backgroundSize = 'cover';
     grindTab.style.backgroundPosition = 'center';
     grindTab.style.backgroundRepeat = 'no-repeat';
@@ -3003,7 +3018,7 @@ function renderPreviewGrid(containerId, gridKey) {
                     // Prefer sprite image for preview if available
                     if (item.sprite) {
                         const img = document.createElement('img');
-                        img.src = item.sprite;
+                        img.src = _resolveAssetUrl(item.sprite);
                         img.alt = item.name || '';
                         if (rotationIndex % 2 === 0) {
                             img.style.width = '100%';
@@ -3062,6 +3077,22 @@ function openWorkshop(type) {
         overlay.classList.add(`workshop-${type}`);
         overlay.classList.remove('hidden');
         overlay.style.display = 'flex';
+        const workshopBackgroundByType = {
+            farm: 'Media/Images/World/Farm_Workshop_C.png',
+            pve: 'Media/Images/World/PVE_Workshop.png'
+        };
+        const workshopBgPath = workshopBackgroundByType[type];
+        if (workshopBgPath) {
+            overlay.style.backgroundImage = `url('${_resolveAssetUrl(workshopBgPath)}')`;
+            overlay.style.backgroundSize = 'cover';
+            overlay.style.backgroundPosition = '50% 42%';
+            overlay.style.backgroundRepeat = 'no-repeat';
+        } else {
+            overlay.style.backgroundImage = '';
+            overlay.style.backgroundSize = '';
+            overlay.style.backgroundPosition = '';
+            overlay.style.backgroundRepeat = '';
+        }
         const title = document.getElementById('workshop-title');
         if (title) title.innerText = type === 'storage' ? "STORAGE" : type.toUpperCase() + " WORKSHOP";
         
@@ -3117,6 +3148,10 @@ function closeWorkshop() {
     if (overlay) {
         overlay.classList.add('hidden');
         overlay.classList.remove('workshop-farm', 'workshop-pve', 'workshop-pvp', 'workshop-sort', 'workshop-storage');
+        overlay.style.backgroundImage = '';
+        overlay.style.backgroundSize = '';
+        overlay.style.backgroundPosition = '';
+        overlay.style.backgroundRepeat = '';
     }
     
     if (typeof saveGame === 'function') saveGame();
