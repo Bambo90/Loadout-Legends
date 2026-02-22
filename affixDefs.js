@@ -2,7 +2,7 @@
  * Central affix/tier source for PoE-inspired item rolling.
  */
 
-const AFFIX_DEFS = Object.freeze([
+const _AFFIX_DEFS_SEED = Object.freeze([
     {
         id: "implicit_precise_crit",
         category: "weapon",
@@ -436,6 +436,90 @@ const AFFIX_DEFS = Object.freeze([
         ])
     }
 ]);
+
+const _AFFIX_TIER_TARGET_COUNT = 12;
+const _AFFIX_TIER_WEIGHT_EXPONENT = 1.8;
+const _AFFIX_TIER_REQUIRED_ILVL_BY_TIER = Object.freeze([85, 80, 75, 70, 65, 60, 55, 50, 45, 35, 25, 10]);
+const _AFFIX_TIER_GAMMA_PERCENT = 1.35;
+const _AFFIX_TIER_GAMMA_FLAT = 1.6;
+
+function _roundTierBound(value) {
+    if (!Number.isFinite(value)) return 0;
+    const precision = Math.abs(value) <= 1 ? 4 : 2;
+    return Number(value.toFixed(precision));
+}
+
+function _normalizeSeedTiers(seedTiers) {
+    if (!Array.isArray(seedTiers)) return [];
+    return seedTiers
+        .map((tier) => {
+            if (!tier || typeof tier !== "object") return null;
+            const min = Number(tier.min);
+            const max = Number(tier.max);
+            const requiredIlvl = Number(tier.requiredIlvl);
+            if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(requiredIlvl)) return null;
+            return {
+                tier: Number.isFinite(tier.tier) ? Math.max(1, Math.floor(tier.tier)) : null,
+                min: Math.min(min, max),
+                max: Math.max(min, max),
+                requiredIlvl: Math.max(1, Math.floor(requiredIlvl))
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.requiredIlvl - b.requiredIlvl);
+}
+
+function _resolveTierGamma(seedTiers) {
+    const normalizedSeed = _normalizeSeedTiers(seedTiers);
+    if (normalizedSeed.length === 0) return _AFFIX_TIER_GAMMA_FLAT;
+    const bestSeed = normalizedSeed[normalizedSeed.length - 1];
+    const worstSeed = normalizedSeed[0];
+    const magnitude = Math.max(
+        Math.abs(bestSeed.min),
+        Math.abs(bestSeed.max),
+        Math.abs(worstSeed.min),
+        Math.abs(worstSeed.max)
+    );
+    return magnitude <= 1 ? _AFFIX_TIER_GAMMA_PERCENT : _AFFIX_TIER_GAMMA_FLAT;
+}
+
+function _buildExpandedTiersFromSeed(seedTiers) {
+    const normalizedSeed = _normalizeSeedTiers(seedTiers);
+    if (normalizedSeed.length === 0) return Object.freeze([]);
+
+    const worstSeed = normalizedSeed[0];
+    const bestSeed = normalizedSeed[normalizedSeed.length - 1];
+    const gamma = _resolveTierGamma(seedTiers);
+
+    const output = [];
+    for (let tierNumber = 1; tierNumber <= _AFFIX_TIER_TARGET_COUNT; tierNumber += 1) {
+        const qualityLinear = (_AFFIX_TIER_TARGET_COUNT === 1)
+            ? 1
+            : (_AFFIX_TIER_TARGET_COUNT - tierNumber) / (_AFFIX_TIER_TARGET_COUNT - 1);
+        const quality = Math.pow(qualityLinear, gamma);
+        const interpolatedMin = worstSeed.min + ((bestSeed.min - worstSeed.min) * quality);
+        const interpolatedMax = worstSeed.max + ((bestSeed.max - worstSeed.max) * quality);
+        const requiredIlvl = _AFFIX_TIER_REQUIRED_ILVL_BY_TIER[tierNumber - 1] || 1;
+        output.push(Object.freeze({
+            tier: tierNumber,
+            min: _roundTierBound(interpolatedMin),
+            max: _roundTierBound(interpolatedMax),
+            requiredIlvl: Math.max(1, Math.floor(requiredIlvl)),
+            weight: Math.max(1, Math.round(Math.pow(tierNumber, _AFFIX_TIER_WEIGHT_EXPONENT)))
+        }));
+    }
+    return Object.freeze(output);
+}
+
+const AFFIX_DEFS = Object.freeze(
+    _AFFIX_DEFS_SEED.map((def) => {
+        if (!def || typeof def !== "object") return def;
+        return Object.freeze({
+            ...def,
+            tiers: _buildExpandedTiersFromSeed(def.tiers)
+        });
+    })
+);
 
 const AFFIX_CATEGORY_POOLS = Object.freeze({
     weapon: Object.freeze({

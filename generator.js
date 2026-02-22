@@ -79,7 +79,26 @@ function _pickTierAndRoll(affixDef, itemLevel, rng) {
         : [];
     if (!Array.isArray(eligibleTiers) || eligibleTiers.length === 0) return null;
 
-    const chosenTier = eligibleTiers[_rngIntInclusive(0, eligibleTiers.length - 1, rng)];
+    const normalizedTiers = eligibleTiers
+        .map((tier) => {
+            if (!tier || typeof tier !== "object") return null;
+            const weight = Number.isFinite(tier.weight) && tier.weight > 0
+                ? tier.weight
+                : Math.max(1, Math.round(Math.pow(Math.max(1, Number(tier.tier) || 1), 1.8)));
+            return { tier, weight };
+        })
+        .filter(Boolean);
+    if (normalizedTiers.length === 0) return null;
+    const totalWeight = normalizedTiers.reduce((sum, entry) => sum + entry.weight, 0);
+    let ticket = _rngFloat(rng) * (totalWeight > 0 ? totalWeight : 1);
+    let chosenTier = normalizedTiers[normalizedTiers.length - 1].tier;
+    for (let i = 0; i < normalizedTiers.length; i++) {
+        ticket -= normalizedTiers[i].weight;
+        if (ticket <= 0) {
+            chosenTier = normalizedTiers[i].tier;
+            break;
+        }
+    }
     const roll = chosenTier.min + (_rngFloat(rng) * (chosenTier.max - chosenTier.min));
     const precision = chosenTier.max <= 1 ? 4 : 2;
     const roundedRoll = Number(roll.toFixed(precision));

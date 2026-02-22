@@ -1,90 +1,56 @@
 # Loadout Legends
 
-Regel 1:
-Simulation ist immer rein logisch.
+Grid-based idle progression and loadout combat prototype inspired by Melvor Idle and Backpack Battles.
 
-Regel 2:
-Item-Instanz ist immer serialisierbar.
+## Golden Rules
 
-Regel 3:
-UI darf nur anzeigen, nie rechnen.
+1. Simulation is pure logic.
+2. Item instances are serializable.
+3. UI renders state and should not own gameplay logic.
 
-A grid-based, idle progression plus loadout combat game mixing Melvor Idle and Backpack Battles mechanics.
+## Quickstart
 
-Current snapshot:
-- Runtime baseline: `v0.2.2` (plus in-progress world and adventure UI updates)
-- Core drag runtime: `customDrag.js` exposed via `window.DragSystem`
+### Web
 
-## Local Development
-
-### Quick start (Web + Static Server)
-
-1. Open a terminal in the project root:
-```bash
-cd "c:\Users\bbs2e\Desktop\Loadout Legends"
-```
-
-2. Start a local server (requires Node.js):
-```bash
-npx http-server . -p 8080
-```
-
-3. Open [http://localhost:8080](http://localhost:8080) in your browser.
-
-### Electron (Desktop App)
-
-1. Install dependencies:
 ```bash
 npm install
+npm run start
 ```
 
-2. Run in Electron:
+Open `http://localhost:8080`.
+
+### Electron
+
 ```bash
 npm run electron:dev
 ```
 
-## Project Structure
+## Current Snapshot
 
-- `index.html` - Main HTML entry point
-- `script.js` - Core game loop and UI orchestration
-- `style.css` - Styling for tabs, workshop, world and zone views
-- `customDrag.js` - Encapsulated drag and rotation runtime (`window.DragSystem`)
-- `dragdropengine.js`, `gridEngine.js`, `workshopEngine.js`, `saveengine.js` - Core mechanics
-- `worldData.js`, `combatEngine.js`, `monsters.js` - World, zone and combat systems
-- `.github/workflows/ci.yml` - Automated checks on push
+- Status: `Pre-Alpha Prototype`
+- Playable core: coast zone combat, inventory/workshop drag+rotate, shop, saves, character panel, options.
+- Reference context: see `CODEX_CONTEXT.md`.
 
-## Version Control and Releases
+## Structure (Key Files)
 
-```bash
-git init
-git add .
-git commit -m "Initial commit: Loadout Legends"
-git remote add origin https://github.com/youruser/loadout-legends.git
-git push -u origin main
-```
+- `index.html`: app shell and script loading
+- `script.js`: runtime orchestration
+- `character.js`: character and derived stats
+- `itemDefs.js`, `affixDefs.js`, `generator.js`: item and affix systems
+- `customDrag.js`, `dragdropengine.js`, `gridEngine.js`: inventory mechanics
+- `saveengine.js`: save/load and migrations
+- `worldData.js`, `monsters.js`, `lootPools.js`: world/content data
 
-Create a release tag:
-```bash
-git tag -a v0.2.2 -m "Release v0.2.2"
-git push origin v0.2.2
-```
+## Documentation
 
-Then use GitHub Releases to attach builds/installers.
-
-## Development Workflow
-
-- Create feature branches: `git checkout -b feature/name`
-- Push to GitHub and create Pull Request
-- CI runs lint and build checks
-- Merge to `main` when ready
-- Tag and release via GitHub Releases
-
-## Build and Distribution
-
-- **Web**: Deploy to GitHub Pages, Netlify, or any static host
-- **Desktop (Electron)**: Package with `npm run electron:build`
-- **Mobile**: Optional future port via Flutter or React Native
+- `CODEX_CONTEXT.md`: canonical AI/human project context
+- `NEXT.md`: short active roadmap
+- `RELEASING.md`: release process
+- `CHANGELOG.md`: notable changes
+- `docs/releases/`: detailed release notes
+- `docs/verification/`: release verification checklists
+- `docs/archive/` and `docs/worklog/`: historical logs
 
 ## License
 
-TBD (add your license here)
+TBD

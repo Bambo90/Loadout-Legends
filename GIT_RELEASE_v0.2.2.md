@@ -41,7 +41,7 @@ Files changed:
 - index.html (fixed script load order)
 - package.json (version bump to 0.2.2)
 - CHANGELOG.md (created, documented changes)
-- RELEASE_NOTES_0.2.2.md (created)
+- docs/releases/RELEASE_NOTES_v0.2.2.md (created)
 - dragEngine.js (deleted)
 
 Breaking changes: None
@@ -103,7 +103,7 @@ git commit -m "refactor(drag): consolidate drag system architecture [v0.2.2]" &&
 
 - [x] Version bumped in package.json (0.2.2)
 - [x] CHANGELOG.md created/updated
-- [x] RELEASE_NOTES_0.2.2.md created
+- [x] docs/releases/RELEASE_NOTES_v0.2.2.md created
 - [x] Debug logs removed
 - [x] Dead code cleaned up
 - [x] Script load order fixed

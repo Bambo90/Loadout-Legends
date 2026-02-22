@@ -312,6 +312,17 @@
 
     function _mapTierToDisplayRank(affixDef, actualTier) {
         if (!affixDef || !Array.isArray(affixDef.tiers) || !_isFiniteNumber(actualTier)) return actualTier;
+        const orderedByTier = affixDef.tiers
+            .filter(Boolean)
+            .slice()
+            .sort((a, b) => (Number(a.tier) || 0) - (Number(b.tier) || 0));
+        const alreadyT1Best = orderedByTier.length > 1 && orderedByTier.every((entry, idx) => {
+            if (idx === 0) return true;
+            const prevReq = Number(orderedByTier[idx - 1].requiredIlvl);
+            const currReq = Number(entry.requiredIlvl);
+            return Number.isFinite(prevReq) && Number.isFinite(currReq) && prevReq >= currReq;
+        });
+        if (alreadyT1Best) return actualTier;
         const ranked = affixDef.tiers
             .filter(Boolean)
             .slice()
