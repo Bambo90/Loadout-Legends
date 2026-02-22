@@ -154,7 +154,7 @@ function createDefaultCharacterBase() {
     const baseAttributes = { str: 10, dex: 10, int: 10 };
     const baseLife = 100;
     const baseMana = 60;
-    const baseStamina = 100;
+    const baseStamina = 100; // Stamina lvl vorher 100 test
     return {
         level: 1,
         xp: 0,
@@ -622,7 +622,7 @@ function _createRuntimeStatsFromBase(base) {
         stamina: base.baseStamina,
         attackIntervalMs: 0,
         critChance: 0.05,
-        staminaRegen: 1,
+        staminaRegen: 1, // normal 1
         staminaCostMultiplier: 1,
         xpGainMultiplier: 1,
         magicScaling: 1,
@@ -693,8 +693,10 @@ function computeCharacterStats(params) {
     const ratio = runtime.currentWeight / limit;
     if (ratio > 1) {
         runtime.staminaCostMultiplier *= 1 + ((ratio - 1) * 0.8);
+        runtime.staminaRegen *= Math.max(0.1, 1 - ((ratio - 1) * 0.5));
     } else if (ratio > 0.75) {
         runtime.staminaCostMultiplier *= 1 + ((ratio - 0.75) * 0.5);
+        runtime.staminaRegen *= Math.max(0.4, 1 - ((ratio - 0.75) * 1.2));
     }
 
     // 6) Finalize derived snapshot.

@@ -33,6 +33,9 @@ function ensureSettingsDefaultsInData(target) {
     if (typeof target.settings.itemTooltipsEnabled !== "boolean") {
         target.settings.itemTooltipsEnabled = true;
     }
+    if (typeof target.settings.devMode !== "boolean") {
+        target.settings.devMode = false;
+    }
     if (!target.settings.keybinds || typeof target.settings.keybinds !== "object" || Array.isArray(target.settings.keybinds)) {
         target.settings.keybinds = {};
     }

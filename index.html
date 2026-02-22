@@ -34,6 +34,8 @@
                 <div class="stat-item"><span class="label">GOLD</span><span id="gold-display" class="value">0</span></div>
                 <div class="stat-item"><span class="label">LEVEL</span><span id="level-display" class="value">1</span></div>
                 <div class="hp-header-container"><div id="hp-fill-header"></div><span id="hp-text-header">HP: 100 / 100</span></div>
+                <div class="stamina-header-container"><div id="stamina-fill-header"></div><span id="stamina-text-header">STA: 100 / 100</span></div>
+                <div class="mana-header-container"><div id="mana-fill-header"></div><span id="mana-text-header">MANA: 60 / 60</span></div>
                 <div class="xp-header-container"><div id="xp-fill-header"></div><span id="xp-text-header">XP: 0 / 500</span></div>
             </header>
 
@@ -166,6 +168,14 @@
                                 <label for="option-volume-ambient">Ambient</label>
                                 <input id="option-volume-ambient" type="range" min="0" max="100" step="1" value="100" oninput="setAudioVolumeSetting('ambient', this.value)">
                                 <span id="option-volume-ambient-value">100</span>
+                            </div>
+                            <div class="options-toggle-row">
+                                <label for="option-dev-mode">Dev Mode (verbose combat debug)</label>
+                                <input id="option-dev-mode" type="checkbox" onchange="setDevModeSetting(this.checked)">
+                            </div>
+                            <div class="options-toggle-row">
+                                <label for="option-affix-details">Affix Details</label>
+                                <input id="option-affix-details" type="checkbox" onchange="setAffixDetailsSetting(this.checked)">
                             </div>
                         </section>
                     </div>

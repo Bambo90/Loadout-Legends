@@ -8,7 +8,7 @@ const ITEM_STATIC_FIELDS = Object.freeze([
     // Economy
     "price", "dropChance", "dropSources",
     // Legacy combat / bonus stats
-    "damage", "defense", "attackSpeed", "attackIntervalMs", "attackCooldownMs", "speedBonus", "xpBonus", "evasion",
+    "damage", "damageFlat", "damageMin", "damageMax", "defense", "attackSpeed", "attackIntervalMs", "attackCooldownMs", "speedBonus", "xpBonus", "evasion",
     "life", "mana", "allResist", "lifeLeech", "damageBonus", "magicBonus",
     "magicReduction", "physicalBonus", "physicalReduction", "spectralDefense",
     "accuracy", "piercing", "armorIgnore", "fireBonus", "coldBonus", "chainBonus",
@@ -16,7 +16,7 @@ const ITEM_STATIC_FIELDS = Object.freeze([
     "critChance", "critMulti",
     "actions", "resourceCost", "staminaCost", "manaCost",
     // PoE-style base schema
-    "baseType", "weight", "baseStats", "implicitPool", "prefixSlots", "suffixSlots", "prefixPool", "suffixPool",
+    "baseType", "weight", "baseStats", "tags", "implicitPool", "prefixSlots", "suffixSlots", "prefixPool", "suffixPool",
     // Affix runtime payload (must not be embedded in grid cells)
     "itemLevel", "implicits", "prefixes", "suffixes", "modifiers",
     // Shape / template data
@@ -44,6 +44,19 @@ const _DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE = Object.freeze({
     staff: 4600,
     stave: 4600,
     weapon: 3600
+});
+const _WEAPON_AFFIX_TYPES = Object.freeze({
+    dagger: true,
+    sword: true,
+    axe: true,
+    mace: true,
+    spear: true,
+    bow: true,
+    crossbow: true,
+    wand: true,
+    staff: true,
+    stave: true,
+    weapon: true
 });
 
 function _isFiniteNumber(value) {
@@ -136,7 +149,17 @@ function _buildLegacyBaseStats(item) {
         add({ statPath: "damage.blunt.max", type: "percent", value });
     };
 
-    if (_isFiniteNumber(item.damage)) {
+    const damageMin = Number(item.damageMin);
+    const damageMax = Number(item.damageMax);
+    if (_isFiniteNumber(damageMin) && _isFiniteNumber(damageMax)) {
+        const min = Math.min(damageMin, damageMax);
+        const max = Math.max(damageMin, damageMax);
+        add({ statPath: "damage.slash.min", type: "flat", value: min });
+        add({ statPath: "damage.slash.max", type: "flat", value: max });
+    } else if (_isFiniteNumber(item.damageFlat)) {
+        add({ statPath: "damage.slash.min", type: "flat", value: item.damageFlat });
+        add({ statPath: "damage.slash.max", type: "flat", value: item.damageFlat });
+    } else if (_isFiniteNumber(item.damage)) {
         add({ statPath: "damage.slash.min", type: "flat", value: item.damage });
         add({ statPath: "damage.slash.max", type: "flat", value: item.damage });
     }
@@ -236,6 +259,26 @@ function _resolveItemTypeForCooldown(item) {
     return "misc";
 }
 
+function _resolveAffixCategoryForItem(item) {
+    if (!item || typeof item !== "object") return null;
+    const tags = Array.isArray(item.tags) ? item.tags : [];
+    if (tags.includes("weapon")) return "weapon";
+    if (tags.includes("armor")) return "armor";
+    if (tags.includes("jewelry")) return "jewelry";
+    if (tags.includes("accessory")) return "jewelry";
+    const baseType = _resolveItemTypeForCooldown(item);
+    if (_WEAPON_AFFIX_TYPES[baseType]) return "weapon";
+    if (baseType === "armor") return "armor";
+    if (baseType === "accessory" || baseType === "jewelry") return "jewelry";
+    return null;
+}
+
+function _resolveCategoryAffixPool(item, group) {
+    const category = _resolveAffixCategoryForItem(item);
+    if (!category || !group || typeof getAffixPoolByCategoryGroup !== "function") return [];
+    return _normalizeAffixPool(getAffixPoolByCategoryGroup(category, group));
+}
+
 function _resolveAttackCooldownMs(item) {
     if (!item || typeof item !== "object") return null;
     const explicitCooldown = Number(item.attackCooldownMs);
@@ -260,11 +303,14 @@ function _normalizeItemDefinition(rawItem) {
     }
     item.weight = _isFiniteNumber(item.weight) ? Math.max(0, item.weight) : _countBodyCellsFromItem(item);
     item.baseStats = _normalizeBaseStats(item.baseStats, item);
-    item.implicitPool = _normalizeAffixPool(item.implicitPool);
     item.prefixSlots = _normalizeSlotValue(item.prefixSlots, item.rarity, "prefixSlots");
     item.suffixSlots = _normalizeSlotValue(item.suffixSlots, item.rarity, "suffixSlots");
-    item.prefixPool = _normalizeAffixPool(item.prefixPool);
-    item.suffixPool = _normalizeAffixPool(item.suffixPool);
+    const explicitImplicitPool = _normalizeAffixPool(item.implicitPool);
+    const explicitPrefixPool = _normalizeAffixPool(item.prefixPool);
+    const explicitSuffixPool = _normalizeAffixPool(item.suffixPool);
+    item.implicitPool = explicitImplicitPool.length > 0 ? explicitImplicitPool : _resolveCategoryAffixPool(item, "implicit");
+    item.prefixPool = explicitPrefixPool.length > 0 ? explicitPrefixPool : _resolveCategoryAffixPool(item, "prefix");
+    item.suffixPool = explicitSuffixPool.length > 0 ? explicitSuffixPool : _resolveCategoryAffixPool(item, "suffix");
     return item;
 }
 

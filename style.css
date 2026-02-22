@@ -93,14 +93,16 @@ body {
 .bonus-display { display: flex; flex-direction: column; min-width: 110px; align-items: center; padding: 7px 16px; background: rgba(255, 215, 0, 0.1); border-radius: 10px; border: 1px solid rgba(255, 215, 0, 0.3); }
 .bonus-value { font-size: 1.15rem; font-weight: bold; color: var(--accent-gold); }
 
-.hp-header-container, .xp-header-container { 
+.hp-header-container, .stamina-header-container, .mana-header-container, .xp-header-container { 
     flex-grow: 1; max-width: 320px; height: 30px; background: #111; 
     border: 1px solid #444; border-radius: 7px; position: relative; 
     overflow: hidden; display: flex; align-items: center; justify-content: center; 
 }
 #hp-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-red); width: 100%; transition: width 0.3s; z-index: 1; }
-#xp-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-blue); width: 0%; transition: width 0.3s; z-index: 1; }
-#hp-text-header, #xp-text-header { position: relative; z-index: 5; font-size: 16px; font-weight: bold; text-shadow: 1px 1px 2px black; color: white; }
+#stamina-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: #b59a2f; width: 100%; transition: width 0.3s; z-index: 1; }
+#mana-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: #2f70d8; width: 100%; transition: width 0.3s; z-index: 1; }
+#xp-fill-header { position: absolute; left: 0; top: 0; height: 100%; background: #7f4dff; width: 0%; transition: width 0.3s; z-index: 1; }
+#hp-text-header, #stamina-text-header, #mana-text-header, #xp-text-header { position: relative; z-index: 5; font-size: 16px; font-weight: bold; text-shadow: 1px 1px 2px black; color: white; }
 
 /* =========================================
    4. CONTENT & GRIND
@@ -1556,6 +1558,18 @@ body.dragging .aura-overlay { opacity: 0.35 !important; }
 .options-audio-row span {
     text-align: right;
     font-family: Consolas, "Courier New", monospace;
+}
+
+.options-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.options-toggle-row label {
+    color: #cfcfcf;
 }
 
 /* SHOP GLOWS (Bleiben unverändert für den Leuchteffekt im Menü) */

@@ -36,7 +36,9 @@ let gameData = {
     },
     itemInstances: {},
     settings: {
-        itemTooltipsEnabled: true
+        itemTooltipsEnabled: true,
+        devMode: false,
+        affixDetailsEnabled: false
     },
     character: (typeof createDefaultCharacterState === "function")
         ? createDefaultCharacterState()
@@ -198,6 +200,12 @@ function ensureSettingsDefaults() {
     if (typeof gameData.settings.itemTooltipsEnabled !== 'boolean') {
         gameData.settings.itemTooltipsEnabled = true;
     }
+    if (typeof gameData.settings.devMode !== 'boolean') {
+        gameData.settings.devMode = false;
+    }
+    if (typeof gameData.settings.affixDetailsEnabled !== 'boolean') {
+        gameData.settings.affixDetailsEnabled = false;
+    }
     if (!gameData.settings.keybinds || typeof gameData.settings.keybinds !== 'object' || Array.isArray(gameData.settings.keybinds)) {
         gameData.settings.keybinds = {};
     }
@@ -222,6 +230,45 @@ function getAudioVolumePercent(channel) {
 function getAudioVolume(channel) {
     return getAudioVolumePercent(channel) / 100;
 }
+
+function isDevModeEnabled() {
+    const settings = ensureSettingsDefaults();
+    return !!(settings && settings.devMode === true);
+}
+
+function _syncDevModeOptionToggle() {
+    const checkbox = document.getElementById('option-dev-mode');
+    if (checkbox) checkbox.checked = isDevModeEnabled();
+}
+
+function isAffixDetailsEnabled() {
+    const settings = ensureSettingsDefaults();
+    return !!(settings && settings.affixDetailsEnabled === true);
+}
+window.isAffixDetailsEnabled = isAffixDetailsEnabled;
+
+function _syncAffixDetailsOptionToggle() {
+    const checkbox = document.getElementById('option-affix-details');
+    if (checkbox) checkbox.checked = isAffixDetailsEnabled();
+}
+
+function setDevModeSetting(enabled, options) {
+    const opts = options && typeof options === 'object' ? options : {};
+    ensureSettingsDefaults();
+    gameData.settings.devMode = !!enabled;
+    _syncDevModeOptionToggle();
+    if (opts.save !== false && typeof saveGame === 'function') saveGame();
+}
+window.setDevModeSetting = setDevModeSetting;
+
+function setAffixDetailsSetting(enabled, options) {
+    const opts = options && typeof options === 'object' ? options : {};
+    ensureSettingsDefaults();
+    gameData.settings.affixDetailsEnabled = !!enabled;
+    _syncAffixDetailsOptionToggle();
+    if (opts.save !== false && typeof saveGame === 'function') saveGame();
+}
+window.setAffixDetailsSetting = setAffixDetailsSetting;
 
 function getActiveKeybinding(actionId) {
     const settings = ensureSettingsDefaults();
@@ -656,6 +703,8 @@ function _renderOptionsKeybindList() {
 function renderOptionsTab() {
     _renderOptionsKeybindList();
     _syncAudioVolumeLabelsAndSliders();
+    _syncDevModeOptionToggle();
+    _syncAffixDetailsOptionToggle();
 }
 window.renderOptionsTab = renderOptionsTab;
 
@@ -1224,7 +1273,7 @@ function _logLegacyFallback(reason, details = {}) {
         ...details
     };
     console.warn(LEGACY_FALLBACK_TAG, payload);
-    _appendZoneCombatLog(`${LEGACY_FALLBACK_TAG}: ${reason}`);
+    _appendZoneCombatVerbose(`${LEGACY_FALLBACK_TAG}: ${reason}`);
 }
 
 function buildCharacterPanelPayload(gridKey) {
@@ -1536,6 +1585,11 @@ function _appendZoneCombatLog(line) {
     logBody.scrollTop = logBody.scrollHeight;
 }
 
+function _appendZoneCombatVerbose(line) {
+    if (!isDevModeEnabled()) return;
+    _appendZoneCombatLog(line);
+}
+
 function _appendZoneCombatEvent(eventType, payload = {}) {
     const type = (typeof eventType === 'string' && eventType) ? eventType : 'event';
     const event = {
@@ -1577,16 +1631,89 @@ function _isCombatWeaponItem(item) {
     return !!ZONE_COMBAT_WEAPON_TYPES[_resolveItemType(item)];
 }
 
+function _readItemModifierTotals(item, statPath) {
+    const output = { flat: 0, percent: 0 };
+    const modifiers = Array.isArray(item && item.modifiers) ? item.modifiers : [];
+    modifiers.forEach((modifier) => {
+        if (!modifier || modifier.statPath !== statPath) return;
+        const value = Number(modifier.value);
+        if (!Number.isFinite(value)) return;
+        if (modifier.type === 'flat') output.flat += value;
+        if (modifier.type === 'percent') output.percent += value;
+    });
+    return output;
+}
+
+function _applyPercentDelta(base, delta) {
+    const value = Number(base);
+    const mod = Number(delta);
+    if (!Number.isFinite(value)) return 0;
+    if (!Number.isFinite(mod)) return value;
+    return value * (1 + mod);
+}
+
 function _resolveWeaponActionCooldownMs(item) {
     if (!item || typeof item !== 'object') return ZONE_COMBAT_UNARMED_INTERVAL_MS;
     const explicitCooldown = Number(item.attackCooldownMs);
-    if (Number.isFinite(explicitCooldown) && explicitCooldown > 0) return _clampCooldownMs(explicitCooldown);
-    const explicitInterval = Number(item.attackIntervalMs);
-    if (Number.isFinite(explicitInterval) && explicitInterval > 0) return _clampCooldownMs(explicitInterval);
-    const attackSpeed = Number(item.attackSpeed);
-    if (Number.isFinite(attackSpeed) && attackSpeed > 0) return _clampCooldownMs(1000 / attackSpeed);
-    const byType = ZONE_DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE[_resolveItemType(item)];
-    return _clampCooldownMs(Number.isFinite(byType) ? byType : ZONE_COMBAT_UNARMED_INTERVAL_MS);
+    let cooldownMs = Number.isFinite(explicitCooldown) && explicitCooldown > 0
+        ? explicitCooldown
+        : NaN;
+    if (!Number.isFinite(cooldownMs) || cooldownMs <= 0) {
+        const byType = ZONE_DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE[_resolveItemType(item)];
+        cooldownMs = Number.isFinite(byType) ? byType : ZONE_COMBAT_UNARMED_INTERVAL_MS;
+    }
+    const cooldownModifiers = _readItemModifierTotals(item, 'attackCooldownMs');
+    if (cooldownModifiers.flat !== 0) {
+        cooldownMs += cooldownModifiers.flat;
+    }
+    if (cooldownModifiers.percent !== 0) {
+        cooldownMs *= (1 - cooldownModifiers.percent);
+    }
+    if (!Number.isFinite(cooldownMs) || cooldownMs <= 0) cooldownMs = ZONE_COMBAT_UNARMED_INTERVAL_MS;
+    return _clampCooldownMs(cooldownMs);
+}
+
+function _resolveWeaponActionDamageBaseRange(item) {
+    if (!item || typeof item !== 'object') return { min: 0, max: 0 };
+    const damageMin = Number(item.damageMin);
+    const damageMax = Number(item.damageMax);
+    if (Number.isFinite(damageMin) && Number.isFinite(damageMax)) {
+        const min = Math.max(0, Math.min(damageMin, damageMax));
+        const max = Math.max(min, Math.max(damageMin, damageMax));
+        return { min, max };
+    }
+    const damageFlat = Number(item.damageFlat);
+    if (Number.isFinite(damageFlat)) {
+        const value = Math.max(0, damageFlat);
+        return { min: value, max: value };
+    }
+    return { min: 0, max: 0 };
+}
+
+function _resolveWeaponActionDamageRange(item) {
+    const baseRange = _resolveWeaponActionDamageBaseRange(item);
+    let min = baseRange.min;
+    let max = baseRange.max;
+    const flatMods = _readItemModifierTotals(item, 'damageFlat');
+    const minMods = _readItemModifierTotals(item, 'damageMin');
+    const maxMods = _readItemModifierTotals(item, 'damageMax');
+    min += flatMods.flat + minMods.flat;
+    max += flatMods.flat + maxMods.flat;
+    min = _applyPercentDelta(min, flatMods.percent + minMods.percent);
+    max = _applyPercentDelta(max, flatMods.percent + maxMods.percent);
+    min = Math.max(0, min);
+    max = Math.max(min, max);
+    return { min, max };
+}
+
+function _resolveWeaponActionDamageValue(effect) {
+    if (!effect || typeof effect !== 'object') return 0;
+    const damageMin = Number(effect.damageMin);
+    const damageMax = Number(effect.damageMax);
+    if (!Number.isFinite(damageMin) || !Number.isFinite(damageMax)) return 0;
+    const min = Math.max(0, Math.min(damageMin, damageMax));
+    const max = Math.max(min, Math.max(damageMin, damageMax));
+    return (min + max) * 0.5;
 }
 
 function _resolveWeaponResourceCost(item) {
@@ -1597,9 +1724,18 @@ function _resolveWeaponResourceCost(item) {
     const itemMana = Number(item && item.manaCost);
     const objectStamina = Number(parsed.stamina);
     const objectMana = Number(parsed.mana);
+    let staminaCost = Number.isFinite(objectStamina)
+        ? objectStamina
+        : (Number.isFinite(itemStamina) ? itemStamina : ZONE_DEFAULT_WEAPON_STAMINA_COST);
+    const manaCost = Number.isFinite(objectMana)
+        ? objectMana
+        : (Number.isFinite(itemMana) ? itemMana : 0);
+    const staminaModifiers = _readItemModifierTotals(item, 'staminaCost');
+    staminaCost += staminaModifiers.flat;
+    staminaCost = _applyPercentDelta(staminaCost, staminaModifiers.percent);
     return {
-        stamina: Math.max(0, Number.isFinite(objectStamina) ? objectStamina : (Number.isFinite(itemStamina) ? itemStamina : ZONE_DEFAULT_WEAPON_STAMINA_COST)),
-        mana: Math.max(0, Number.isFinite(objectMana) ? objectMana : (Number.isFinite(itemMana) ? itemMana : 0))
+        stamina: Math.max(0, staminaCost),
+        mana: Math.max(0, manaCost)
     };
 }
 
@@ -1703,7 +1839,7 @@ function _buildActionDescriptorsForEquippedItems(stats, activeGridKey) {
         if (!_isCombatWeaponItem(item)) return;
         const baseCooldown = _resolveWeaponActionCooldownMs(item);
         const cooldownMs = _clampCooldownMs(baseCooldown * cooldownScale);
-        const damage = Math.max(0, Number(item.damage) || 0);
+        const damageRange = _resolveWeaponActionDamageRange(item);
         descriptors.push({
             key: `${instanceKey}::weapon_attack`,
             instanceKey,
@@ -1718,7 +1854,8 @@ function _buildActionDescriptorsForEquippedItems(stats, activeGridKey) {
             resourceCost: _resolveWeaponResourceCost(item),
             effect: {
                 type: 'weapon_attack',
-                damage
+                damageMin: damageRange.min,
+                damageMax: damageRange.max
             },
             order: (entryIdx * 10)
         });
@@ -1849,7 +1986,7 @@ function _processZoneCombatItemActions(stepMs, stats, activeGridKey, monster) {
             _payResourceCost(runtime.resourceCost);
             const remaining = _readPlayerResourceSnapshot();
             if (runtime.kind === 'weapon') {
-                const damage = Math.max(0, Number(runtime.effect && runtime.effect.damage) || 0);
+                const damage = _resolveWeaponActionDamageValue(runtime.effect);
                 if (monster) {
                     monster.hp = Math.max(0, (Number.isFinite(monster.hp) ? monster.hp : 0) - damage);
                 }
@@ -2059,8 +2196,13 @@ function _renderZoneCombatHud() {
     ui.monsterCdText.textContent = zoneCombatState.active ? `${(monsterRemaining / 1000).toFixed(2)}s (${Math.ceil(monsterRemaining)}ms)` : '--';
 
     const resources = _readPlayerResourceSnapshot();
+    const activeGridKey = getActiveCombatGridKey();
+    const characterStats = getDerivedCharacterStats(activeGridKey);
+    const staminaRegenPerSec = (characterStats && Number.isFinite(characterStats.staminaRegen))
+        ? characterStats.staminaRegen
+        : 0;
     if (ui.staminaText) {
-        ui.staminaText.textContent = `Stamina: ${resources.stamina.toFixed(1)}`;
+        ui.staminaText.textContent = `Stamina: ${resources.stamina.toFixed(1)} | St-Reg/sek: ${staminaRegenPerSec.toFixed(2)}`;
     }
     if (ui.manaText) {
         ui.manaText.textContent = `Mana: ${resources.mana.toFixed(1)}`;
@@ -2956,7 +3098,11 @@ function renderZoneView(zoneId) {
         _syncZoneCombatActionRuntime(startStats, activeGridKey);
         _refreshZoneMonsterTiming(spawned, true);
         const actionCount = _getSortedActionRuntimeEntries().length;
-        _appendZoneCombatLog(`Combat start | actions=${actionCount} | tick=${ZONE_COMBAT_TICK_MS}ms`);
+        _appendZoneCombatVerbose(`Combat start | actions=${actionCount} | tick=${ZONE_COMBAT_TICK_MS}ms`);
+        const actionSummary = _getSortedActionRuntimeEntries()
+            .map((entry) => `${entry.itemId || entry.actionId || 'item'}:${Math.round(Number(entry.cooldownMs) || 0)}ms`)
+            .join(', ');
+        _appendZoneCombatVerbose(`Combat actions | ${actionSummary || 'none'}`);
         _renderZoneMonsterUI();
         _renderZoneCombatHud();
     });
@@ -3203,6 +3349,7 @@ function handleWorkClick() {
 function updateLogic() {
     const now = Date.now();
     const dt = (now - gameData.lastUpdate) / 1000;
+    const fixedStepSec = ZONE_COMBAT_TICK_MS / 1000;
     gameData.lastUpdate = now;
 
     const combatGridKey = getActiveCombatGridKey();
@@ -3214,11 +3361,18 @@ function updateLogic() {
     if (characterStats && gameData.character && gameData.character.base) {
         const base = gameData.character.base;
         const lifeRegen = (typeof characterStats.lifeRegen === 'number') ? characterStats.lifeRegen : gameData.hpRegen;
+        const staminaRegen = (typeof characterStats.staminaRegen === 'number') ? characterStats.staminaRegen : 1;
         if (typeof base.currentLife !== 'number') {
             base.currentLife = characterStats.life;
         }
+        if (typeof base.currentStamina !== 'number') {
+            base.currentStamina = characterStats.stamina;
+        }
         if (base.currentLife < characterStats.life) {
             base.currentLife = Math.min(characterStats.life, base.currentLife + (lifeRegen * dt));
+        }
+        if (base.currentStamina < characterStats.stamina) {
+            base.currentStamina = Math.min(characterStats.stamina, base.currentStamina + (staminaRegen * fixedStepSec));
         }
         if (typeof syncLegacyCharacterFields === 'function') {
             syncLegacyCharacterFields(gameData, characterStats);
@@ -3254,6 +3408,30 @@ function _getHudStats() {
                 : (Number.isFinite(gameData.hp) ? gameData.hp : 0)
         )
     );
+    const maxMana = Math.max(
+        0,
+        Number.isFinite(derived.maxMana) ? derived.maxMana
+            : (Number.isFinite(derived.mana) ? derived.mana : (Number.isFinite(base.baseMana) ? base.baseMana : 0))
+    );
+    const currentMana = Math.max(
+        0,
+        Math.min(
+            maxMana,
+            Number.isFinite(base.currentMana) ? base.currentMana : 0
+        )
+    );
+    const maxStamina = Math.max(
+        1,
+        Number.isFinite(derived.maxStamina) ? derived.maxStamina
+            : (Number.isFinite(derived.stamina) ? derived.stamina : (Number.isFinite(base.baseStamina) ? base.baseStamina : 1))
+    );
+    const currentStamina = Math.max(
+        0,
+        Math.min(
+            maxStamina,
+            Number.isFinite(base.currentStamina) ? base.currentStamina : 0
+        )
+    );
     const xp = Number.isFinite(base.xp) ? base.xp
         : (Number.isFinite(gameData.xp) ? gameData.xp : 0);
     const xpToNextLevel = Number.isFinite(derived.xpToNextLevel)
@@ -3263,6 +3441,10 @@ function _getHudStats() {
     return {
         currentLife,
         maxLife,
+        currentMana,
+        maxMana,
+        currentStamina,
+        maxStamina,
         xp,
         xpToNextLevel
     };
@@ -3280,12 +3462,20 @@ function updateUI() {
     setW('work-fill', 0);
     const hud = _getHudStats();
     const hpFillRaw = hud.maxLife > 0 ? (hud.currentLife / hud.maxLife) * 100 : 0;
+    const staminaFillRaw = hud.maxStamina > 0 ? (hud.currentStamina / hud.maxStamina) * 100 : 0;
+    const manaFillRaw = hud.maxMana > 0 ? (hud.currentMana / hud.maxMana) * 100 : 0;
     const xpFillRaw = hud.xpToNextLevel > 0 ? (hud.xp / hud.xpToNextLevel) * 100 : 0;
     const hpFill = Math.max(0, Math.min(100, hpFillRaw));
+    const staminaFill = Math.max(0, Math.min(100, staminaFillRaw));
+    const manaFill = Math.max(0, Math.min(100, manaFillRaw));
     const xpFill = Math.max(0, Math.min(100, xpFillRaw));
     setW('hp-fill-header', hpFill);
+    setW('stamina-fill-header', staminaFill);
+    setW('mana-fill-header', manaFill);
     setW('xp-fill-header', xpFill);
     setT('hp-text-header', `HP: ${Math.ceil(hud.currentLife)} / ${Math.ceil(hud.maxLife)}`);
+    setT('stamina-text-header', `STA: ${Math.ceil(hud.currentStamina)} / ${Math.ceil(hud.maxStamina)}`);
+    setT('mana-text-header', `MANA: ${Math.ceil(hud.currentMana)} / ${Math.ceil(hud.maxMana)}`);
     setT('xp-text-header', `XP: ${Math.floor(hud.xp)} / ${Math.floor(hud.xpToNextLevel)}`);
     
     if (gameData.currentMonster) {
@@ -3694,6 +3884,8 @@ window.onload = () => {
     }
     ensureSettingsDefaults();
     _syncAudioVolumeLabelsAndSliders();
+    _syncDevModeOptionToggle();
+    _syncAffixDetailsOptionToggle();
     _syncActiveAudioVolumes();
     _ensureMusicLoopRunning(true);
     markCharacterDirty();

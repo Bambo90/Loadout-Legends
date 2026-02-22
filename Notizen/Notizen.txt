@@ -81,3 +81,11 @@ Inventar:
 FARM PVE PVP zusammenlegen, Rechts davon Anzeige der Itemmutatoren, Aüsrüstung um ein Sub menu Verringern. 
 
 Charakter Sheet.
+
+Speichern 
+git add -A
+git commit -m "pre-codex: weapon cooldown base"
+
+1 Schritt zurück
+git reset --hard HEAD
+git clean -fd

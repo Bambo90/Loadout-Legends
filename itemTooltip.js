@@ -30,9 +30,13 @@
         "damage.pierce.max": "Pierce Damage Max",
         "damage.blunt.min": "Blunt Damage Min",
         "damage.blunt.max": "Blunt Damage Max",
+        "damageFlat": "Damage",
+        "damageMin": "Damage Min",
+        "damageMax": "Damage Max",
         "armor.slash": "Slash Armor",
         "armor.pierce": "Pierce Armor",
         "armor.blunt": "Blunt Armor",
+        "attackCooldownMs": "Attack Cooldown",
         "attackIntervalMs": "Attack Interval (ms)",
         "attackSpeed": "Attack Speed",
         "xpGainMultiplier": "XP Gain",
@@ -40,6 +44,9 @@
         "life": "Life",
         "mana": "Mana",
         "stamina": "Stamina",
+        "staminaRegen": "Stamina Regen",
+        "manaRegen": "Mana Regen",
+        "staminaCost": "Stamina Cost",
         "weightLimit": "Weight Limit"
     });
 
@@ -141,11 +148,18 @@
 
     function _formatNumber(value) {
         if (!Number.isFinite(value)) return "0";
-        const abs = Math.abs(value);
-        if (abs >= 100) return String(Math.round(value));
-        if (abs >= 10) return value.toFixed(2).replace(/\.00$/, "");
-        if (abs >= 1) return value.toFixed(2).replace(/\.00$/, "");
-        return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+        const rounded = Number(value.toFixed(2));
+        if (Number.isInteger(rounded)) return String(rounded);
+        return rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+    }
+
+    function _isIntegerLikeStatPath(statPath) {
+        if (typeof statPath !== "string" || !statPath) return false;
+        if (statPath === "life" || statPath === "mana" || statPath === "stamina" || statPath === "weightLimit" || statPath === "staminaCost") return true;
+        if (statPath === "damageFlat" || statPath === "damageMin" || statPath === "damageMax") return true;
+        if (statPath.startsWith("armor.")) return true;
+        if (statPath.startsWith("damage.")) return true;
+        return false;
     }
 
     function _normalizeModifier(rawModifier) {
@@ -163,14 +177,20 @@
     function _formatModifierValue(modifier) {
         const normalized = _normalizeModifier(modifier);
         if (!normalized) return "0";
-        const value = normalized.value;
+        let value = normalized.value;
+        if (normalized.statPath === "attackCooldownMs" && normalized.type === "percent") {
+            value = -value;
+        }
         if (normalized.type === "percent") {
             const percent = value * 100;
             const sign = percent > 0 ? "+" : "";
             return `${sign}${_formatNumber(percent)}%`;
         }
         const sign = value > 0 ? "+" : "";
-        return `${sign}${_formatNumber(value)}`;
+        const valueText = _isIntegerLikeStatPath(normalized.statPath)
+            ? String(Math.round(value))
+            : _formatNumber(value);
+        return `${sign}${valueText}`;
     }
 
     function _modifierKey(modifier) {
@@ -184,8 +204,6 @@
         const cell = ctx.cell && typeof ctx.cell === "object" ? ctx.cell : null;
 
         if (ctx.itemInstance && typeof ctx.itemInstance === "object") return ctx.itemInstance;
-        if (ctx.item && typeof ctx.item === "object") return ctx.item;
-        if (ctx.itemDef && typeof ctx.itemDef === "object") return ctx.itemDef;
 
         if (cell && cell.itemId) {
             if (typeof getItemDefinition === "function") {
@@ -201,6 +219,9 @@
                 if (base) return base;
             }
         }
+
+        if (ctx.item && typeof ctx.item === "object") return ctx.item;
+        if (ctx.itemDef && typeof ctx.itemDef === "object") return ctx.itemDef;
 
         if (typeof ctx.itemId === "string" && ctx.itemId) {
             if (typeof getItemDefById === "function") {
@@ -266,14 +287,63 @@
         return affixDef.tiers.find((tierEntry) => tierEntry && tierEntry.tier === tierValue) || null;
     }
 
+    function _isRollWithinTierBounds(rollValue, tierDef) {
+        if (!_isFiniteNumber(rollValue) || !tierDef) return false;
+        const min = Number.isFinite(tierDef.min) ? Math.min(tierDef.min, tierDef.max) : null;
+        const max = Number.isFinite(tierDef.max) ? Math.max(tierDef.min, tierDef.max) : null;
+        if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
+        const epsilon = 0.0001;
+        return rollValue >= (min - epsilon) && rollValue <= (max + epsilon);
+    }
+
+    function _resolveAffixTierForRoll(affixDef, rollEntry) {
+        if (!affixDef || !Array.isArray(affixDef.tiers)) return null;
+        const rollValue = Number(rollEntry && rollEntry.roll);
+        const storedTier = _isFiniteNumber(rollEntry && rollEntry.tier) ? Math.max(1, Math.floor(rollEntry.tier)) : null;
+        let tierDef = storedTier ? _findAffixTier(affixDef, storedTier) : null;
+        if (tierDef && _isFiniteNumber(rollValue) && !_isRollWithinTierBounds(rollValue, tierDef)) {
+            tierDef = null;
+        }
+        if (!tierDef && _isFiniteNumber(rollValue)) {
+            tierDef = affixDef.tiers.find((candidate) => _isRollWithinTierBounds(rollValue, candidate)) || null;
+        }
+        return tierDef;
+    }
+
+    function _mapTierToDisplayRank(affixDef, actualTier) {
+        if (!affixDef || !Array.isArray(affixDef.tiers) || !_isFiniteNumber(actualTier)) return actualTier;
+        const ranked = affixDef.tiers
+            .filter(Boolean)
+            .slice()
+            .sort((a, b) => {
+                const ai = Number.isFinite(a.requiredIlvl) ? a.requiredIlvl : 0;
+                const bi = Number.isFinite(b.requiredIlvl) ? b.requiredIlvl : 0;
+                if (bi !== ai) return bi - ai;
+                const at = Number.isFinite(a.tier) ? a.tier : 0;
+                const bt = Number.isFinite(b.tier) ? b.tier : 0;
+                return bt - at;
+            });
+        const idx = ranked.findIndex((entry) => entry && entry.tier === actualTier);
+        return idx >= 0 ? (idx + 1) : actualTier;
+    }
+
     function _formatAffixName(affixId, affixDef) {
+        if (affixDef && typeof affixDef.displayName === "string" && affixDef.displayName) return affixDef.displayName;
         if (affixDef && typeof affixDef.name === "string" && affixDef.name) return affixDef.name;
         const raw = typeof affixId === "string" ? affixId : "";
         if (!raw) return "Affix";
         return raw
             .replace(/^(implicit_|prefix_|suffix_)/, "")
+            .replace(/^(weapon_|armor_|jewelry_)/, "")
+            .replace(/^of_/, "")
             .replace(/_/g, " ")
             .replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    function _formatAffixEffectText(modifier) {
+        const normalized = _normalizeModifier(modifier);
+        if (!normalized) return "";
+        return `${_formatStatLabel(normalized.statPath)} ${_formatModifierValue(normalized)}`;
     }
 
     function _buildAffixRows(rollList) {
@@ -293,13 +363,19 @@
                     value: rollEntry.roll
                 });
                 if (!modifier) return null;
-                const tier = _isFiniteNumber(rollEntry.tier) ? Math.max(1, Math.floor(rollEntry.tier)) : 1;
-                const tierDef = _findAffixTier(affixDef, tier);
+                const tierDef = _resolveAffixTierForRoll(affixDef, rollEntry);
+                const tierActual = (tierDef && _isFiniteNumber(tierDef.tier))
+                    ? Math.max(1, Math.floor(tierDef.tier))
+                    : (_isFiniteNumber(rollEntry.tier) ? Math.max(1, Math.floor(rollEntry.tier)) : 1);
+                const tierDisplay = _mapTierToDisplayRank(affixDef, tierActual);
                 return {
+                    affixId: rollEntry.affixId,
                     name: _formatAffixName(rollEntry.affixId, affixDef),
-                    tier,
+                    tier: tierDisplay,
+                    tierActual,
                     min: tierDef && _isFiniteNumber(tierDef.min) ? tierDef.min : null,
                     max: tierDef && _isFiniteNumber(tierDef.max) ? tierDef.max : null,
+                    roll: rollEntry.roll,
                     modifier,
                     key: _modifierKey(modifier)
                 };
@@ -327,20 +403,35 @@
             .join("");
     }
 
+    function _isAffixDetailsEnabled() {
+        if (typeof isAffixDetailsEnabled === "function") {
+            return !!isAffixDetailsEnabled();
+        }
+        const settings = _ensureGameSettings();
+        return !!(settings && settings.affixDetailsEnabled === true);
+    }
+
     function _renderAffixRows(rows) {
         if (!Array.isArray(rows) || rows.length === 0) {
             return `<div class="item-tooltip-empty">${_escapeHtml(_label("empty"))}</div>`;
         }
+        const showDetails = _isAffixDetailsEnabled();
         return rows.map((entry) => {
+            const effectText = _formatAffixEffectText(entry.modifier);
             const rangeText = (Number.isFinite(entry.min) && Number.isFinite(entry.max))
-                ? `${_label("range")} ${_formatNumber(entry.min)}-${_formatNumber(entry.max)}`
+                ? `${_label("range")} ${_formatModifierValue({ statPath: entry.modifier.statPath, type: entry.modifier.type, value: entry.min })}–${_formatModifierValue({ statPath: entry.modifier.statPath, type: entry.modifier.type, value: entry.max })}`
                 : `${_label("range")} -`;
             const tierText = `${_label("tier")}${entry.tier}`;
+            const rollText = `${_label("roll")} ${_formatModifierValue({ statPath: entry.modifier.statPath, type: entry.modifier.type, value: entry.roll })}`;
+            const detailsHtml = showDetails
+                ? `<div class="item-tooltip-row"><span class="item-tooltip-stat"><span class="item-tooltip-source">${_escapeHtml(`${tierText} (${rangeText}) ${rollText}`)}</span></span><span class="item-tooltip-value"></span></div>`
+                : "";
             return (
                 `<div class="item-tooltip-row">` +
-                    `<span class="item-tooltip-stat">${_escapeHtml(entry.name)} <span class="item-tooltip-source">(${_escapeHtml(tierText)} | ${_escapeHtml(rangeText)})</span></span>` +
-                    `<span class="item-tooltip-value">${_escapeHtml(_formatModifierValue(entry.modifier))}</span>` +
-                `</div>`
+                    `<span class="item-tooltip-stat">${_escapeHtml(effectText)}</span>` +
+                    `<span class="item-tooltip-value">${_escapeHtml(entry.name)}</span>` +
+                `</div>` +
+                detailsHtml
             );
         }).join("");
     }
@@ -420,6 +511,20 @@
 
         if (legacyModifiers.length > 0) {
             sections.push(_renderSection(_label("legacy"), _renderModifierRows(legacyModifiers)));
+        }
+        const devModeEnabled = (typeof isDevModeEnabled === "function")
+            ? isDevModeEnabled()
+            : !!(typeof gameData !== "undefined" && gameData && gameData.settings && gameData.settings.devMode === true);
+        if (devModeEnabled) {
+            const ctx = context && typeof context === "object" ? context : {};
+            const cell = ctx.cell && typeof ctx.cell === "object" ? ctx.cell : null;
+            const debugItemId = runtimeItem.id || runtimeItem.itemId || baseItem.id || baseItem.itemId || ctx.itemId || "--";
+            const debugInstanceId = (cell && cell.instanceId) ? cell.instanceId : "--";
+            const affixCount =
+                (Array.isArray(runtimeItem.implicits) ? runtimeItem.implicits.length : 0) +
+                (Array.isArray(runtimeItem.prefixes) ? runtimeItem.prefixes.length : 0) +
+                (Array.isArray(runtimeItem.suffixes) ? runtimeItem.suffixes.length : 0);
+            sections.push(`<section class="item-tooltip-section"><div class="item-tooltip-section-title">Debug</div><div class="item-tooltip-section-body"><div class="item-tooltip-row"><span class="item-tooltip-stat">${_escapeHtml(`id=${debugItemId} | inst=${debugInstanceId} | affixes=${affixCount}`)}</span><span class="item-tooltip-value"></span></div></div></section>`);
         }
 
         return (
@@ -562,6 +667,25 @@
     function _onGlobalKeyDown(event) {
         if (!event || event.repeat) return;
         if (typeof window.isKeybindCaptureActive === "function" && window.isKeybindCaptureActive()) return;
+        const target = event.target;
+        const isTextInput = !!(target && (
+            target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.tagName === "SELECT" ||
+            target.isContentEditable
+        ));
+        const isDetailsToggleKey = event.code === "KeyD" || (typeof event.key === "string" && event.key.toLowerCase() === "d");
+        if (isDetailsToggleKey && !isTextInput) {
+            const nextValue = !_isAffixDetailsEnabled();
+            if (typeof setAffixDetailsSetting === "function") {
+                setAffixDetailsSetting(nextValue);
+            } else {
+                const settings = _ensureGameSettings();
+                if (settings) settings.affixDetailsEnabled = nextValue;
+            }
+            event.preventDefault();
+            return;
+        }
         const isToggleKey = (typeof window.matchesActionKeybinding === "function")
             ? window.matchesActionKeybinding("toggleTooltips", event)
             : event.key === "Alt";
