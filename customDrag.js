@@ -20,6 +20,11 @@ let _perfFrameTimes = [];
 let _perfLastFrameTime = 0;
 let _perfEnabled = false; // Set to true to enable perf logging
 
+function _readSpriteOffset(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+}
+
 // ===== ROTATION UTILITIES =====
 function rotateMatrixCW(matrix) {
     const h = matrix.length;
@@ -427,6 +432,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     // ADD ICON / SPRITE LAST (on top)
     const rotationDeg = draggedItem.rotationIndex * 90;
     if (item.sprite || item.image) {
+        const spriteOffsetX = _readSpriteOffset(item.spriteOffsetX);
+        const spriteOffsetY = _readSpriteOffset(item.spriteOffsetY);
         const wrapper = document.createElement('div');
         wrapper.style.position = 'absolute';
         wrapper.style.top = '0';
@@ -436,6 +443,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         wrapper.style.display = 'flex';
         wrapper.style.alignItems = 'center';
         wrapper.style.justifyContent = 'center';
+        wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
         wrapper.style.pointerEvents = 'none';
         wrapper.style.zIndex = '100';
         
@@ -595,6 +603,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         // ADD ICON / SPRITE (on top)
         const rotationDeg = draggedItem.rotationIndex * 90;
         if (draggedItem.item.sprite || draggedItem.item.image) {
+            const spriteOffsetX = _readSpriteOffset(draggedItem.item.spriteOffsetX);
+            const spriteOffsetY = _readSpriteOffset(draggedItem.item.spriteOffsetY);
             const wrapper = document.createElement('div');
             wrapper.style.position = 'absolute';
             wrapper.style.top = '0';
@@ -604,6 +614,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             wrapper.style.display = 'flex';
             wrapper.style.alignItems = 'center';
             wrapper.style.justifyContent = 'center';
+            wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
             wrapper.style.pointerEvents = 'none';
             wrapper.style.zIndex = '100';
             

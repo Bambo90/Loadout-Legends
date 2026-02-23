@@ -10,16 +10,19 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
         type: "tool",
         rarity: "common",
         icon: "⛏️",
+        sprite: "Media/Images/Items/Tools/Pick-Axe_A.png",
+        spriteOffsetX: 1,
+        spriteOffsetY: 6,
         price: 25,
         inShop: true,
         req: 1,
         speedBonus: 1.05,
         desc: "Besser als mit den Händen zu graben.",
         rotations: {
-            0: { grid: [["A", "A", "A"], ["0", "B", "0"], ["0", "A", "0"]] },
-            1: { grid: [["0", "0", "A"], ["A", "B", "A"], ["0", "0", "A"]] },
-            2: { grid: [["0", "A", "0"], ["0", "B", "0"], ["A", "A", "A"]] },
-            3: { grid: [["A", "0", "0"], ["A", "B", "A"], ["A", "0", "0"]] }
+            0: { grid: [["A", "B", "B", "B", "A"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "A", "0", "0"]] },
+            1: { grid: [["0", "0", "0", "A"], ["0", "0", "0", "B"], ["A", "B", "B", "B"], ["0", "0", "0", "B"], ["0", "0", "0", "A"]] },
+            2: { grid: [["0", "0", "A", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["A", "B", "B", "B", "A"]] },
+            3: { grid: [["A", "0", "0", "0"], ["B", "0", "0", "0"], ["B", "B", "B", "A"], ["B", "0", "0", "0"], ["A", "0", "0", "0"]] }
         }
     },
     {
@@ -28,16 +31,19 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
         type: "tool",
         rarity: "magic",
         icon: "⛏️",
+        sprite: "Media/Images/Items/Tools/Pick-Axe_A.png",
+        spriteOffsetX: 7,
+        spriteOffsetY: 16,
         price: 150,
         inShop: true,
         req: 3,
         speedBonus: 1.2,
         desc: "Solider Stahl für ehrliche Arbeit.",
         rotations: {
-            0: { grid: [["A", "A", "A"], ["0", "B", "0"], ["0", "A", "0"]] },
-            1: { grid: [["0", "0", "A"], ["A", "B", "A"], ["0", "0", "A"]] },
-            2: { grid: [["0", "A", "0"], ["0", "B", "0"], ["A", "A", "A"]] },
-            3: { grid: [["A", "0", "0"], ["A", "B", "A"], ["A", "0", "0"]] }
+            0: { grid: [["A", "B", "B", "B", "A"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "A", "0", "0"]] },
+            1: { grid: [["0", "0", "0", "A"], ["0", "0", "0", "B"], ["A", "B", "B", "B"], ["0", "0", "0", "B"], ["0", "0", "0", "A"]] },
+            2: { grid: [["0", "0", "A", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["A", "B", "B", "B", "A"]] },
+            3: { grid: [["A", "0", "0", "0"], ["B", "0", "0", "0"], ["B", "B", "B", "A"], ["B", "0", "0", "0"], ["A", "0", "0", "0"]] }
         }
     },
     {
@@ -46,16 +52,19 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
         type: "tool",
         rarity: "rare",
         icon: "⛏️",
+        sprite: "Media/Images/Items/Tools/Pick-Axe_A.png",
+        spriteOffsetX: 1,
+        spriteOffsetY: 6,
         price: 500,
         inShop: true,
         req: 7,
         speedBonus: 1.45,
         desc: "Damit knackst du jeden Fels.",
         rotations: {
-            0: { grid: [["A", "A", "A"], ["0", "B", "0"], ["0", "A", "0"]] },
-            1: { grid: [["0", "0", "A"], ["A", "B", "A"], ["0", "0", "A"]] },
-            2: { grid: [["0", "A", "0"], ["0", "B", "0"], ["A", "A", "A"]] },
-            3: { grid: [["A", "0", "0"], ["A", "B", "A"], ["A", "0", "0"]] }
+            0: { grid: [["A", "B", "B", "B", "A"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "A", "0", "0"]] },
+            1: { grid: [["0", "0", "0", "A"], ["0", "0", "0", "B"], ["A", "B", "B", "B"], ["0", "0", "0", "B"], ["0", "0", "0", "A"]] },
+            2: { grid: [["0", "0", "A", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["A", "B", "B", "B", "A"]] },
+            3: { grid: [["A", "0", "0", "0"], ["B", "0", "0", "0"], ["B", "B", "B", "A"], ["B", "0", "0", "0"], ["A", "0", "0", "0"]] }
         }
     },
     {
@@ -64,6 +73,9 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
         type: "tool",
         rarity: "unique",
         icon: "⛏️",
+        sprite: "Media/Images/Items/Tools/Pick-Axe_A.png",
+        spriteOffsetX: 1,
+        spriteOffsetY: 6,
         price: 2000,
         inShop: false,
         dropSources: ["gold_golem", "treasure_mimic"],
@@ -72,10 +84,10 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
         speedBonus: 1.8,
         desc: "Glänzt und arbeitet fast von allein.",
         rotations: {
-            0: { grid: [["A", "A", "A"], ["0", "B", "0"], ["0", "A", "0"]] },
-            1: { grid: [["0", "0", "A"], ["A", "B", "A"], ["0", "0", "A"]] },
-            2: { grid: [["0", "A", "0"], ["0", "B", "0"], ["A", "A", "A"]] },
-            3: { grid: [["A", "0", "0"], ["A", "B", "A"], ["A", "0", "0"]] }
+            0: { grid: [["A", "B", "B", "B", "A"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "A", "0", "0"]] },
+            1: { grid: [["0", "0", "0", "A"], ["0", "0", "0", "B"], ["A", "B", "B", "B"], ["0", "0", "0", "B"], ["0", "0", "0", "A"]] },
+            2: { grid: [["0", "0", "A", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["A", "B", "B", "B", "A"]] },
+            3: { grid: [["A", "0", "0", "0"], ["B", "0", "0", "0"], ["B", "B", "B", "A"], ["B", "0", "0", "0"], ["A", "0", "0", "0"]] }
         }
     },
     {
@@ -84,6 +96,9 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
         type: "tool",
         rarity: "legendary",
         icon: "⛏️",
+        sprite: "Media/Images/Items/Tools/Pick-Axe_A.png",
+        spriteOffsetX: 1,
+        spriteOffsetY: 6,
         price: 10000,
         inShop: false,
         dropSources: ["lava_dragon"],
@@ -92,10 +107,10 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
         speedBonus: 2.5,
         desc: "Ein Relikt aus alter Zeit.",
         rotations: {
-            0: { grid: [["A", "A", "A"], ["0", "B", "0"], ["0", "A", "0"]] },
-            1: { grid: [["0", "0", "A"], ["A", "B", "A"], ["0", "0", "A"]] },
-            2: { grid: [["0", "A", "0"], ["0", "B", "0"], ["A", "A", "A"]] },
-            3: { grid: [["A", "0", "0"], ["A", "B", "A"], ["A", "0", "0"]] }
+            0: { grid: [["A", "B", "B", "B", "A"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "A", "0", "0"]] },
+            1: { grid: [["0", "0", "0", "A"], ["0", "0", "0", "B"], ["A", "B", "B", "B"], ["0", "0", "0", "B"], ["0", "0", "0", "A"]] },
+            2: { grid: [["0", "0", "A", "0", "0"], ["0", "0", "B", "0", "0"], ["0", "0", "B", "0", "0"], ["A", "B", "B", "B", "A"]] },
+            3: { grid: [["A", "0", "0", "0"], ["B", "0", "0", "0"], ["B", "B", "B", "A"], ["B", "0", "0", "0"], ["A", "0", "0", "0"]] }
         }
     }
 ];
@@ -103,3 +118,6 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
 if (typeof window !== "undefined") {
     window.ITEMS_ENHANCEMENTS_WHETSTONES = ITEMS_ENHANCEMENTS_WHETSTONES;
 }
+
+
+

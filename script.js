@@ -144,6 +144,7 @@ const audioRuntime = {
     musicQueue: [],
     ambientQueue: [],
     coastActive: false,
+    settingsReady: false,
     unlockListenerBound: false
 };
 
@@ -451,6 +452,8 @@ function _bindAudioUnlockListener() {
     if (audioRuntime.unlockListenerBound) return;
     audioRuntime.unlockListenerBound = true;
     const onUserInteract = () => {
+        // Prevent autoplay with default volumes before save settings are loaded.
+        if (!audioRuntime.settingsReady) return;
         _ensureMusicLoopRunning(true);
         _syncAmbientLoopState(true);
     };
@@ -725,7 +728,6 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
 
 ensureSettingsDefaults();
 _bindAudioUnlockListener();
-_ensureMusicLoopRunning();
 
 function _getUISoundBase(soundKey) {
     const path = UI_SOUND_PATHS[soundKey];
@@ -3883,6 +3885,7 @@ window.onload = () => {
         ensureBattlefieldData(gameData);
     }
     ensureSettingsDefaults();
+    audioRuntime.settingsReady = true;
     _syncAudioVolumeLabelsAndSliders();
     _syncDevModeOptionToggle();
     _syncAffixDetailsOptionToggle();

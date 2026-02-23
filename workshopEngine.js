@@ -27,6 +27,11 @@ function _getGridDimensions(location) {
     };
 }
 
+function _readSpriteOffset(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+}
+
 function _findFirstPlacementIndex(grid, shape, cols, rows) {
     const maxSlots = cols * rows;
     for (let i = 0; i < maxSlots; i++) {
@@ -219,6 +224,8 @@ function createSlot(container, location, index, cols) {
     // Prefer sprite image overlay when available, centered above the body.
     const rotationDeg = rotationIndex * 90;
     if (item.sprite || item.image) {
+        const spriteOffsetX = _readSpriteOffset(item.spriteOffsetX);
+        const spriteOffsetY = _readSpriteOffset(item.spriteOffsetY);
         const wrapper = document.createElement('div');
         wrapper.style.position = 'absolute';
         wrapper.style.left = '0';
@@ -228,6 +235,7 @@ function createSlot(container, location, index, cols) {
         wrapper.style.display = 'flex';
         wrapper.style.alignItems = 'center';
         wrapper.style.justifyContent = 'center';
+        wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
         wrapper.style.pointerEvents = 'none';
         wrapper.style.zIndex = '110';
         
