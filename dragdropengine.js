@@ -31,6 +31,7 @@ function handleDropInSlot(e) {
     e.preventDefault();
     const draggedItem = DragSystem.getDraggedItem();
     if (!draggedItem) return;
+    const debugPlacement = (typeof window !== 'undefined' && window.DEBUG_PLACEMENT === true);
 
     const slot = e.currentTarget;
     const location = slot.dataset.location;
@@ -93,7 +94,7 @@ function handleDropInSlot(e) {
     const originY = mouseY - adjustedOffsetY;
     const finalOriginIndex = originY * cols + originX;
     
-    console.log('🔷 DROP ATTEMPT ->', { 
+    if (debugPlacement) console.debug('🔷 DROP ATTEMPT ->', { 
         location, targetIndex, cols, maxRows,
         bodyShape: JSON.stringify(bodyShape),
         bodyDim: { h: bodyH, w: bodyW },
@@ -106,7 +107,7 @@ function handleDropInSlot(e) {
         crossGrid: location !== draggedItem.fromLocation
     });
     
-    console.log('  📌 Grid bounds: cols=', cols, 'maxRows=', maxRows, '| Body would occupy X:', originX, 'to', originX + bodyW - 1, '| Y:', originY, 'to', originY + bodyH - 1);
+    if (debugPlacement) console.debug('  📌 Grid bounds: cols=', cols, 'maxRows=', maxRows, '| Body would occupy X:', originX, 'to', originX + bodyW - 1, '| Y:', originY, 'to', originY + bodyH - 1);
 
     // Helper: Check if body has ANY overlap with grid (not "fully inside")
     // Backpack Battles: Body only needs 1 cell touching grid, can partially extend outside
@@ -153,10 +154,10 @@ function handleDropInSlot(e) {
     // 3. If overlap but no valid placement found → Snap back
     const hasOverlap = hasBodyOverlapWithGrid(bodyShape, originX, originY, cols, maxRows);
     
-    console.log('  🔍 Body overlap check:', hasOverlap ? '✅ HAS OVERLAP' : '❌ NO OVERLAP (completely outside)');
+    if (debugPlacement) console.debug('  🔍 Body overlap check:', hasOverlap ? '✅ HAS OVERLAP' : '❌ NO OVERLAP (completely outside)');
     
     if (!hasOverlap) {
-        console.log('❌ BODY COMPLETELY OUTSIDE GRID (no overlap) - snapping back to Storage');
+        if (debugPlacement) console.debug('❌ BODY COMPLETELY OUTSIDE GRID (no overlap) - snapping back to Storage');
         const fromCols = draggedItem && draggedItem.fromCols ? draggedItem.fromCols : (draggedItem && draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
         placeItemIntoGrid(
             gameData[draggedItem.fromLocation],
@@ -176,10 +177,10 @@ function handleDropInSlot(e) {
 
     // FIRST: Try direct placement (body must be fully inside and collision-free)
     let canPlace = canPlaceItem(grid, finalOriginIndex, bodyShape, cols, maxRows);
-    console.log('  📍 Direct placement at origin index', finalOriginIndex, ':', canPlace ? '✅ VALID' : '❌ INVALID');
+    if (debugPlacement) console.debug('  📍 Direct placement at origin index', finalOriginIndex, ':', canPlace ? '✅ VALID' : '❌ INVALID');
     
     if (!canPlace) {
-        console.log('    ⚠️ Reason: Body does not fit fully in grid or collision detected');
+        if (debugPlacement) console.debug('    ⚠️ Reason: Body does not fit fully in grid or collision detected');
     }
 
     let chosenIndex = finalOriginIndex;
@@ -188,7 +189,7 @@ function handleDropInSlot(e) {
     // This allows partial placement like Backpack Battles
     if (!canPlace) {
         const searchRadius = location !== draggedItem.fromLocation ? 4 : 2;
-        console.log('  🔍 Searching for valid placement within radius', searchRadius, '(cross-grid:', location !== draggedItem.fromLocation, ')');
+        if (debugPlacement) console.debug('  🔍 Searching for valid placement within radius', searchRadius, '(cross-grid:', location !== draggedItem.fromLocation, ')');
         let searchAttempts = 0;
         let skippedNoOverlap = 0;
         
@@ -213,7 +214,7 @@ function handleDropInSlot(e) {
                         
                         const oidx = oy * cols + ox;
                         if (canPlaceItem(grid, oidx, bodyShape, cols, maxRows)) {
-                            console.log('    ✅ Found valid at offset (dx=', dx, 'dy=', dy, ') → originXY (', ox, ',', oy, ') index=', oidx);
+                            if (debugPlacement) console.debug('    ✅ Found valid at offset (dx=', dx, 'dy=', dy, ') → originXY (', ox, ',', oy, ') index=', oidx);
                             return oidx;
                         }
                     }
@@ -222,20 +223,20 @@ function handleDropInSlot(e) {
             return null;
         })();
         
-        console.log('    📊 Search stats: attempts=', searchAttempts, 'skipped(no overlap)=', skippedNoOverlap);
+        if (debugPlacement) console.debug('    📊 Search stats: attempts=', searchAttempts, 'skipped(no overlap)=', skippedNoOverlap);
         
         if (found !== null) {
-            console.log('  ✅ Found valid placement at index', found, 'within radius', searchRadius);
+            if (debugPlacement) console.debug('  ✅ Found valid placement at index', found, 'within radius', searchRadius);
             chosenIndex = found;
             canPlace = true;
         } else {
-            console.log('  ✋ No valid placement found even with radius search');
+            if (debugPlacement) console.debug('  ✋ No valid placement found even with radius search');
         }
     }
 
     // VALIDATION: If still invalid, snap back to original location
     if (!canPlace) {
-        console.log("❌ Drop FAILED - restoring item to original location (no valid placement found)");
+        if (debugPlacement) console.debug("❌ Drop FAILED - restoring item to original location (no valid placement found)");
         const fromCols = draggedItem && draggedItem.fromCols ? draggedItem.fromCols : (draggedItem && draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
         placeItemIntoGrid(
             gameData[draggedItem.fromLocation],
@@ -266,7 +267,7 @@ function handleDropInSlot(e) {
         draggedItem.rotatedAura || null,
         draggedItem.rotationIndex
     );
-    console.log('✅ PLACED ITEM', { itemId: draggedItem.item.id, instance: draggedItem.instanceId, location, index: chosenIndex });
+    if (debugPlacement) console.debug('✅ PLACED ITEM', { itemId: draggedItem.item.id, instance: draggedItem.instanceId, location, index: chosenIndex });
     DragSystem.clearDraggedItem();
     postDropRender();
     

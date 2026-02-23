@@ -32,8 +32,11 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
         rarity: "magic",
         icon: "⛏️",
         sprite: "Media/Images/Items/Tools/Pick-Axe_A.png",
-        spriteOffsetX: 7,
-        spriteOffsetY: 16,
+        spriteScale: 1.5,
+        spriteAnchorCell: { x: 2, y: 1 },
+        spriteAnchorOffsetPx: { x: 7, y: 16 },
+        spriteOffsetX: 0,
+        spriteOffsetY: 0,
         price: 150,
         inShop: true,
         req: 3,
@@ -118,6 +121,3 @@ const ITEMS_ENHANCEMENTS_WHETSTONES = [
 if (typeof window !== "undefined") {
     window.ITEMS_ENHANCEMENTS_WHETSTONES = ITEMS_ENHANCEMENTS_WHETSTONES;
 }
-
-
-

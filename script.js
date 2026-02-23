@@ -3735,7 +3735,9 @@ function renderWorkshopGrids() {
     if (!gameData.pvpGrid) gameData.pvpGrid = {};
     if (!gameData.sortGrid) gameData.sortGrid = {};
     
-    console.log("Rendering workshop grids for:", currentWorkshop);
+    if (typeof window !== 'undefined' && window.DEBUG_WORKSHOP_RENDER === true) {
+        console.debug("Rendering workshop grids for:", currentWorkshop);
+    }
     
     // Bank Grid - always use centralized bank columns (storage-mode or compact)
     const bankCols = getBankCols();

@@ -153,7 +153,9 @@ function createSlot(container, location, index, cols) {
         return;
     }
     if (!cell.root) {
-        console.log('⏭️  SKIP RENDER (no root) at index=' + index + ', cell has itemId=' + cell.itemId + ', instanceId=' + cell.instanceId);
+        if (typeof window !== 'undefined' && window.DEBUG_RENDER_SKIPS === true) {
+            console.debug('⏭️  SKIP RENDER (no root) at index=' + index + ', cell has itemId=' + cell.itemId + ', instanceId=' + cell.instanceId);
+        }
         container.appendChild(slot);
         return;
     }
@@ -221,39 +223,97 @@ function createSlot(container, location, index, cols) {
         });
     });
 
-    // Prefer sprite image overlay when available, centered above the body.
+    // Prefer sprite image overlay when available.
     const rotationDeg = rotationIndex * 90;
     if (item.sprite || item.image) {
-        const spriteOffsetX = _readSpriteOffset(item.spriteOffsetX);
-        const spriteOffsetY = _readSpriteOffset(item.spriteOffsetY);
-        const wrapper = document.createElement('div');
-        wrapper.style.position = 'absolute';
-        wrapper.style.left = '0';
-        wrapper.style.top = '0';
-        wrapper.style.width = '100%';
-        wrapper.style.height = '100%';
-        wrapper.style.display = 'flex';
-        wrapper.style.alignItems = 'center';
-        wrapper.style.justifyContent = 'center';
-        wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
-        wrapper.style.pointerEvents = 'none';
-        wrapper.style.zIndex = '110';
-        
         const img = document.createElement('img');
         img.src = item.sprite || item.image;
         img.alt = item.name || '';
         img.classList.add('item-sprite');
-        if (rotationIndex % 2 === 0) {
-            img.style.width = '100%';
-            img.style.height = 'auto';
+
+        const spriteAnchoring = (typeof window !== 'undefined' && window.SpriteAnchoring)
+            ? window.SpriteAnchoring
+            : null;
+        const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(item));
+        const bodyBounds = (typeof getItemBodyBounds === 'function')
+            ? getItemBodyBounds(item, rotationIndex)
+            : { minR: 0, minC: 0 };
+        const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
+            ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
+                item,
+                slotSizePx: slotSize,
+                gapPx: gap,
+                rot: rotationIndex,
+                bodyBounds
+            })
+            : null;
+        const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
+            ? spriteAnchoring.computeAnchoredSpriteStyle({
+                item,
+                slotSizePx: slotSize,
+                gapPx: gap,
+                rot: rotationIndex,
+                spriteBox: item.spriteBox,
+                spriteBoxByRot: item.spriteBoxByRot,
+                spriteAnchorCell: item.spriteAnchorCell,
+                spriteAnchorInBoxCell: item.spriteAnchorInBoxCell,
+                spriteAnchorOffsetPx: item.spriteAnchorOffsetPx
+            })
+            : null;
+
+        if (anchoredStyle && spriteLayerLayout) {
+            const spriteLayer = document.createElement('div');
+            spriteLayer.style.position = 'absolute';
+            spriteLayer.style.left = '0';
+            spriteLayer.style.top = '0';
+            spriteLayer.style.width = `${spriteLayerLayout.fullGridWidthPx}px`;
+            spriteLayer.style.height = `${spriteLayerLayout.fullGridHeightPx}px`;
+            spriteLayer.style.pointerEvents = 'none';
+            spriteLayer.style.overflow = 'visible';
+            spriteLayer.style.transform = `translate(${spriteLayerLayout.layerTranslatePx.x}px, ${spriteLayerLayout.layerTranslatePx.y}px)`;
+            spriteLayer.style.zIndex = '110';
+
+            img.style.position = 'absolute';
+            img.style.left = '0';
+            img.style.top = '0';
+            img.style.display = 'block';
+            img.style.objectFit = 'contain';
+            img.style.width = `${anchoredStyle.widthPx}px`;
+            img.style.height = `${anchoredStyle.heightPx}px`;
+            img.style.transformOrigin = anchoredStyle.transformOrigin;
+            img.style.transform = anchoredStyle.transform;
+
+            spriteLayer.appendChild(img);
+            itemEl.appendChild(spriteLayer);
         } else {
-            img.style.width = 'auto';
-            img.style.height = '100%';
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'absolute';
+            wrapper.style.left = '0';
+            wrapper.style.top = '0';
+            wrapper.style.width = '100%';
+            wrapper.style.height = '100%';
+            wrapper.style.pointerEvents = 'none';
+            wrapper.style.zIndex = '110';
+
+            const spriteOffsetX = _readSpriteOffset(item.spriteOffsetX);
+            const spriteOffsetY = _readSpriteOffset(item.spriteOffsetY);
+            wrapper.style.display = 'flex';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.justifyContent = 'center';
+            wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
+            if (rotationIndex % 2 === 0) {
+                img.style.width = '100%';
+                img.style.height = 'auto';
+            } else {
+                img.style.width = 'auto';
+                img.style.height = '100%';
+            }
+            img.style.transform = `rotate(${rotationDeg}deg)`;
+            img.style.transformOrigin = 'center';
+
+            wrapper.appendChild(img);
+            itemEl.appendChild(wrapper);
         }
-        img.style.transform = `rotate(${rotationDeg}deg)`;
-        img.style.transformOrigin = 'center';
-        wrapper.appendChild(img);
-        itemEl.appendChild(wrapper);
     } else {
         const icon = document.createElement('div');
         icon.classList.add('item-icon-overlay');
@@ -345,7 +405,9 @@ function createSlot(container, location, index, cols) {
         console.log('  🔄 Using rotated aura for drag preview:', JSON.stringify(aura));
     } else if (cell.rotatedAura) {
         aura = cell.rotatedAura;
-        console.log('  🔄 Using stored rotated aura from grid:', JSON.stringify(aura));
+        if (typeof window !== 'undefined' && window.DEBUG_AURA_RENDER === true) {
+            console.debug('  🔄 Using stored rotated aura from grid:', JSON.stringify(aura));
+        }
     } else if (typeof getItemAuraMatrix === 'function') {
         aura = getItemAuraMatrix(item, rotationIndex);
     }

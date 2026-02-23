@@ -86,32 +86,35 @@ function _buildCombinedGrid(body, aura) {
 function getItemRotationGrid(item, rotationIndex) {
     if (!item) return null;
     const idx = (typeof rotationIndex === 'number') ? rotationIndex : 0;
-    console.log('  📋 getItemRotationGrid: item=' + (item.id || '?') + ' idx=' + idx + ' has rotations=' + (item.rotations ? 'yes' : 'no'));
+    const debugRotationGrid = (typeof window !== 'undefined' && window.DEBUG_ITEM_ROTATION_GRID === true);
+    if (debugRotationGrid) {
+        console.debug('  📋 getItemRotationGrid: item=' + (item.id || '?') + ' idx=' + idx + ' has rotations=' + (item.rotations ? 'yes' : 'no'));
+    }
     if (idx === 0 && Array.isArray(item.grid)) {
-        console.log('    ✅ Found item.grid (idx=0)');
+        if (debugRotationGrid) console.debug('    ✅ Found item.grid (idx=0)');
         return item.grid;
     }
     if (item.rotations && item.rotations[idx]) {
         const rot = item.rotations[idx];
-        console.log('    Found item.rotations[' + idx + ']:', typeof rot, 'has grid=' + (rot && Array.isArray(rot.grid)));
+        if (debugRotationGrid) console.debug('    Found item.rotations[' + idx + ']:', typeof rot, 'has grid=' + (rot && Array.isArray(rot.grid)));
         if (Array.isArray(rot)) {
-            console.log('    ✅ rot is array');
+            if (debugRotationGrid) console.debug('    ✅ rot is array');
             return rot;
         }
         if (rot && Array.isArray(rot.grid)) {
-            console.log('    ✅ rot.grid exists, returning it');
+            if (debugRotationGrid) console.debug('    ✅ rot.grid exists, returning it');
             return rot.grid;
         }
         if (rot && (rot.body || rot.aura)) {
-            console.log('    ✅ rot has body/aura, building grid');
+            if (debugRotationGrid) console.debug('    ✅ rot has body/aura, building grid');
             return _buildCombinedGrid(rot.body, rot.aura);
         }
     }
     if (item.body || item.aura) {
-        console.log('    ✅ Using legacy body/aura');
+        if (debugRotationGrid) console.debug('    ✅ Using legacy body/aura');
         return _buildCombinedGrid(item.body || [[1]], item.aura || null);
     }
-    console.log('    ❌ FAILED TO GET GRID');
+    if (debugRotationGrid) console.debug('    ❌ FAILED TO GET GRID');
     return null;
 }
 

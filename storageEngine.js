@@ -467,7 +467,8 @@ function getFilteredStorageItems(grid) {
 function autoSortStorage(gridKey) {
     const targetKey = (typeof gridKey === "string" && gridKey) ? gridKey : "bank";
     const grid = targetKey === "bank" ? getActiveBankGrid() : gameData[targetKey];
-    if (!grid) return;
+    // Guard: autosort must remain state-driven and never depend on DOM geometry.
+    if (!grid || typeof grid !== "object" || Array.isArray(grid) || grid.nodeType) return;
 
     const items = [];
     for (const [index, cell] of Object.entries(grid)) {

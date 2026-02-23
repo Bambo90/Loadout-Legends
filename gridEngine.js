@@ -80,6 +80,7 @@ function canPlaceItem(grid, originIndex, shape, cols, maxRows) {
 }
 
 function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId, maxRowsOverride, rotatedAura, rotationIndex) {
+    const debugPlacement = (typeof window !== 'undefined' && window.DEBUG_PLACEMENT === true);
     // If no instanceId provided, generate a new one
     if (!instanceId) {
         instanceId = generateInstanceId();
@@ -118,7 +119,7 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId, max
         }
     }
 
-    console.log('📦 PLACE INTO GRID', { item: item.id, instance: instanceId, originIndex, originXY: { x: originX, y: originY }, shapeDim: { h: shapeCopy.length, w: shapeCopy[0].length }, shape: JSON.stringify(shapeCopy), minRC: { minR, minC }, rotatedAura: rotatedAura ? JSON.stringify(rotatedAura) : 'none' });
+    if (debugPlacement) console.debug('📦 PLACE INTO GRID', { item: item.id, instance: instanceId, originIndex, originXY: { x: originX, y: originY }, shapeDim: { h: shapeCopy.length, w: shapeCopy[0].length }, shape: JSON.stringify(shapeCopy), minRC: { minR, minC }, rotatedAura: rotatedAura ? JSON.stringify(rotatedAura) : 'none' });
 
     if (minR === Infinity || minC === Infinity) {
         console.error('⚠️ WARNING: Shape is empty or all zeros! minR:', minR, 'minC:', minC);
@@ -158,18 +159,18 @@ function placeItemIntoGrid(grid, originIndex, item, shape, cols, instanceId, max
             // Store rotated aura if provided (only on root cell)
             if (isRoot && rotatedAura) {
                 grid[idx].rotatedAura = rotatedAura.map(r => [...r]);
-                console.log('  🔄 Stored rotated aura:', JSON.stringify(rotatedAura));
+                if (debugPlacement) console.debug('  🔄 Stored rotated aura:', JSON.stringify(rotatedAura));
             }
             if (isRoot && typeof rotationIndex === 'number') {
                 grid[idx].rotationIndex = rotationIndex;
             }
 
             if (isRoot) {
-                console.log('  🟢 ROOT CELL at idx=' + idx + ' (r=' + r + ', c=' + c + ')');
+                if (debugPlacement) console.debug('  🟢 ROOT CELL at idx=' + idx + ' (r=' + r + ', c=' + c + ')');
             }
         });
     });
 
-    console.log('📦 PLACE COMPLETE for instance ' + instanceId);
+    if (debugPlacement) console.debug('📦 PLACE COMPLETE for instance ' + instanceId);
     return instanceId; // Return the instanceId for tracking
 }

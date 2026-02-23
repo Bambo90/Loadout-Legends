@@ -45,6 +45,7 @@ Keep this file short, current, and factual.
 - `customDrag.js`: drag runtime (`window.DragSystem`), rotation interaction.
 - `dragdropengine.js`: drop validation and placement fallback logic.
 - `gridEngine.js`: grid placement checks and writes.
+- `spriteAnchoring.js`: shared anchored sprite helpers (`window.SpriteAnchoring`) for placed and drag rendering.
 - `workshopEngine.js`: workshop and grid rendering integration.
 - `storageEngine.js`: storage pages, filters, bulk sell mode.
 - `saveengine.js`: save/load, migrations, normalization.

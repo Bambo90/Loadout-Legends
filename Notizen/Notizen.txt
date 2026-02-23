@@ -89,3 +89,13 @@ git commit -m "pre-codex: weapon cooldown base"
 1 Schritt zurück
 git reset --hard HEAD
 git clean -fd
+
+
+Debug:
+
+window.DEBUG_PLACEMENT = false;
+window.DEBUG_ITEM_ROTATION_GRID = false;
+window.DEBUG_RENDER_SKIPS = false;
+window.DEBUG_AURA_RENDER = false;
+window.DEBUG_WORKSHOP_RENDER = false;
+window.DEBUG_SPRITE_ANCHOR = true;   // nur das aktiv

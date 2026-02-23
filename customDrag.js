@@ -432,36 +432,94 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     // ADD ICON / SPRITE LAST (on top)
     const rotationDeg = draggedItem.rotationIndex * 90;
     if (item.sprite || item.image) {
-        const spriteOffsetX = _readSpriteOffset(item.spriteOffsetX);
-        const spriteOffsetY = _readSpriteOffset(item.spriteOffsetY);
-        const wrapper = document.createElement('div');
-        wrapper.style.position = 'absolute';
-        wrapper.style.top = '0';
-        wrapper.style.left = '0';
-        wrapper.style.width = '100%';
-        wrapper.style.height = '100%';
-        wrapper.style.display = 'flex';
-        wrapper.style.alignItems = 'center';
-        wrapper.style.justifyContent = 'center';
-        wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
-        wrapper.style.pointerEvents = 'none';
-        wrapper.style.zIndex = '100';
-        
         const img = document.createElement('img');
         img.src = item.sprite || item.image;
         img.alt = item.name || '';
         img.className = 'item-sprite';
-        if (draggedItem.rotationIndex % 2 === 0) {
-            img.style.width = '100%';
-            img.style.height = 'auto';
+
+        const spriteAnchoring = (typeof window !== 'undefined' && window.SpriteAnchoring)
+            ? window.SpriteAnchoring
+            : null;
+        const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(item));
+        const bodyBounds = (typeof getItemBodyBounds === 'function')
+            ? getItemBodyBounds(item, draggedItem.rotationIndex)
+            : { minR: 0, minC: 0 };
+        const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
+            ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
+                item,
+                slotSizePx: slotSize,
+                gapPx: gap,
+                rot: draggedItem.rotationIndex,
+                bodyBounds
+            })
+            : null;
+        const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
+            ? spriteAnchoring.computeAnchoredSpriteStyle({
+                item,
+                slotSizePx: slotSize,
+                gapPx: gap,
+                rot: draggedItem.rotationIndex,
+                spriteBox: item.spriteBox,
+                spriteBoxByRot: item.spriteBoxByRot,
+                spriteAnchorCell: item.spriteAnchorCell,
+                spriteAnchorInBoxCell: item.spriteAnchorInBoxCell,
+                spriteAnchorOffsetPx: item.spriteAnchorOffsetPx
+            })
+            : null;
+
+        if (anchoredStyle && spriteLayerLayout) {
+            const spriteLayer = document.createElement('div');
+            spriteLayer.style.position = 'absolute';
+            spriteLayer.style.left = '0';
+            spriteLayer.style.top = '0';
+            spriteLayer.style.width = `${spriteLayerLayout.fullGridWidthPx}px`;
+            spriteLayer.style.height = `${spriteLayerLayout.fullGridHeightPx}px`;
+            spriteLayer.style.pointerEvents = 'none';
+            spriteLayer.style.overflow = 'visible';
+            spriteLayer.style.transform = `translate(${spriteLayerLayout.layerTranslatePx.x}px, ${spriteLayerLayout.layerTranslatePx.y}px)`;
+            spriteLayer.style.zIndex = '100';
+
+            img.style.position = 'absolute';
+            img.style.left = '0';
+            img.style.top = '0';
+            img.style.display = 'block';
+            img.style.objectFit = 'contain';
+            img.style.width = `${anchoredStyle.widthPx}px`;
+            img.style.height = `${anchoredStyle.heightPx}px`;
+            img.style.transformOrigin = anchoredStyle.transformOrigin;
+            img.style.transform = anchoredStyle.transform;
+
+            spriteLayer.appendChild(img);
+            _customFollowEl.appendChild(spriteLayer);
         } else {
-            img.style.width = 'auto';
-            img.style.height = '100%';
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'absolute';
+            wrapper.style.top = '0';
+            wrapper.style.left = '0';
+            wrapper.style.width = '100%';
+            wrapper.style.height = '100%';
+            wrapper.style.pointerEvents = 'none';
+            wrapper.style.zIndex = '100';
+
+            const spriteOffsetX = _readSpriteOffset(item.spriteOffsetX);
+            const spriteOffsetY = _readSpriteOffset(item.spriteOffsetY);
+            wrapper.style.display = 'flex';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.justifyContent = 'center';
+            wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
+            if (draggedItem.rotationIndex % 2 === 0) {
+                img.style.width = '100%';
+                img.style.height = 'auto';
+            } else {
+                img.style.width = 'auto';
+                img.style.height = '100%';
+            }
+            img.style.transform = `rotate(${rotationDeg}deg)`;
+            img.style.transformOrigin = 'center';
+
+            wrapper.appendChild(img);
+            _customFollowEl.appendChild(wrapper);
         }
-        img.style.transform = `rotate(${rotationDeg}deg)`;
-        img.style.transformOrigin = 'center';
-        wrapper.appendChild(img);
-        _customFollowEl.appendChild(wrapper);
     } else {
         const icon = document.createElement('div');
         icon.className = 'item-icon-overlay';
@@ -603,36 +661,94 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         // ADD ICON / SPRITE (on top)
         const rotationDeg = draggedItem.rotationIndex * 90;
         if (draggedItem.item.sprite || draggedItem.item.image) {
-            const spriteOffsetX = _readSpriteOffset(draggedItem.item.spriteOffsetX);
-            const spriteOffsetY = _readSpriteOffset(draggedItem.item.spriteOffsetY);
-            const wrapper = document.createElement('div');
-            wrapper.style.position = 'absolute';
-            wrapper.style.top = '0';
-            wrapper.style.left = '0';
-            wrapper.style.width = '100%';
-            wrapper.style.height = '100%';
-            wrapper.style.display = 'flex';
-            wrapper.style.alignItems = 'center';
-            wrapper.style.justifyContent = 'center';
-            wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
-            wrapper.style.pointerEvents = 'none';
-            wrapper.style.zIndex = '100';
-            
             const img = document.createElement('img');
             img.src = draggedItem.item.sprite || draggedItem.item.image;
             img.alt = draggedItem.item.name || '';
             img.className = 'item-sprite';
-            if (draggedItem.rotationIndex % 2 === 0) {
-                img.style.width = '100%';
-                img.style.height = 'auto';
+
+            const spriteAnchoring = (typeof window !== 'undefined' && window.SpriteAnchoring)
+                ? window.SpriteAnchoring
+                : null;
+            const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(draggedItem.item));
+            const bodyBounds = (typeof getItemBodyBounds === 'function')
+                ? getItemBodyBounds(draggedItem.item, draggedItem.rotationIndex)
+                : { minR: 0, minC: 0 };
+            const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
+                ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
+                    item: draggedItem.item,
+                    slotSizePx: slotSize2,
+                    gapPx: gap2,
+                    rot: draggedItem.rotationIndex,
+                    bodyBounds
+                })
+                : null;
+            const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
+                ? spriteAnchoring.computeAnchoredSpriteStyle({
+                    item: draggedItem.item,
+                    slotSizePx: slotSize2,
+                    gapPx: gap2,
+                    rot: draggedItem.rotationIndex,
+                    spriteBox: draggedItem.item.spriteBox,
+                    spriteBoxByRot: draggedItem.item.spriteBoxByRot,
+                    spriteAnchorCell: draggedItem.item.spriteAnchorCell,
+                    spriteAnchorInBoxCell: draggedItem.item.spriteAnchorInBoxCell,
+                    spriteAnchorOffsetPx: draggedItem.item.spriteAnchorOffsetPx
+                })
+                : null;
+
+            if (anchoredStyle && spriteLayerLayout) {
+                const spriteLayer = document.createElement('div');
+                spriteLayer.style.position = 'absolute';
+                spriteLayer.style.left = '0';
+                spriteLayer.style.top = '0';
+                spriteLayer.style.width = `${spriteLayerLayout.fullGridWidthPx}px`;
+                spriteLayer.style.height = `${spriteLayerLayout.fullGridHeightPx}px`;
+                spriteLayer.style.pointerEvents = 'none';
+                spriteLayer.style.overflow = 'visible';
+                spriteLayer.style.transform = `translate(${spriteLayerLayout.layerTranslatePx.x}px, ${spriteLayerLayout.layerTranslatePx.y}px)`;
+                spriteLayer.style.zIndex = '100';
+
+                img.style.position = 'absolute';
+                img.style.left = '0';
+                img.style.top = '0';
+                img.style.display = 'block';
+                img.style.objectFit = 'contain';
+                img.style.width = `${anchoredStyle.widthPx}px`;
+                img.style.height = `${anchoredStyle.heightPx}px`;
+                img.style.transformOrigin = anchoredStyle.transformOrigin;
+                img.style.transform = anchoredStyle.transform;
+
+                spriteLayer.appendChild(img);
+                _customFollowEl.appendChild(spriteLayer);
             } else {
-                img.style.width = 'auto';
-                img.style.height = '100%';
+                const wrapper = document.createElement('div');
+                wrapper.style.position = 'absolute';
+                wrapper.style.top = '0';
+                wrapper.style.left = '0';
+                wrapper.style.width = '100%';
+                wrapper.style.height = '100%';
+                wrapper.style.pointerEvents = 'none';
+                wrapper.style.zIndex = '100';
+
+                const spriteOffsetX = _readSpriteOffset(draggedItem.item.spriteOffsetX);
+                const spriteOffsetY = _readSpriteOffset(draggedItem.item.spriteOffsetY);
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.justifyContent = 'center';
+                wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
+                if (draggedItem.rotationIndex % 2 === 0) {
+                    img.style.width = '100%';
+                    img.style.height = 'auto';
+                } else {
+                    img.style.width = 'auto';
+                    img.style.height = '100%';
+                }
+                img.style.transform = `rotate(${rotationDeg}deg)`;
+                img.style.transformOrigin = 'center';
+
+                wrapper.appendChild(img);
+                _customFollowEl.appendChild(wrapper);
             }
-            img.style.transform = `rotate(${rotationDeg}deg)`;
-            img.style.transformOrigin = 'center';
-            wrapper.appendChild(img);
-            _customFollowEl.appendChild(wrapper);
         } else {
             const icon = document.createElement('div');
             icon.className = 'item-icon-overlay';
