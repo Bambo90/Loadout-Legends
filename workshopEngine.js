@@ -241,6 +241,8 @@ function createSlot(container, location, index, cols) {
         const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
             ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
                 item,
+                cellSizePx: slotSize,
+                stepPx: geo.cellW,
                 slotSizePx: slotSize,
                 gapPx: gap,
                 rot: rotationIndex,
@@ -250,6 +252,8 @@ function createSlot(container, location, index, cols) {
         const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
             ? spriteAnchoring.computeAnchoredSpriteStyle({
                 item,
+                cellSizePx: slotSize,
+                stepPx: geo.cellW,
                 slotSizePx: slotSize,
                 gapPx: gap,
                 rot: rotationIndex,

@@ -109,6 +109,23 @@
         return fallbackMax;
     }
 
+    function _resolveSpriteGeometry(config) {
+        if (!config || typeof config !== 'object') return null;
+        const cellSizeCandidate = (config.cellSizePx !== undefined) ? config.cellSizePx : config.slotSizePx;
+        const cellSizePx = Number(cellSizeCandidate);
+        if (!Number.isFinite(cellSizePx) || cellSizePx <= 0) return null;
+
+        const stepCandidate = Number(config.stepPx);
+        const gapCandidate = Number(config.gapPx);
+        const hasStep = Number.isFinite(stepCandidate) && stepCandidate > 0;
+        const hasGap = Number.isFinite(gapCandidate) && gapCandidate >= 0;
+
+        const stepPx = hasStep ? stepCandidate : (cellSizePx + (hasGap ? gapCandidate : 0));
+        const gapPx = hasGap ? gapCandidate : Math.max(0, stepPx - cellSizePx);
+
+        return { cellSizePx, gapPx, stepPx };
+    }
+
     function computeBodyBoundsInFullGrid(rotGrid) {
         if (!Array.isArray(rotGrid) || rotGrid.length === 0) {
             return { minR: 0, minC: 0, maxR: 0, maxC: 0, hasBody: false };
@@ -169,10 +186,11 @@
 
     function computeAnchoredSpriteLayerLayout(config) {
         if (!config || typeof config !== 'object') return null;
-        const slotSizePx = Number(config.slotSizePx);
-        if (!Number.isFinite(slotSizePx) || slotSizePx <= 0) return null;
-        const gapPx = Number.isFinite(Number(config.gapPx)) ? Number(config.gapPx) : 0;
-        const stepPx = slotSizePx + gapPx;
+        const geometry = _resolveSpriteGeometry(config);
+        if (!geometry) return null;
+        const cellSizePx = geometry.cellSizePx;
+        const gapPx = geometry.gapPx;
+        const stepPx = geometry.stepPx;
         const rot = normalizeRotationIndex(config.rot);
         const rotGrid = _getRotationGrid(config.item, rot);
 
@@ -193,8 +211,8 @@
             : Number(fallbackBodyBounds && fallbackBodyBounds.minR);
         const safeMinC = Number.isFinite(minC) ? minC : 0;
         const safeMinR = Number.isFinite(minR) ? minR : 0;
-        const fullGridWidthPx = (wCells * stepPx) - gapPx;
-        const fullGridHeightPx = (hCells * stepPx) - gapPx;
+        const fullGridWidthPx = ((wCells - 1) * stepPx) + cellSizePx;
+        const fullGridHeightPx = ((hCells - 1) * stepPx) + cellSizePx;
         const layerTranslatePx = {
             x: -(safeMinC * stepPx),
             y: -(safeMinR * stepPx)
@@ -240,10 +258,11 @@
 
         const rot = normalizeRotationIndex(config.rot);
 
-        const slotSizePx = Number(config.slotSizePx);
-        if (!Number.isFinite(slotSizePx) || slotSizePx <= 0) return null;
-        const gapPx = Number.isFinite(Number(config.gapPx)) ? Number(config.gapPx) : 0;
-        const stepPx = slotSizePx + gapPx;
+        const geometry = _resolveSpriteGeometry(config);
+        if (!geometry) return null;
+        const cellSizePx = geometry.cellSizePx;
+        const gapPx = geometry.gapPx;
+        const stepPx = geometry.stepPx;
 
         const rot0Dims = _getRotationGridDimensions(config.item, 0);
         const rotatedAnchor = rotateCellFromRot0(
@@ -291,18 +310,46 @@
         const anchorInBoxY = Number(anchorInBoxCell.y);
         if (!Number.isFinite(anchorInBoxX) || !Number.isFinite(anchorInBoxY)) return null;
 
-        const targetAnchorPxX = (anchorTargetX * stepPx) + (slotSizePx / 2);
-        const targetAnchorPxY = (anchorTargetY * stepPx) + (slotSizePx / 2);
-        const anchorInSpritePxX = ((anchorInBoxX * stepPx) + (slotSizePx / 2)) * spriteScale;
-        const anchorInSpritePxY = ((anchorInBoxY * stepPx) + (slotSizePx / 2)) * spriteScale;
+        const targetAnchorPxX = (anchorTargetX * stepPx) + (cellSizePx / 2);
+        const targetAnchorPxY = (anchorTargetY * stepPx) + (cellSizePx / 2);
+        const anchorInSpritePxX = ((anchorInBoxX * stepPx) + (cellSizePx / 2)) * spriteScale;
+        const anchorInSpritePxY = ((anchorInBoxY * stepPx) + (cellSizePx / 2)) * spriteScale;
 
-        const offset = (config.spriteAnchorOffsetPx && typeof config.spriteAnchorOffsetPx === 'object')
+        const offsetCells = (
+            (config.item && config.item.spriteAnchorOffsetCells && typeof config.item.spriteAnchorOffsetCells === 'object')
+                ? config.item.spriteAnchorOffsetCells
+                : (config.spriteAnchorOffsetCells && typeof config.spriteAnchorOffsetCells === 'object' ? config.spriteAnchorOffsetCells : null)
+        );
+        const offsetCellsX = Number(offsetCells ? offsetCells.x : 0);
+        const offsetCellsY = Number(offsetCells ? offsetCells.y : 0);
+        const safeOffsetCellsX = Number.isFinite(offsetCellsX) ? offsetCellsX : 0;
+        const safeOffsetCellsY = Number.isFinite(offsetCellsY) ? offsetCellsY : 0;
+        let rotatedOffsetCellsX = safeOffsetCellsX;
+        let rotatedOffsetCellsY = safeOffsetCellsY;
+        if (rot === 1) {
+            rotatedOffsetCellsX = -safeOffsetCellsY;
+            rotatedOffsetCellsY = safeOffsetCellsX;
+        } else if (rot === 2) {
+            rotatedOffsetCellsX = -safeOffsetCellsX;
+            rotatedOffsetCellsY = -safeOffsetCellsY;
+        } else if (rot === 3) {
+            rotatedOffsetCellsX = safeOffsetCellsY;
+            rotatedOffsetCellsY = -safeOffsetCellsX;
+        }
+
+        let tx = targetAnchorPxX - anchorInSpritePxX;
+        let ty = targetAnchorPxY - anchorInSpritePxY;
+
+        tx += rotatedOffsetCellsX * cellSizePx;
+        ty += rotatedOffsetCellsY * cellSizePx;
+
+        const offsetPx = (config.spriteAnchorOffsetPx && typeof config.spriteAnchorOffsetPx === 'object')
             ? config.spriteAnchorOffsetPx
-            : null;
-        const offsetX = readSpriteOffset(offset ? offset.x : 0);
-        const offsetY = readSpriteOffset(offset ? offset.y : 0);
-        const tx = targetAnchorPxX - anchorInSpritePxX + offsetX;
-        const ty = targetAnchorPxY - anchorInSpritePxY + offsetY;
+            : ((config.item && config.item.spriteAnchorOffsetPx && typeof config.item.spriteAnchorOffsetPx === 'object') ? config.item.spriteAnchorOffsetPx : null);
+        const offsetX = readSpriteOffset(offsetPx ? offsetPx.x : 0);
+        const offsetY = readSpriteOffset(offsetPx ? offsetPx.y : 0);
+        tx += offsetX;
+        ty += offsetY;
 
         return {
             widthPx: boxWCells * stepPx * spriteScale,

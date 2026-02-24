@@ -4,10 +4,34 @@
  */
 
 const ITEMS_ARMOR_DEFAULT_ROTATIONS = {
-    0: { grid: [["A", "A", "A", "A"], ["A", "B", "B", "A"], ["A", "B", "B", "A"], ["A", "B", "B", "A"], ["A", "A", "A", "A"]] },
-    1: { grid: [["A", "A", "A", "A", "A"], ["A", "B", "B", "B", "A"], ["A", "B", "B", "B", "A"], ["A", "A", "A", "A", "A"]] },
-    2: { grid: [["A", "A", "A", "A"], ["A", "B", "B", "A"], ["A", "B", "B", "A"], ["A", "B", "B", "A"], ["A", "A", "A", "A"]] },
-    3: { grid: [["A", "A", "A", "A", "A"], ["A", "B", "B", "B", "A"], ["A", "B", "B", "B", "A"], ["A", "A", "A", "A", "A"]] }
+  0: { grid: [
+    ["0","A","A","A","A"],
+    ["0","A","B","B","A"],
+    ["0","A","B","B","A"],
+    ["0","A","B","B","A"],
+    ["0","A","A","A","A"],
+  ]},
+  1: { grid: [
+    ["0","0","0","0","0"],
+    ["A","A","A","A","A"],
+    ["A","B","B","B","A"],
+    ["A","B","B","B","A"],
+    ["A","A","A","A","A"],
+  ]},
+  2: { grid: [
+    ["0","A","A","A","A"],
+    ["0","A","B","B","A"],
+    ["0","A","B","B","A"],
+    ["0","A","B","B","A"],
+    ["0","A","A","A","A"],
+  ]},
+  3: { grid: [
+    ["0","0","0","0","0"],
+    ["A","A","A","A","A"],
+    ["A","B","B","B","A"],
+    ["A","B","B","B","A"],
+    ["A","A","A","A","A"],
+  ]},
 };
 
 const ITEMS_ARMOR_BODY = [
@@ -39,7 +63,11 @@ const ITEMS_ARMOR_BODY = [
         evasion: 0.15,
         durability: 1.1,
         desc: "Schwere Bronzerüstung, robust und zuverlässig.",
-        sprite: "Media/Images/Items/Armours/Bronze_A.png"
+        sprite: "Media/Images/Items/Armours/Bronze_A.png",
+        spriteScale: 1.0,
+        spriteAnchorCell: { x: 2, y: 2 },
+        spriteAnchorOffsetCells: { x: 0, y: 0 },
+        spriteAnchorOffsetPx: { x: 0, y: 0 },
     },
     {
         id: "armor_new_3",

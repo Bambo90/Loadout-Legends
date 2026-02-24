@@ -447,6 +447,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
             ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
                 item,
+                cellSizePx: slotSize,
+                stepPx: cellW2,
                 slotSizePx: slotSize,
                 gapPx: gap,
                 rot: draggedItem.rotationIndex,
@@ -456,6 +458,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
             ? spriteAnchoring.computeAnchoredSpriteStyle({
                 item,
+                cellSizePx: slotSize,
+                stepPx: cellW2,
                 slotSizePx: slotSize,
                 gapPx: gap,
                 rot: draggedItem.rotationIndex,
@@ -676,6 +680,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
                 ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
                     item: draggedItem.item,
+                    cellSizePx: slotSize2,
+                    stepPx: cellWLocal,
                     slotSizePx: slotSize2,
                     gapPx: gap2,
                     rot: draggedItem.rotationIndex,
@@ -685,6 +691,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
                 ? spriteAnchoring.computeAnchoredSpriteStyle({
                     item: draggedItem.item,
+                    cellSizePx: slotSize2,
+                    stepPx: cellWLocal,
                     slotSizePx: slotSize2,
                     gapPx: gap2,
                     rot: draggedItem.rotationIndex,
