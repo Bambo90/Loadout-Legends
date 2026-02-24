@@ -4,20 +4,25 @@
  */
 
 const ITEMS_ARMOR_DEFAULT_ROTATIONS = {
+  // rot0: hochkant, fehlende Spalte RECHTS
   0: { grid: [
-    ["0","A","A","A","A"],
-    ["0","A","B","B","A"],
-    ["0","A","B","B","A"],
-    ["0","A","B","B","A"],
-    ["0","A","A","A","A"],
+    ["A","A","A","A","0"],
+    ["A","B","B","A","0"],
+    ["A","B","B","A","0"],
+    ["A","B","B","A","0"],
+    ["A","A","A","A","0"],
   ]},
+
+  // rot1: quer, fehlende Zeile UNTEN
   1: { grid: [
+    ["A","A","A","A","A"],
+    ["A","B","B","B","A"],
+    ["A","B","B","B","A"],
+    ["A","A","A","A","A"],
     ["0","0","0","0","0"],
-    ["A","A","A","A","A"],
-    ["A","B","B","B","A"],
-    ["A","B","B","B","A"],
-    ["A","A","A","A","A"],
   ]},
+
+  // rot2: hochkant, fehlende Spalte LINKS (Spiegel von rot0)
   2: { grid: [
     ["0","A","A","A","A"],
     ["0","A","B","B","A"],
@@ -25,6 +30,8 @@ const ITEMS_ARMOR_DEFAULT_ROTATIONS = {
     ["0","A","B","B","A"],
     ["0","A","A","A","A"],
   ]},
+
+  // rot3: quer, fehlende Zeile OBEN (Spiegel von rot1)
   3: { grid: [
     ["0","0","0","0","0"],
     ["A","A","A","A","A"],
@@ -47,7 +54,12 @@ const ITEMS_ARMOR_BODY = [
         tags: ["armor", "body"],
         defense: 5,
         evasion: 0.1,
-        desc: "Einfache Leinenkleidung, bietet minimalen Schutz."
+        desc: "Einfache Leinenkleidung, bietet minimalen Schutz.",
+        sprite: "Media/Images/Items/Armours/Bronze_A3.png",
+        spriteAnchorCell: null,
+        spriteOffsetX: 0,
+        spriteOffsetY: 0,
+        spriteAnchorOffsetItemPx: { x: -30, y: 0 },
     },
     {
         id: "armor_new_2",
@@ -82,7 +94,12 @@ const ITEMS_ARMOR_BODY = [
         defense: 22,
         evasion: 0.25,
         magicReduction: 0.15,
-        desc: "Elegante Plattenkombination aus feinem Mithril."
+        desc: "Elegante Plattenkombination aus feinem Mithril.",
+         sprite: "Media/Images/Items/Armours/Bronze_A3.png",
+        spriteAnchorCell: null,
+        spriteOffsetX: 0,
+        spriteOffsetY: 0,
+        spriteAnchorOffsetItemPx: { x: -30, y: 0 },
     },
     {
         id: "armor_new_4",
@@ -99,7 +116,12 @@ const ITEMS_ARMOR_BODY = [
         defense: 18,
         evasion: 0.35,
         spectralDefense: 0.2,
-        desc: "Eine mystische Robe, die zwischen Welten flüstert."
+        desc: "Eine mystische Robe, die zwischen Welten flüstert.",
+        sprite: "Media/Images/Items/Armours/Bronze_A3.png",
+        spriteAnchorCell: null,
+        spriteOffsetX: 0,
+        spriteOffsetY: 0,
+        spriteAnchorOffsetItemPx: { x: -30, y: 0 },
     },
     {
         id: "armor_new_5",
@@ -116,7 +138,12 @@ const ITEMS_ARMOR_BODY = [
         defense: 45,
         evasion: -0.05,
         physicalReduction: 0.3,
-        desc: "Die ultimative Rüstung, geschmiedet im Mithril-Hochofen."
+        desc: "Die ultimative Rüstung, geschmiedet im Mithril-Hochofen.",
+         sprite: "Media/Images/Items/Armours/Bronze_A3.png",
+        spriteAnchorCell: null,
+        spriteOffsetX: 0,
+        spriteOffsetY: 0,
+        spriteAnchorOffsetItemPx: { x: -30, y: 0 },
     }
 ];
 
