@@ -83,6 +83,14 @@
         return { x: y0, y: (w0 - 1) - x0 };
     }
 
+    function rotateOffsetByRot(dx, dy, rot) {
+        const rotation = normalizeRotationIndex(rot);
+        if (rotation === 0) return { x: dx, y: dy };
+        if (rotation === 1) return { x: -dy, y: dx };
+        if (rotation === 2) return { x: -dx, y: -dy };
+        return { x: dy, y: -dx };
+    }
+
     function _computeItemSquareBoxCellsFromBody(item) {
         let boxCellsItem = 0;
         for (let rot = 0; rot < 4; rot++) {
@@ -324,18 +332,9 @@
         const offsetCellsY = Number(offsetCells ? offsetCells.y : 0);
         const safeOffsetCellsX = Number.isFinite(offsetCellsX) ? offsetCellsX : 0;
         const safeOffsetCellsY = Number.isFinite(offsetCellsY) ? offsetCellsY : 0;
-        let rotatedOffsetCellsX = safeOffsetCellsX;
-        let rotatedOffsetCellsY = safeOffsetCellsY;
-        if (rot === 1) {
-            rotatedOffsetCellsX = -safeOffsetCellsY;
-            rotatedOffsetCellsY = safeOffsetCellsX;
-        } else if (rot === 2) {
-            rotatedOffsetCellsX = -safeOffsetCellsX;
-            rotatedOffsetCellsY = -safeOffsetCellsY;
-        } else if (rot === 3) {
-            rotatedOffsetCellsX = safeOffsetCellsY;
-            rotatedOffsetCellsY = -safeOffsetCellsX;
-        }
+        const rotatedOffsetCells = rotateOffsetByRot(safeOffsetCellsX, safeOffsetCellsY, rot);
+        const rotatedOffsetCellsX = rotatedOffsetCells.x;
+        const rotatedOffsetCellsY = rotatedOffsetCells.y;
 
         let tx = targetAnchorPxX - anchorInSpritePxX;
         let ty = targetAnchorPxY - anchorInSpritePxY;
@@ -351,11 +350,38 @@
         tx += offsetX;
         ty += offsetY;
 
+        const offsetItemPx = (
+            (config.item && config.item.spriteAnchorOffsetItemPx && typeof config.item.spriteAnchorOffsetItemPx === 'object')
+                ? config.item.spriteAnchorOffsetItemPx
+                : (config.spriteAnchorOffsetItemPx && typeof config.spriteAnchorOffsetItemPx === 'object' ? config.spriteAnchorOffsetItemPx : null)
+        );
+        const offsetItemPxX = Number(offsetItemPx ? offsetItemPx.x : 0);
+        const offsetItemPxY = Number(offsetItemPx ? offsetItemPx.y : 0);
+        const safeOffsetItemPxX = Number.isFinite(offsetItemPxX) ? offsetItemPxX : 0;
+        const safeOffsetItemPxY = Number.isFinite(offsetItemPxY) ? offsetItemPxY : 0;
+        const rotatedOffsetItemPx = rotateOffsetByRot(safeOffsetItemPxX, safeOffsetItemPxY, rot);
+
+        // Apply item-space pixel offset at the very end so it cannot be overwritten by later tx/ty changes.
+        tx += rotatedOffsetItemPx.x;
+        ty += rotatedOffsetItemPx.y;
+
+        const transform = `translate(${tx}px, ${ty}px) rotate(${rot * 90}deg)`;
+        if (
+            typeof globalScope !== 'undefined' &&
+            globalScope.DEBUG_SPRITE_ANCHOR === true &&
+            config.item &&
+            config.item.id === 'armor_new_2'
+        ) {
+            console.debug(
+                `[SPRITE_ANCHOR][style] rot=${rot} rawOffsetItemPx=(${safeOffsetItemPxX},${safeOffsetItemPxY}) appliedItemOffsetPx=(${rotatedOffsetItemPx.x},${rotatedOffsetItemPx.y}) finalTranslatePx=(${tx},${ty}) transform="${transform}"`
+            );
+        }
+
         return {
             widthPx: boxWCells * stepPx * spriteScale,
             heightPx: boxHCells * stepPx * spriteScale,
             transformOrigin: `${anchorInSpritePxX}px ${anchorInSpritePxY}px`,
-            transform: `translate(${tx}px, ${ty}px) rotate(${rot * 90}deg)`,
+            transform,
             translatePx: { x: tx, y: ty },
             selectedSpriteBox: {
                 wCells: boxWCells,

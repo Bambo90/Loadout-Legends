@@ -25,6 +25,48 @@ function _readSpriteOffset(value) {
     return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function _normalizeRotationIndex(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 0;
+    const truncated = Math.trunc(numeric);
+    return ((truncated % 4) + 4) % 4;
+}
+
+function _resolveSpriteMetaItemForDrag(itemLike) {
+    const defId = itemLike && (itemLike.baseId || itemLike.id);
+    const fromDef = (typeof getItemDefById === 'function')
+        ? getItemDefById(defId)
+        : (typeof getItemById === 'function' ? getItemById(defId) : null);
+    if (fromDef && typeof fromDef === 'object') {
+        return { item: fromDef, source: 'def' };
+    }
+    if (itemLike && typeof itemLike === 'object') {
+        return { item: itemLike, source: 'instance' };
+    }
+    return { item: null, source: 'fallback' };
+}
+
+function _readOffsetPair(value) {
+    if (!value || typeof value !== 'object') return { x: 0, y: 0 };
+    const x = Number(value.x);
+    const y = Number(value.y);
+    return {
+        x: Number.isFinite(x) ? x : 0,
+        y: Number.isFinite(y) ? y : 0
+    };
+}
+
+function _debugSpriteAnchorRotationGhost(item, instanceId, gridRotationIndex, rotGridLookupRot, spriteAnchoringRot, metaSource, metaItem) {
+    if (typeof window === 'undefined' || window.DEBUG_SPRITE_ANCHOR !== true) return;
+    if (!item || item.id !== 'armor_new_2') return;
+    const offsetCells = _readOffsetPair(metaItem && metaItem.spriteAnchorOffsetCells);
+    const offsetItemPx = _readOffsetPair(metaItem && metaItem.spriteAnchorOffsetItemPx);
+    const offsetPx = _readOffsetPair(metaItem && metaItem.spriteAnchorOffsetPx);
+    console.debug(
+        `[SPRITE_ANCHOR][ghost] instanceId=${instanceId || ''} gridRotationIndex=${gridRotationIndex} rotGridLookupRot=${rotGridLookupRot} spriteAnchoringRot=${spriteAnchoringRot} metaSource=${metaSource} offsetCells=(${offsetCells.x},${offsetCells.y}) offsetItemPx=(${offsetItemPx.x},${offsetItemPx.y}) offsetPx=(${offsetPx.x},${offsetPx.y})`
+    );
+}
+
 // ===== ROTATION UTILITIES =====
 function rotateMatrixCW(matrix) {
     const h = matrix.length;
@@ -86,7 +128,7 @@ function applyRotation(dir) {
     _rotationCount++;
 
     const item = draggedItem.item;
-    const currentRotIndex = draggedItem.rotationIndex || 0;
+    const currentRotIndex = _normalizeRotationIndex(draggedItem.rotationIndex);
     const nextRotIndex = dir === 1
         ? (currentRotIndex + 1) % 4
         : ((currentRotIndex - 1) + 4) % 4;
@@ -268,7 +310,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     if (draggedItem) return;
 
     // CRITICAL: Always use item body, NEVER previewShape (which might contain aura)
-    const initialRotationIndex = (typeof rotationIndex === 'number') ? rotationIndex : 0;
+    const initialRotationIndex = _normalizeRotationIndex(rotationIndex);
     const baseShape = (typeof getItemBodyMatrix === 'function')
         ? getItemBodyMatrix(item, initialRotationIndex)
         : item.body;
@@ -374,10 +416,18 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     
     _customFollowEl.appendChild(gridWrapper);
     
+    const gridRotationIndex = draggedItem.rotationIndex;
+    const canonicalRotationIndex = _normalizeRotationIndex(gridRotationIndex);
+    draggedItem.rotationIndex = canonicalRotationIndex;
+    const rotGridLookupRot = canonicalRotationIndex;
+    const spriteAnchoringRot = canonicalRotationIndex;
+    const spriteMeta = _resolveSpriteMetaItemForDrag(item);
+    const spriteMetaItem = spriteMeta.item || item;
+
     // ADD AURA OVERLAY FIRST (behind icon)
     // Use rotated aura if available (when picking up rotated item)
     const aura = (typeof getItemAuraMatrix === 'function')
-        ? getItemAuraMatrix(item, draggedItem.rotationIndex)
+        ? getItemAuraMatrix(item, rotGridLookupRot)
         : (draggedItem.rotatedAura || item.aura);
     if (aura) {
         const auraOverlay = document.createElement('div');
@@ -400,7 +450,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         
         // Align aura using body bounds inside the combined grid (use left/top for consistency)
         const bounds = (typeof getItemBodyBounds === 'function')
-            ? getItemBodyBounds(item, draggedItem.rotationIndex)
+            ? getItemBodyBounds(item, rotGridLookupRot)
             : { minR: 0, minC: 0 };
         const offsetX = -bounds.minC * cellW2;
         const offsetY = -bounds.minR * cellH2;
@@ -430,44 +480,45 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     }
     
     // ADD ICON / SPRITE LAST (on top)
-    const rotationDeg = draggedItem.rotationIndex * 90;
-    if (item.sprite || item.image) {
+    const rotationDeg = spriteAnchoringRot * 90;
+    _debugSpriteAnchorRotationGhost(item, draggedItem.instanceId, gridRotationIndex, rotGridLookupRot, spriteAnchoringRot, spriteMeta.source, spriteMetaItem);
+    if (spriteMetaItem && (spriteMetaItem.sprite || spriteMetaItem.image)) {
         const img = document.createElement('img');
-        img.src = item.sprite || item.image;
+        img.src = spriteMetaItem.sprite || spriteMetaItem.image;
         img.alt = item.name || '';
         img.className = 'item-sprite';
 
         const spriteAnchoring = (typeof window !== 'undefined' && window.SpriteAnchoring)
             ? window.SpriteAnchoring
             : null;
-        const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(item));
+        const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(spriteMetaItem));
         const bodyBounds = (typeof getItemBodyBounds === 'function')
-            ? getItemBodyBounds(item, draggedItem.rotationIndex)
+            ? getItemBodyBounds(spriteMetaItem, rotGridLookupRot)
             : { minR: 0, minC: 0 };
         const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
             ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
-                item,
+                item: spriteMetaItem,
                 cellSizePx: slotSize,
                 stepPx: cellW2,
                 slotSizePx: slotSize,
                 gapPx: gap,
-                rot: draggedItem.rotationIndex,
+                rot: spriteAnchoringRot,
                 bodyBounds
             })
             : null;
         const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
             ? spriteAnchoring.computeAnchoredSpriteStyle({
-                item,
+                item: spriteMetaItem,
                 cellSizePx: slotSize,
                 stepPx: cellW2,
                 slotSizePx: slotSize,
                 gapPx: gap,
-                rot: draggedItem.rotationIndex,
-                spriteBox: item.spriteBox,
-                spriteBoxByRot: item.spriteBoxByRot,
-                spriteAnchorCell: item.spriteAnchorCell,
-                spriteAnchorInBoxCell: item.spriteAnchorInBoxCell,
-                spriteAnchorOffsetPx: item.spriteAnchorOffsetPx
+                rot: spriteAnchoringRot,
+                spriteBox: spriteMetaItem.spriteBox,
+                spriteBoxByRot: spriteMetaItem.spriteBoxByRot,
+                spriteAnchorCell: spriteMetaItem.spriteAnchorCell,
+                spriteAnchorInBoxCell: spriteMetaItem.spriteAnchorInBoxCell,
+                spriteAnchorOffsetPx: spriteMetaItem.spriteAnchorOffsetPx
             })
             : null;
 
@@ -505,13 +556,13 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             wrapper.style.pointerEvents = 'none';
             wrapper.style.zIndex = '100';
 
-            const spriteOffsetX = _readSpriteOffset(item.spriteOffsetX);
-            const spriteOffsetY = _readSpriteOffset(item.spriteOffsetY);
+            const spriteOffsetX = _readSpriteOffset(spriteMetaItem.spriteOffsetX);
+            const spriteOffsetY = _readSpriteOffset(spriteMetaItem.spriteOffsetY);
             wrapper.style.display = 'flex';
             wrapper.style.alignItems = 'center';
             wrapper.style.justifyContent = 'center';
             wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
-            if (draggedItem.rotationIndex % 2 === 0) {
+            if (spriteAnchoringRot % 2 === 0) {
                 img.style.width = '100%';
                 img.style.height = 'auto';
             } else {
@@ -604,9 +655,17 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         
         _customFollowEl.appendChild(gridWrapper);
         
+        const gridRotationIndex = draggedItem.rotationIndex;
+        const canonicalRotationIndex = _normalizeRotationIndex(gridRotationIndex);
+        draggedItem.rotationIndex = canonicalRotationIndex;
+        const rotGridLookupRot = canonicalRotationIndex;
+        const spriteAnchoringRot = canonicalRotationIndex;
+        const spriteMeta = _resolveSpriteMetaItemForDrag(draggedItem.item);
+        const spriteMetaItem = spriteMeta.item || draggedItem.item;
+
         // ADD AURA OVERLAY (using rotated aura if available)
         const aura = (typeof getItemAuraMatrix === 'function')
-            ? getItemAuraMatrix(draggedItem.item, draggedItem.rotationIndex)
+            ? getItemAuraMatrix(draggedItem.item, rotGridLookupRot)
             : (draggedItem.rotatedAura || draggedItem.item.aura);
         if (aura) {
             const auraOverlay = document.createElement('div');
@@ -629,7 +688,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
             // Align aura using body bounds inside the combined grid
             const bounds = (typeof getItemBodyBounds === 'function')
-                ? getItemBodyBounds(draggedItem.item, draggedItem.rotationIndex)
+                ? getItemBodyBounds(draggedItem.item, rotGridLookupRot)
                 : { minR: 0, minC: 0 };
             const offsetX = -bounds.minC * cellWLocal;
             const offsetY = -bounds.minR * cellHLocal;
@@ -663,44 +722,45 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         }
         
         // ADD ICON / SPRITE (on top)
-        const rotationDeg = draggedItem.rotationIndex * 90;
-        if (draggedItem.item.sprite || draggedItem.item.image) {
+        const rotationDeg = spriteAnchoringRot * 90;
+        _debugSpriteAnchorRotationGhost(draggedItem.item, draggedItem.instanceId, gridRotationIndex, rotGridLookupRot, spriteAnchoringRot, spriteMeta.source, spriteMetaItem);
+        if (spriteMetaItem && (spriteMetaItem.sprite || spriteMetaItem.image)) {
             const img = document.createElement('img');
-            img.src = draggedItem.item.sprite || draggedItem.item.image;
+            img.src = spriteMetaItem.sprite || spriteMetaItem.image;
             img.alt = draggedItem.item.name || '';
             img.className = 'item-sprite';
 
             const spriteAnchoring = (typeof window !== 'undefined' && window.SpriteAnchoring)
                 ? window.SpriteAnchoring
                 : null;
-            const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(draggedItem.item));
+            const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(spriteMetaItem));
             const bodyBounds = (typeof getItemBodyBounds === 'function')
-                ? getItemBodyBounds(draggedItem.item, draggedItem.rotationIndex)
+                ? getItemBodyBounds(spriteMetaItem, rotGridLookupRot)
                 : { minR: 0, minC: 0 };
             const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
                 ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
-                    item: draggedItem.item,
+                    item: spriteMetaItem,
                     cellSizePx: slotSize2,
                     stepPx: cellWLocal,
                     slotSizePx: slotSize2,
                     gapPx: gap2,
-                    rot: draggedItem.rotationIndex,
+                    rot: spriteAnchoringRot,
                     bodyBounds
                 })
                 : null;
             const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
                 ? spriteAnchoring.computeAnchoredSpriteStyle({
-                    item: draggedItem.item,
+                    item: spriteMetaItem,
                     cellSizePx: slotSize2,
                     stepPx: cellWLocal,
                     slotSizePx: slotSize2,
                     gapPx: gap2,
-                    rot: draggedItem.rotationIndex,
-                    spriteBox: draggedItem.item.spriteBox,
-                    spriteBoxByRot: draggedItem.item.spriteBoxByRot,
-                    spriteAnchorCell: draggedItem.item.spriteAnchorCell,
-                    spriteAnchorInBoxCell: draggedItem.item.spriteAnchorInBoxCell,
-                    spriteAnchorOffsetPx: draggedItem.item.spriteAnchorOffsetPx
+                    rot: spriteAnchoringRot,
+                    spriteBox: spriteMetaItem.spriteBox,
+                    spriteBoxByRot: spriteMetaItem.spriteBoxByRot,
+                    spriteAnchorCell: spriteMetaItem.spriteAnchorCell,
+                    spriteAnchorInBoxCell: spriteMetaItem.spriteAnchorInBoxCell,
+                    spriteAnchorOffsetPx: spriteMetaItem.spriteAnchorOffsetPx
                 })
                 : null;
 
@@ -738,13 +798,13 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 wrapper.style.pointerEvents = 'none';
                 wrapper.style.zIndex = '100';
 
-                const spriteOffsetX = _readSpriteOffset(draggedItem.item.spriteOffsetX);
-                const spriteOffsetY = _readSpriteOffset(draggedItem.item.spriteOffsetY);
+                const spriteOffsetX = _readSpriteOffset(spriteMetaItem.spriteOffsetX);
+                const spriteOffsetY = _readSpriteOffset(spriteMetaItem.spriteOffsetY);
                 wrapper.style.display = 'flex';
                 wrapper.style.alignItems = 'center';
                 wrapper.style.justifyContent = 'center';
                 wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
-                if (draggedItem.rotationIndex % 2 === 0) {
+                if (spriteAnchoringRot % 2 === 0) {
                     img.style.width = '100%';
                     img.style.height = 'auto';
                 } else {

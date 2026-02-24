@@ -63,10 +63,11 @@ const ITEMS_ARMOR_BODY = [
         evasion: 0.15,
         durability: 1.1,
         desc: "Schwere Bronzerüstung, robust und zuverlässig.",
-        sprite: "Media/Images/Items/Armours/Bronze_A.png",
+       sprite: "Media/Images/Items/Armours/Bronze_A3.png",
         spriteScale: 1.0,
-        spriteAnchorCell: { x: 2, y: 2 },
+        spritespriteAnchorCell: { x: 2.5, y: 2.5 },
         spriteAnchorOffsetCells: { x: 0, y: 0 },
+        spriteAnchorOffsetItemPx: { x: 0, y: 0 },
         spriteAnchorOffsetPx: { x: 0, y: 0 },
     },
     {
