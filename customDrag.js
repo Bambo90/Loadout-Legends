@@ -25,11 +25,15 @@ function _readSpriteOffset(value) {
     return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function _normalizeRotationIndex(value) {
+function getCanonicalRot(value) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return 0;
     const truncated = Math.trunc(numeric);
     return ((truncated % 4) + 4) % 4;
+}
+
+function _normalizeRotationIndex(value) {
+    return getCanonicalRot(value);
 }
 
 function _resolveSpriteMetaItemForDrag(itemLike) {
@@ -54,6 +58,230 @@ function _readOffsetPair(value) {
         x: Number.isFinite(x) ? x : 0,
         y: Number.isFinite(y) ? y : 0
     };
+}
+
+function _isFinitePoint(point) {
+    return !!(point && Number.isFinite(Number(point.x)) && Number.isFinite(Number(point.y)));
+}
+
+function _parseTransformOriginPx(transformOrigin) {
+    if (typeof transformOrigin !== 'string') return null;
+    const match = transformOrigin.match(/(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px/i);
+    if (!match) return null;
+    const x = Number(match[1]);
+    const y = Number(match[2]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x, y };
+}
+
+function _parseTranslatePx(transformValue) {
+    if (typeof transformValue !== 'string') return null;
+    const match = transformValue.match(/translate\(\s*(-?\d+(?:\.\d+)?)px\s*,\s*(-?\d+(?:\.\d+)?)px\s*\)/i);
+    if (!match) return null;
+    const x = Number(match[1]);
+    const y = Number(match[2]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x, y };
+}
+
+function _computeAnchorLocalPxFromAnchoredStyle(anchoredStyle, spriteLayerLayout) {
+    if (!anchoredStyle || !spriteLayerLayout) return null;
+    const origin = _parseTransformOriginPx(anchoredStyle.transformOrigin);
+    if (!origin) return null;
+
+    const translateFromStyle = _isFinitePoint(anchoredStyle.translatePx)
+        ? { x: Number(anchoredStyle.translatePx.x), y: Number(anchoredStyle.translatePx.y) }
+        : _parseTranslatePx(anchoredStyle.transform);
+    if (!translateFromStyle) return null;
+
+    const layerTranslate = _isFinitePoint(spriteLayerLayout.layerTranslatePx)
+        ? { x: Number(spriteLayerLayout.layerTranslatePx.x), y: Number(spriteLayerLayout.layerTranslatePx.y) }
+        : { x: 0, y: 0 };
+
+    return {
+        x: layerTranslate.x + translateFromStyle.x + origin.x,
+        y: layerTranslate.y + translateFromStyle.y + origin.y
+    };
+}
+
+function _computeBodyBoundsFromGrid(grid) {
+    if (!Array.isArray(grid) || grid.length === 0) return null;
+    let minR = Infinity;
+    let minC = Infinity;
+    let maxR = -1;
+    let maxC = -1;
+    for (let r = 0; r < grid.length; r++) {
+        const row = grid[r];
+        if (!Array.isArray(row)) continue;
+        for (let c = 0; c < row.length; c++) {
+            const cell = row[c];
+            if (typeof cell !== 'string') continue;
+            if (!(cell === 'B' || cell === 'AB' || cell.includes('B'))) continue;
+            if (r < minR) minR = r;
+            if (c < minC) minC = c;
+            if (r > maxR) maxR = r;
+            if (c > maxC) maxC = c;
+        }
+    }
+    if (maxR < 0 || maxC < 0) return null;
+    return { minR, minC, maxR, maxC, hasBody: true };
+}
+
+function _computeBodyBoundsFromBodyMatrix(bodyMatrix) {
+    if (!Array.isArray(bodyMatrix) || bodyMatrix.length === 0) return null;
+    let minR = Infinity;
+    let minC = Infinity;
+    let maxR = -1;
+    let maxC = -1;
+    for (let r = 0; r < bodyMatrix.length; r++) {
+        const row = bodyMatrix[r];
+        if (!Array.isArray(row)) continue;
+        for (let c = 0; c < row.length; c++) {
+            if (!row[c]) continue;
+            if (r < minR) minR = r;
+            if (c < minC) minC = c;
+            if (r > maxR) maxR = r;
+            if (c > maxC) maxC = c;
+        }
+    }
+    if (maxR < 0 || maxC < 0) return null;
+    return { minR, minC, maxR, maxC, hasBody: true };
+}
+
+function _resolveBodyBoundsForDrag(itemLike, rotationIndex) {
+    const rot = getCanonicalRot(rotationIndex);
+    const rotGrid = (typeof getItemRotationGrid === 'function') ? getItemRotationGrid(itemLike, rot) : null;
+    const fromGrid = _computeBodyBoundsFromGrid(rotGrid);
+    if (fromGrid) return fromGrid;
+
+    if (typeof getItemBodyBounds === 'function') {
+        const bounds = getItemBodyBounds(itemLike, rot);
+        if (bounds && Number.isFinite(Number(bounds.minR)) && Number.isFinite(Number(bounds.minC)) && Number.isFinite(Number(bounds.maxR)) && Number.isFinite(Number(bounds.maxC))) {
+            return {
+                minR: Number(bounds.minR),
+                minC: Number(bounds.minC),
+                maxR: Number(bounds.maxR),
+                maxC: Number(bounds.maxC),
+                hasBody: true
+            };
+        }
+    }
+
+    const bodyMatrix = (typeof getItemBodyMatrix === 'function')
+        ? getItemBodyMatrix(itemLike, rot)
+        : (itemLike && itemLike.body ? itemLike.body : null);
+    const fromBody = _computeBodyBoundsFromBodyMatrix(bodyMatrix);
+    if (fromBody) return fromBody;
+
+    return { minR: 0, minC: 0, maxR: 0, maxC: 0, hasBody: false };
+}
+
+function _computeDefaultAnchorLocalPxFromBodyBounds(bodyBounds, geometry) {
+    const safeGeometry = geometry && typeof geometry === 'object' ? geometry : {};
+    const stepPx = Number(safeGeometry.stepPx);
+    const cellSizePx = Number(safeGeometry.cellSizePx);
+    if (!Number.isFinite(stepPx) || stepPx <= 0 || !Number.isFinite(cellSizePx) || cellSizePx <= 0) {
+        return { x: 0, y: 0 };
+    }
+
+    const bounds = bodyBounds && typeof bodyBounds === 'object' ? bodyBounds : null;
+    const minR = bounds ? Number(bounds.minR) : NaN;
+    const minC = bounds ? Number(bounds.minC) : NaN;
+    const maxR = bounds ? Number(bounds.maxR) : NaN;
+    const maxC = bounds ? Number(bounds.maxC) : NaN;
+    const hasFiniteBounds = Number.isFinite(minR) && Number.isFinite(minC) && Number.isFinite(maxR) && Number.isFinite(maxC) && maxR >= minR && maxC >= minC;
+    if (!hasFiniteBounds) {
+        return {
+            x: cellSizePx / 2,
+            y: cellSizePx / 2
+        };
+    }
+
+    const centerXCell = (minC + maxC) / 2;
+    const centerYCell = (minR + maxR) / 2;
+    return {
+        x: ((centerXCell - minC) * stepPx) + (cellSizePx / 2),
+        y: ((centerYCell - minR) * stepPx) + (cellSizePx / 2)
+    };
+}
+
+function _computeDefaultAnchorLocalPxFromBodyMatrix(bodyMatrix, geometry) {
+    const bounds = _computeBodyBoundsFromBodyMatrix(bodyMatrix);
+    return _computeDefaultAnchorLocalPxFromBodyBounds(bounds, geometry);
+}
+
+function _debugDragRotateEvent(itemId, rawRot, canonicalRot, rotForBody, rotForSprite, bodyBounds, anchorLocalPx) {
+    if (typeof window === 'undefined' || window.DEBUG_DRAG_ROT !== true) return;
+    const bounds = bodyBounds && typeof bodyBounds === 'object'
+        ? `minR=${Number(bodyBounds.minR)},minC=${Number(bodyBounds.minC)},maxR=${Number(bodyBounds.maxR)},maxC=${Number(bodyBounds.maxC)}`
+        : 'minR=0,minC=0,maxR=0,maxC=0';
+    const anchor = _isFinitePoint(anchorLocalPx)
+        ? `x=${Number(anchorLocalPx.x).toFixed(2)},y=${Number(anchorLocalPx.y).toFixed(2)}`
+        : 'x=NaN,y=NaN';
+    console.debug(
+        `[DRAG_ROT] itemId=${itemId || ''} rawRot=${rawRot} canonicalRot=${canonicalRot} rotForBody=${rotForBody} rotForSprite=${rotForSprite} bodyBounds={${bounds}} anchorLocalPx={${anchor}}`
+    );
+}
+
+function _debugDragAnchor(phase, rotationIndex, anchorLocalPx, mousePx) {
+    if (typeof window === 'undefined' || window.DEBUG_DRAG_ANCHOR !== true) return;
+    if (!_isFinitePoint(anchorLocalPx) || !_isFinitePoint(mousePx)) return;
+    const ghostTopLeftPx = {
+        x: Math.round(mousePx.x - Number(anchorLocalPx.x)),
+        y: Math.round(mousePx.y - Number(anchorLocalPx.y))
+    };
+    console.debug(
+        `[DRAG_ANCHOR][${phase}] rotationIndex=${rotationIndex} anchorLocalPx=(${Number(anchorLocalPx.x).toFixed(2)},${Number(anchorLocalPx.y).toFixed(2)}) mousePx=(${Number(mousePx.x).toFixed(2)},${Number(mousePx.y).toFixed(2)}) ghostTopLeftPx=(${ghostTopLeftPx.x},${ghostTopLeftPx.y})`
+    );
+}
+
+function _restoreDragCursor() {
+    if (typeof document !== 'undefined' && document.body) {
+        document.body.style.cursor = '';
+    }
+}
+
+function _cleanupCustomDragArtifacts() {
+    if (_customFollowEl && _customFollowEl.parentNode) _customFollowEl.parentNode.removeChild(_customFollowEl);
+    _customFollowEl = null;
+    if (_customPointerMove) window.removeEventListener('pointermove', _customPointerMove);
+    if (_customPointerUp) window.removeEventListener('pointerup', _customPointerUp);
+    if (_rotationKeyHandler) window.removeEventListener('keydown', _rotationKeyHandler);
+    if (_rotationWheelHandler) window.removeEventListener('wheel', _rotationWheelHandler);
+    _customPointerMove = null;
+    _customPointerUp = null;
+    _rotationKeyHandler = null;
+    _rotationWheelHandler = null;
+    _restoreDragCursor();
+    if (typeof hideAllAuras === 'function') hideAllAuras();
+    if (typeof document !== 'undefined' && document.body) {
+        document.body.classList.remove('dragging', 'drop-allowed', 'drop-invalid');
+    }
+}
+
+function _restoreDraggedItemToSourceIfNeeded() {
+    if (!draggedItem) return;
+    if (gameData[draggedItem.fromLocation]) {
+        const fromCols = draggedItem.fromCols || (draggedItem.fromLocation === 'bank'
+            ? (((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage') ? 10 : 6)
+            : GRID_SIZE);
+        const restoreShape = (typeof getItemBodyMatrix === 'function')
+            ? getItemBodyMatrix(draggedItem.item, draggedItem.rotationIndex || 0)
+            : (draggedItem.item?.body || draggedItem.previewShape);
+        placeItemIntoGrid(
+            gameData[draggedItem.fromLocation],
+            draggedItem.fromIndex,
+            draggedItem.item,
+            restoreShape,
+            fromCols,
+            draggedItem.instanceId,
+            null,
+            draggedItem.rotatedAura || null,
+            draggedItem.rotationIndex
+        );
+    }
+    draggedItem = null;
+    renderAllActiveGrids();
 }
 
 function _debugSpriteAnchorRotationGhost(item, instanceId, gridRotationIndex, rotGridLookupRot, spriteAnchoringRot, metaSource, metaItem) {
@@ -128,10 +356,9 @@ function applyRotation(dir) {
     _rotationCount++;
 
     const item = draggedItem.item;
-    const currentRotIndex = _normalizeRotationIndex(draggedItem.rotationIndex);
-    const nextRotIndex = dir === 1
-        ? (currentRotIndex + 1) % 4
-        : ((currentRotIndex - 1) + 4) % 4;
+    const currentRotIndex = getCanonicalRot(draggedItem.rotationIndex);
+    const rawNextRot = currentRotIndex + (dir === 1 ? 1 : -1);
+    const nextRotIndex = getCanonicalRot(rawNextRot);
 
     const rotationGrid = (typeof getItemRotationGrid === 'function')
         ? getItemRotationGrid(item, nextRotIndex)
@@ -148,6 +375,16 @@ function applyRotation(dir) {
         if (typeof window._updateFollowElementPosition === 'function' && window._dragLastPos) {
             window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
         }
+        const debugBodyBounds = _computeBodyBoundsFromBodyMatrix(draggedItem.previewShape) || _resolveBodyBoundsForDrag(item, nextRotIndex);
+        _debugDragRotateEvent(
+            item.id,
+            rawNextRot,
+            nextRotIndex,
+            nextRotIndex,
+            nextRotIndex,
+            debugBodyBounds,
+            draggedItem.pointerToAnchorOffsetPx
+        );
         renderAllActiveGrids();
         return;
     }
@@ -160,6 +397,10 @@ function applyRotationCanonical(dir) {
     if (!draggedItem) return;
     
     _rotationCount++;
+    const currentRotIndex = getCanonicalRot(draggedItem.rotationIndex);
+    const rawNextRot = currentRotIndex + (dir === 1 ? 1 : -1);
+    const nextRotIndex = getCanonicalRot(rawNextRot);
+    draggedItem.rotationIndex = nextRotIndex;
     
     // capture OLD shape dimensions BEFORE rotation
     const oldShape = draggedItem.previewShape;
@@ -231,6 +472,16 @@ function applyRotationCanonical(dir) {
             window._updateFollowElementPosition(window._dragLastPos.x, window._dragLastPos.y);
         }
     }
+    const debugBodyBounds = _computeBodyBoundsFromBodyMatrix(draggedItem.previewShape) || _resolveBodyBoundsForDrag(draggedItem.item, nextRotIndex);
+    _debugDragRotateEvent(
+        draggedItem && draggedItem.item ? draggedItem.item.id : '',
+        rawNextRot,
+        nextRotIndex,
+        nextRotIndex,
+        nextRotIndex,
+        debugBodyBounds,
+        draggedItem.pointerToAnchorOffsetPx
+    );
     // Update grid preview to show new rotation
     renderAllActiveGrids();
 }
@@ -310,7 +561,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     if (draggedItem) return;
 
     // CRITICAL: Always use item body, NEVER previewShape (which might contain aura)
-    const initialRotationIndex = _normalizeRotationIndex(rotationIndex);
+    const initialRotationIndex = getCanonicalRot(rotationIndex);
     const baseShape = (typeof getItemBodyMatrix === 'function')
         ? getItemBodyMatrix(item, initialRotationIndex)
         : item.body;
@@ -331,7 +582,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             ? getItemAuraMatrix(item, initialRotationIndex)
             : (rotatedAura || null),
         rotationIndex: initialRotationIndex,
-        instanceId: instanceId // Store instance ID for tracking
+        instanceId: instanceId, // Store instance ID for tracking
+        pointerToAnchorOffsetPx: null
     };
 
     // Mark drag state for performance-friendly styling
@@ -417,7 +669,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     _customFollowEl.appendChild(gridWrapper);
     
     const gridRotationIndex = draggedItem.rotationIndex;
-    const canonicalRotationIndex = _normalizeRotationIndex(gridRotationIndex);
+    const canonicalRotationIndex = getCanonicalRot(gridRotationIndex);
     draggedItem.rotationIndex = canonicalRotationIndex;
     const rotGridLookupRot = canonicalRotationIndex;
     const spriteAnchoringRot = canonicalRotationIndex;
@@ -428,6 +680,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         stepPx: cellW2,
         gapPx: gap
     };
+    const bodyBoundsForFrame = _resolveBodyBoundsForDrag(item, rotGridLookupRot);
+    const defaultAnchorLocalPx = _computeDefaultAnchorLocalPxFromBodyMatrix(shape, spriteGeometry);
 
     // ADD AURA OVERLAY FIRST (behind icon)
     // Use rotated aura if available (when picking up rotated item)
@@ -454,9 +708,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             auraOverlay.style.gap = gap + 'px';
         
         // Align aura using body bounds inside the combined grid (use left/top for consistency)
-        const bounds = (typeof getItemBodyBounds === 'function')
-            ? getItemBodyBounds(item, rotGridLookupRot)
-            : { minR: 0, minC: 0 };
+        const bounds = bodyBoundsForFrame || { minR: 0, minC: 0 };
         const offsetX = -bounds.minC * cellW2;
         const offsetY = -bounds.minR * cellH2;
         auraOverlay.style.left = offsetX + 'px';
@@ -497,9 +749,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             ? window.SpriteAnchoring
             : null;
         const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(spriteMetaItem));
-        const bodyBounds = (typeof getItemBodyBounds === 'function')
-            ? getItemBodyBounds(spriteMetaItem, rotGridLookupRot)
-            : { minR: 0, minC: 0 };
+        const bodyBounds = _resolveBodyBoundsForDrag(spriteMetaItem, rotGridLookupRot);
         const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
             ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
                 itemDef: spriteMetaItem,
@@ -541,6 +791,18 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
             spriteLayer.appendChild(img);
             _customFollowEl.appendChild(spriteLayer);
+            const anchorLocalPx = _computeAnchorLocalPxFromAnchoredStyle(anchoredStyle, spriteLayerLayout);
+            if (_isFinitePoint(anchorLocalPx)) {
+                draggedItem.pointerToAnchorOffsetPx = {
+                    x: Number(anchorLocalPx.x),
+                    y: Number(anchorLocalPx.y)
+                };
+            } else {
+                draggedItem.pointerToAnchorOffsetPx = {
+                    x: Number(defaultAnchorLocalPx.x),
+                    y: Number(defaultAnchorLocalPx.y)
+                };
+            }
         } else {
             const wrapper = document.createElement('div');
             wrapper.style.position = 'absolute';
@@ -557,7 +819,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             wrapper.style.alignItems = 'center';
             wrapper.style.justifyContent = 'center';
             wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
-            if (spriteAnchoringRot % 2 === 0) {
+            const isEvenQuarterTurn = spriteAnchoringRot === 0 || spriteAnchoringRot === 2;
+            if (isEvenQuarterTurn) {
                 img.style.width = '100%';
                 img.style.height = 'auto';
             } else {
@@ -569,6 +832,10 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
             wrapper.appendChild(img);
             _customFollowEl.appendChild(wrapper);
+            draggedItem.pointerToAnchorOffsetPx = {
+                x: Number(defaultAnchorLocalPx.x),
+                y: Number(defaultAnchorLocalPx.y)
+            };
         }
     } else {
         const icon = document.createElement('div');
@@ -582,6 +849,10 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         icon.style.fontSize = '2rem';
         icon.innerText = item.icon;
         _customFollowEl.appendChild(icon);
+        draggedItem.pointerToAnchorOffsetPx = {
+            x: Number(defaultAnchorLocalPx.x),
+            y: Number(defaultAnchorLocalPx.y)
+        };
     }
 
     document.body.appendChild(_customFollowEl);
@@ -651,7 +922,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         _customFollowEl.appendChild(gridWrapper);
         
         const gridRotationIndex = draggedItem.rotationIndex;
-        const canonicalRotationIndex = _normalizeRotationIndex(gridRotationIndex);
+        const canonicalRotationIndex = getCanonicalRot(gridRotationIndex);
         draggedItem.rotationIndex = canonicalRotationIndex;
         const rotGridLookupRot = canonicalRotationIndex;
         const spriteAnchoringRot = canonicalRotationIndex;
@@ -662,6 +933,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             stepPx: cellWLocal,
             gapPx: gap2
         };
+        const bodyBoundsForFrame = _resolveBodyBoundsForDrag(draggedItem.item, rotGridLookupRot);
+        const defaultAnchorLocalPx = _computeDefaultAnchorLocalPxFromBodyMatrix(shape, spriteGeometry);
 
         // ADD AURA OVERLAY (using rotated aura if available)
         const aura = (typeof getItemAuraMatrix === 'function')
@@ -687,9 +960,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             auraOverlay.style.gap = gap2 + 'px';
 
             // Align aura using body bounds inside the combined grid
-            const bounds = (typeof getItemBodyBounds === 'function')
-                ? getItemBodyBounds(draggedItem.item, rotGridLookupRot)
-                : { minR: 0, minC: 0 };
+            const bounds = bodyBoundsForFrame || { minR: 0, minC: 0 };
             const offsetX = -bounds.minC * cellWLocal;
             const offsetY = -bounds.minR * cellHLocal;
             auraOverlay.style.left = offsetX + 'px';
@@ -734,9 +1005,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 ? window.SpriteAnchoring
                 : null;
             const hasAnchorMeta = !!(spriteAnchoring && typeof spriteAnchoring.hasAnchoredSpriteMeta === 'function' && spriteAnchoring.hasAnchoredSpriteMeta(spriteMetaItem));
-            const bodyBounds = (typeof getItemBodyBounds === 'function')
-                ? getItemBodyBounds(spriteMetaItem, rotGridLookupRot)
-                : { minR: 0, minC: 0 };
+            const bodyBounds = _resolveBodyBoundsForDrag(spriteMetaItem, rotGridLookupRot);
             const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
                 ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
                     itemDef: spriteMetaItem,
@@ -778,6 +1047,21 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
                 spriteLayer.appendChild(img);
                 _customFollowEl.appendChild(spriteLayer);
+                const anchorLocalPx = _computeAnchorLocalPxFromAnchoredStyle(anchoredStyle, spriteLayerLayout);
+                if (_isFinitePoint(anchorLocalPx)) {
+                    draggedItem.pointerToAnchorOffsetPx = {
+                        x: Number(anchorLocalPx.x),
+                        y: Number(anchorLocalPx.y)
+                    };
+                    if (window._dragLastPos && _isFinitePoint(window._dragLastPos)) {
+                        _debugDragAnchor('rotate', draggedItem.rotationIndex, draggedItem.pointerToAnchorOffsetPx, window._dragLastPos);
+                    }
+                } else {
+                    draggedItem.pointerToAnchorOffsetPx = {
+                        x: Number(defaultAnchorLocalPx.x),
+                        y: Number(defaultAnchorLocalPx.y)
+                    };
+                }
             } else {
                 const wrapper = document.createElement('div');
                 wrapper.style.position = 'absolute';
@@ -794,7 +1078,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 wrapper.style.alignItems = 'center';
                 wrapper.style.justifyContent = 'center';
                 wrapper.style.transform = `translate(${spriteOffsetX}px, ${spriteOffsetY}px)`;
-                if (spriteAnchoringRot % 2 === 0) {
+                const isEvenQuarterTurn = spriteAnchoringRot === 0 || spriteAnchoringRot === 2;
+                if (isEvenQuarterTurn) {
                     img.style.width = '100%';
                     img.style.height = 'auto';
                 } else {
@@ -806,6 +1091,10 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
                 wrapper.appendChild(img);
                 _customFollowEl.appendChild(wrapper);
+                draggedItem.pointerToAnchorOffsetPx = {
+                    x: Number(defaultAnchorLocalPx.x),
+                    y: Number(defaultAnchorLocalPx.y)
+                };
             }
         } else {
             const icon = document.createElement('div');
@@ -819,6 +1108,10 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             icon.style.fontSize = '2rem';
             icon.innerText = draggedItem.item.icon;
             _customFollowEl.appendChild(icon);
+            draggedItem.pointerToAnchorOffsetPx = {
+                x: Number(defaultAnchorLocalPx.x),
+                y: Number(defaultAnchorLocalPx.y)
+            };
         }
     };
 
@@ -858,10 +1151,15 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         window._dragLastPos = { x: clientX, y: clientY };
         const curOffsetX = (draggedItem && typeof draggedItem.offsetX === 'number') ? draggedItem.offsetX : _localOffsetX;
         const curOffsetY = (draggedItem && typeof draggedItem.offsetY === 'number') ? draggedItem.offsetY : _localOffsetY;
+        const anchorOffset = (draggedItem && _isFinitePoint(draggedItem.pointerToAnchorOffsetPx))
+            ? draggedItem.pointerToAnchorOffsetPx
+            : null;
+        const pointerToGhostOffsetX = anchorOffset ? Number(anchorOffset.x) : (curOffsetX * _cachedGeo.cellW);
+        const pointerToGhostOffsetY = anchorOffset ? Number(anchorOffset.y) : (curOffsetY * _cachedGeo.cellH);
         
         // Use cached geometry for compositor-friendly transform positioning (no layout reads)
-        const px = Math.round(clientX - (curOffsetX * _cachedGeo.cellW));
-        const py = Math.round(clientY - (curOffsetY * _cachedGeo.cellH));
+        const px = Math.round(clientX - pointerToGhostOffsetX);
+        const py = Math.round(clientY - pointerToGhostOffsetY);
         
         if (_customFollowEl) {
             // Use transform for GPU-accelerated movement (no layout thrashing)
@@ -887,6 +1185,9 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     // initial position
     const initX = (startEvent && startEvent.clientX) || (window._dragLastPos && window._dragLastPos.x) || (window.innerWidth/2);
     const initY = (startEvent && startEvent.clientY) || (window._dragLastPos && window._dragLastPos.y) || (window.innerHeight/2);
+    if (draggedItem && _isFinitePoint(draggedItem.pointerToAnchorOffsetPx)) {
+        _debugDragAnchor('start', draggedItem.rotationIndex, draggedItem.pointerToAnchorOffsetPx, { x: initX, y: initY });
+    }
     updatePos(initX, initY);
 
     // pointer move/up handlers
@@ -981,18 +1282,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
         // cleanup follow element after a short timeout to allow placement to clear draggedItem
         setTimeout(() => {
-            if (_customFollowEl && _customFollowEl.parentNode) _customFollowEl.parentNode.removeChild(_customFollowEl);
-            _customFollowEl = null;
-            window.removeEventListener('pointermove', _customPointerMove);
-            window.removeEventListener('pointerup', _customPointerUp);
-            if (_rotationKeyHandler) window.removeEventListener('keydown', _rotationKeyHandler);
-            if (_rotationWheelHandler) window.removeEventListener('wheel', _rotationWheelHandler);
-            _customPointerMove = null;
-            _customPointerUp = null;
-            _rotationKeyHandler = null;
-            _rotationWheelHandler = null;
-            // Restore cursor
-            document.body.style.cursor = '';
+            _cleanupCustomDragArtifacts();
             
             // Performance report
             if (_perfEnabled && _perfFrameTimes.length > 0) {
@@ -1007,27 +1297,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             
             // if draggedItem still exists (drop failed), restore
             if (draggedItem) {
-                if (gameData[draggedItem.fromLocation]) {
-                    const fromCols = draggedItem.fromCols || (draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
-                    const restoreShape = (typeof getItemBodyMatrix === 'function')
-                        ? getItemBodyMatrix(draggedItem.item, draggedItem.rotationIndex || 0)
-                        : (draggedItem.item?.body || draggedItem.previewShape);
-                    placeItemIntoGrid(
-                        gameData[draggedItem.fromLocation],
-                        draggedItem.fromIndex,
-                        draggedItem.item,
-                        restoreShape,
-                        fromCols,
-                        draggedItem.instanceId,
-                        null,
-                        draggedItem.rotatedAura || null,
-                        draggedItem.rotationIndex
-                    );
-                }
-                draggedItem = null;
-                renderAllActiveGrids();
+                _restoreDraggedItemToSourceIfNeeded();
             }
-            document.body.classList.remove('dragging','drop-allowed','drop-invalid');
         }, 10);
     };
 
@@ -1038,6 +1309,15 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     _rotationKeyHandler = (e) => {
         if (!draggedItem) return;
         if (typeof window.isKeybindCaptureActive === 'function' && window.isKeybindCaptureActive()) return;
+        const isCancelKey = (typeof window.matchesActionKeybinding === 'function')
+            ? window.matchesActionKeybinding('cancelAction', e)
+            : (!!e && e.key === 'Escape');
+        if (isCancelKey) {
+            e.preventDefault();
+            _restoreDraggedItemToSourceIfNeeded();
+            _cleanupCustomDragArtifacts();
+            return;
+        }
         const isRotateKey = (typeof window.matchesActionKeybinding === 'function')
             ? window.matchesActionKeybinding('rotateItem', e)
             : (!!e && typeof e.key === 'string' && e.key.toLowerCase() === 'r');
@@ -1070,7 +1350,10 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 window.DragSystem = {
     // Drag state access
     getDraggedItem: () => draggedItem,
-    clearDraggedItem: () => { draggedItem = null; },
+    clearDraggedItem: () => {
+        draggedItem = null;
+        _cleanupCustomDragArtifacts();
+    },
     
     // Drag operations
     startCustomDrag: startCustomDrag,
