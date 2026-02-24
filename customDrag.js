@@ -423,6 +423,11 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     const spriteAnchoringRot = canonicalRotationIndex;
     const spriteMeta = _resolveSpriteMetaItemForDrag(item);
     const spriteMetaItem = spriteMeta.item || item;
+    const spriteGeometry = {
+        cellSizePx: slotSize,
+        stepPx: cellW2,
+        gapPx: gap
+    };
 
     // ADD AURA OVERLAY FIRST (behind icon)
     // Use rotated aura if available (when picking up rotated item)
@@ -497,28 +502,18 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             : { minR: 0, minC: 0 };
         const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
             ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
-                item: spriteMetaItem,
-                cellSizePx: slotSize,
-                stepPx: cellW2,
-                slotSizePx: slotSize,
-                gapPx: gap,
+                itemDef: spriteMetaItem,
                 rot: spriteAnchoringRot,
+                geometry: spriteGeometry,
                 bodyBounds
             })
             : null;
         const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
             ? spriteAnchoring.computeAnchoredSpriteStyle({
-                item: spriteMetaItem,
-                cellSizePx: slotSize,
-                stepPx: cellW2,
-                slotSizePx: slotSize,
-                gapPx: gap,
+                itemDef: spriteMetaItem,
                 rot: spriteAnchoringRot,
-                spriteBox: spriteMetaItem.spriteBox,
-                spriteBoxByRot: spriteMetaItem.spriteBoxByRot,
-                spriteAnchorCell: spriteMetaItem.spriteAnchorCell,
-                spriteAnchorInBoxCell: spriteMetaItem.spriteAnchorInBoxCell,
-                spriteAnchorOffsetPx: spriteMetaItem.spriteAnchorOffsetPx
+                geometry: spriteGeometry,
+                layerLayout: spriteLayerLayout
             })
             : null;
 
@@ -662,6 +657,11 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         const spriteAnchoringRot = canonicalRotationIndex;
         const spriteMeta = _resolveSpriteMetaItemForDrag(draggedItem.item);
         const spriteMetaItem = spriteMeta.item || draggedItem.item;
+        const spriteGeometry = {
+            cellSizePx: slotSize2,
+            stepPx: cellWLocal,
+            gapPx: gap2
+        };
 
         // ADD AURA OVERLAY (using rotated aura if available)
         const aura = (typeof getItemAuraMatrix === 'function')
@@ -739,28 +739,18 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 : { minR: 0, minC: 0 };
             const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
                 ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
-                    item: spriteMetaItem,
-                    cellSizePx: slotSize2,
-                    stepPx: cellWLocal,
-                    slotSizePx: slotSize2,
-                    gapPx: gap2,
+                    itemDef: spriteMetaItem,
                     rot: spriteAnchoringRot,
+                    geometry: spriteGeometry,
                     bodyBounds
                 })
                 : null;
             const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
                 ? spriteAnchoring.computeAnchoredSpriteStyle({
-                    item: spriteMetaItem,
-                    cellSizePx: slotSize2,
-                    stepPx: cellWLocal,
-                    slotSizePx: slotSize2,
-                    gapPx: gap2,
+                    itemDef: spriteMetaItem,
                     rot: spriteAnchoringRot,
-                    spriteBox: spriteMetaItem.spriteBox,
-                    spriteBoxByRot: spriteMetaItem.spriteBoxByRot,
-                    spriteAnchorCell: spriteMetaItem.spriteAnchorCell,
-                    spriteAnchorInBoxCell: spriteMetaItem.spriteAnchorInBoxCell,
-                    spriteAnchorOffsetPx: spriteMetaItem.spriteAnchorOffsetPx
+                    geometry: spriteGeometry,
+                    layerLayout: spriteLayerLayout
                 })
                 : null;
 

@@ -63,6 +63,32 @@ function _readOffsetPair(value) {
     };
 }
 
+const _spriteAnchorPlacedDebugState = new Map();
+
+function _debugSpriteAnchorPlacedOncePerState(state) {
+    if (typeof window === 'undefined' || window.DEBUG_SPRITE_ANCHOR !== true) return;
+    if (!state || !state.itemId || state.itemId !== 'armor_new_2') return;
+    const instanceKey = state.instanceId || `${state.location || 'unknown'}:${state.index ?? 'na'}`;
+    const signature = [
+        state.gridRotationIndex,
+        state.rotGridLookupRot,
+        state.spriteAnchoringRot,
+        state.metaSource,
+        state.offsetCellsX,
+        state.offsetCellsY,
+        state.offsetItemPxX,
+        state.offsetItemPxY,
+        state.offsetPxX,
+        state.offsetPxY
+    ].join('|');
+    const previous = _spriteAnchorPlacedDebugState.get(instanceKey);
+    if (previous === signature) return;
+    _spriteAnchorPlacedDebugState.set(instanceKey, signature);
+    console.debug(
+        `[SPRITE_ANCHOR][placed] instanceId=${state.instanceId || ''} gridRotationIndex=${state.gridRotationIndex} rotGridLookupRot=${state.rotGridLookupRot} spriteAnchoringRot=${state.spriteAnchoringRot} metaSource=${state.metaSource} offsetCells=(${state.offsetCellsX},${state.offsetCellsY}) offsetItemPx=(${state.offsetItemPxX},${state.offsetItemPxY}) offsetPx=(${state.offsetPxX},${state.offsetPxY})`
+    );
+}
+
 function _findFirstPlacementIndex(grid, shape, cols, rows) {
     const maxSlots = cols * rows;
     for (let i = 0; i < maxSlots; i++) {
@@ -261,14 +287,30 @@ function createSlot(container, location, index, cols) {
     const rotationDeg = rotationIndex * 90;
     const spriteMeta = _resolveSpriteMetaItemForPlaced(cell.itemId, item);
     const spriteItem = spriteMeta.item || item;
-    if (typeof window !== 'undefined' && window.DEBUG_SPRITE_ANCHOR === true && item.id === 'armor_new_2') {
-        const offsetCells = _readOffsetPair(spriteItem && spriteItem.spriteAnchorOffsetCells);
-        const offsetItemPx = _readOffsetPair(spriteItem && spriteItem.spriteAnchorOffsetItemPx);
-        const offsetPx = _readOffsetPair(spriteItem && spriteItem.spriteAnchorOffsetPx);
-        console.debug(
-            `[SPRITE_ANCHOR][placed] instanceId=${cell.instanceId || ''} gridRotationIndex=${gridRotationIndex} rotGridLookupRot=${rotGridLookupRot} spriteAnchoringRot=${spriteAnchoringRot} metaSource=${spriteMeta.source} offsetCells=(${offsetCells.x},${offsetCells.y}) offsetItemPx=(${offsetItemPx.x},${offsetItemPx.y}) offsetPx=(${offsetPx.x},${offsetPx.y})`
-        );
-    }
+    const offsetCells = _readOffsetPair(spriteItem && spriteItem.spriteAnchorOffsetCells);
+    const offsetItemPx = _readOffsetPair(spriteItem && spriteItem.spriteAnchorOffsetItemPx);
+    const offsetPx = _readOffsetPair(spriteItem && spriteItem.spriteAnchorOffsetPx);
+    _debugSpriteAnchorPlacedOncePerState({
+        itemId: item.id,
+        instanceId: cell.instanceId || '',
+        location,
+        index,
+        gridRotationIndex,
+        rotGridLookupRot,
+        spriteAnchoringRot,
+        metaSource: spriteMeta.source,
+        offsetCellsX: offsetCells.x,
+        offsetCellsY: offsetCells.y,
+        offsetItemPxX: offsetItemPx.x,
+        offsetItemPxY: offsetItemPx.y,
+        offsetPxX: offsetPx.x,
+        offsetPxY: offsetPx.y
+    });
+    const spriteGeometry = {
+        cellSizePx: slotSize,
+        stepPx: geo.cellW,
+        gapPx: gap
+    };
     if (spriteItem && (spriteItem.sprite || spriteItem.image)) {
         const img = document.createElement('img');
         img.src = spriteItem.sprite || spriteItem.image;
@@ -284,28 +326,18 @@ function createSlot(container, location, index, cols) {
             : { minR: 0, minC: 0 };
         const spriteLayerLayout = (hasAnchorMeta && typeof spriteAnchoring.computeAnchoredSpriteLayerLayout === 'function')
             ? spriteAnchoring.computeAnchoredSpriteLayerLayout({
-                item: spriteItem,
-                cellSizePx: slotSize,
-                stepPx: geo.cellW,
-                slotSizePx: slotSize,
-                gapPx: gap,
+                itemDef: spriteItem,
                 rot: spriteAnchoringRot,
+                geometry: spriteGeometry,
                 bodyBounds
             })
             : null;
         const anchoredStyle = (hasAnchorMeta && spriteLayerLayout && typeof spriteAnchoring.computeAnchoredSpriteStyle === 'function')
             ? spriteAnchoring.computeAnchoredSpriteStyle({
-                item: spriteItem,
-                cellSizePx: slotSize,
-                stepPx: geo.cellW,
-                slotSizePx: slotSize,
-                gapPx: gap,
+                itemDef: spriteItem,
                 rot: spriteAnchoringRot,
-                spriteBox: spriteItem.spriteBox,
-                spriteBoxByRot: spriteItem.spriteBoxByRot,
-                spriteAnchorCell: spriteItem.spriteAnchorCell,
-                spriteAnchorInBoxCell: spriteItem.spriteAnchorInBoxCell,
-                spriteAnchorOffsetPx: spriteItem.spriteAnchorOffsetPx
+                geometry: spriteGeometry,
+                layerLayout: spriteLayerLayout
             })
             : null;
 
