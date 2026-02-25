@@ -136,18 +136,20 @@ function quickTransferItemBetweenStorageAndActive(location, cell) {
         return true;
     }
 
-    clearItemFromGrid(sourceGrid, cell.instanceId);
-    placeItemIntoGrid(
-        targetGrid,
-        targetIndex,
-        item,
-        shapeCopy,
-        targetDims.cols,
-        cell.instanceId,
-        targetDims.rows,
-        cell.rotatedAura || null,
+    const tx = tryPlaceItemTransactional(targetGrid, item, shapeCopy, targetIndex, targetDims.cols, {
+        instanceId: cell.instanceId,
+        maxRows: targetDims.rows,
+        rotatedAura: cell.rotatedAura || null,
         rotationIndex
-    );
+    });
+    if (!tx.ok) {
+        if (typeof window !== 'undefined' && typeof window.showStorageToast === 'function') {
+            window.showStorageToast('No space');
+        }
+        return true;
+    }
+
+    clearItemFromGrid(sourceGrid, cell.instanceId);
 
     if (typeof saveGame === 'function') saveGame();
     if (typeof renderWorkshopGrids === 'function') {

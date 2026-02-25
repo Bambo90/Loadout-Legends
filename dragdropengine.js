@@ -1,17 +1,10 @@
 // ================================
 // DRAG & DROP ENGINE (Dragdropengine.js)
-// Handhabt das Ablegen mit Offset
+// Drop handling + placement validation
 // ================================
 
-/**
- * Render all active grids (Workshop and/or Character-Hub)
- * Called after drop, rotation, or other grid-changing operations
- */
 function renderAllActiveGrids() {
-    // Update Workshop if open
     try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); }
-    
-    // If Character-Hub is visible, also update its grid
     const tabCharacter = document.getElementById('tab-character');
     if (tabCharacter && tabCharacter.classList.contains('active')) {
         if (typeof renderCharacterHubGrid === 'function') {
@@ -20,258 +13,263 @@ function renderAllActiveGrids() {
     }
 }
 
-/**
- * Post-drop render: Update both Workshop and Character-Hub grids if visible
- */
 function postDropRender() {
     renderAllActiveGrids();
+}
+
+function _hasBodyOverlapWithGrid(bodyShape, originX, originY, cols, maxRows) {
+    const bodyW = bodyShape[0] ? bodyShape[0].length : 1;
+    const bodyH = bodyShape.length;
+    for (let r = 0; r < bodyH; r++) {
+        for (let c = 0; c < bodyW; c++) {
+            if (!bodyShape[r][c]) continue;
+            const x = originX + c;
+            const y = originY + r;
+            if (x >= 0 && x < cols && y >= 0 && y < maxRows) return true;
+        }
+    }
+    return false;
+}
+
+function _findNearestValidOriginIndex(grid, desiredOriginX, desiredOriginY, bodyShape, cols, maxRows, radius) {
+    for (let d = 0; d <= radius; d++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                if (Math.abs(dx) > d && Math.abs(dy) > d) continue;
+                const ox = desiredOriginX + dx;
+                const oy = desiredOriginY + dy;
+                if (!_hasBodyOverlapWithGrid(bodyShape, ox, oy, cols, maxRows)) continue;
+                const oidx = (oy * cols) + ox;
+                if (canPlaceItem(grid, oidx, bodyShape, cols, maxRows)) {
+                    return oidx;
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function resolveDropPlacementPlan(config) {
+    const draggedItem = config && config.draggedItem;
+    const location = config && config.location;
+    const targetIndex = Number(config && config.targetIndex);
+    const cols = Number(config && config.cols);
+    const maxRows = Number(config && config.maxRows);
+    const grid = config && config.grid;
+    const searchRadius = Number.isFinite(Number(config && config.searchRadius))
+        ? Math.max(0, Math.floor(Number(config.searchRadius)))
+        : 2;
+    const allowRadiusSearch = config && config.allowRadiusSearch !== false;
+
+    if (!draggedItem || !grid || !Number.isFinite(targetIndex) || !Number.isFinite(cols) || cols <= 0 || !Number.isFinite(maxRows) || maxRows <= 0) {
+        return { ok: false, reason: 'invalid_input', location, targetIndex, cols, maxRows };
+    }
+
+    const bodyShape = draggedItem.previewShape;
+    if (!Array.isArray(bodyShape) || bodyShape.length === 0) {
+        return { ok: false, reason: 'missing_body_shape', location, targetIndex, cols, maxRows };
+    }
+
+    const bodyW = bodyShape[0] ? bodyShape[0].length : 1;
+    const bodyH = bodyShape.length;
+    const hoverX = targetIndex % cols;
+    const hoverY = Math.floor(targetIndex / cols);
+    const offsetX = Number.isFinite(Number(draggedItem.offsetX)) ? Math.floor(Number(draggedItem.offsetX)) : 0;
+    const offsetY = Number.isFinite(Number(draggedItem.offsetY)) ? Math.floor(Number(draggedItem.offsetY)) : 0;
+    const originX = hoverX - offsetX;
+    const originY = hoverY - offsetY;
+    const originIndex = (originY * cols) + originX;
+    const hasOverlap = _hasBodyOverlapWithGrid(bodyShape, originX, originY, cols, maxRows);
+
+    if (!hasOverlap) {
+        return {
+            ok: true,
+            reason: 'no_overlap',
+            location,
+            targetIndex,
+            cols,
+            maxRows,
+            bodyShape,
+            bodyW,
+            bodyH,
+            offsetX,
+            offsetY,
+            originX,
+            originY,
+            originIndex,
+            chosenIndex: originIndex,
+            canPlaceDirect: false,
+            canPlace: false,
+            hasOverlap,
+            usedRadiusSearch: false,
+            searchRadius
+        };
+    }
+
+    const canPlaceDirect = canPlaceItem(grid, originIndex, bodyShape, cols, maxRows);
+    if (canPlaceDirect) {
+        return {
+            ok: true,
+            reason: 'direct_valid',
+            location,
+            targetIndex,
+            cols,
+            maxRows,
+            bodyShape,
+            bodyW,
+            bodyH,
+            offsetX,
+            offsetY,
+            originX,
+            originY,
+            originIndex,
+            chosenIndex: originIndex,
+            canPlaceDirect: true,
+            canPlace: true,
+            hasOverlap,
+            usedRadiusSearch: false,
+            searchRadius
+        };
+    }
+
+    if (!allowRadiusSearch) {
+        return {
+            ok: true,
+            reason: 'direct_invalid_no_search',
+            location,
+            targetIndex,
+            cols,
+            maxRows,
+            bodyShape,
+            bodyW,
+            bodyH,
+            offsetX,
+            offsetY,
+            originX,
+            originY,
+            originIndex,
+            chosenIndex: originIndex,
+            canPlaceDirect: false,
+            canPlace: false,
+            hasOverlap,
+            usedRadiusSearch: false,
+            searchRadius
+        };
+    }
+
+    const found = _findNearestValidOriginIndex(grid, originX, originY, bodyShape, cols, maxRows, searchRadius);
+    return {
+        ok: true,
+        reason: found !== null ? 'radius_found' : 'radius_not_found',
+        location,
+        targetIndex,
+        cols,
+        maxRows,
+        bodyShape,
+        bodyW,
+        bodyH,
+        offsetX,
+        offsetY,
+        originX,
+        originY,
+        originIndex,
+        chosenIndex: found !== null ? found : originIndex,
+        canPlaceDirect: false,
+        canPlace: found !== null,
+        hasOverlap,
+        usedRadiusSearch: true,
+        searchRadius
+    };
+}
+
+function _matchesStoredPreviewPlan(draggedItem, location, cols) {
+    if (!draggedItem || !draggedItem.lastPreviewPlan) return false;
+    const entry = draggedItem.lastPreviewPlan;
+    if (entry.location !== location) return false;
+    if (entry.cols !== cols) return false;
+    if (entry.rotationIndex !== draggedItem.rotationIndex) return false;
+    if (entry.offsetX !== draggedItem.offsetX || entry.offsetY !== draggedItem.offsetY) return false;
+    return !!entry.plan;
+}
+
+function _restoreDraggedItemFromSource() {
+    if (!DragSystem || typeof DragSystem.restoreDraggedItemToSource !== 'function') return false;
+    return !!DragSystem.restoreDraggedItemToSource();
 }
 
 function handleDropInSlot(e) {
     e.preventDefault();
     const draggedItem = DragSystem.getDraggedItem();
     if (!draggedItem) return;
-    const debugPlacement = (typeof window !== 'undefined' && window.DEBUG_PLACEMENT === true);
 
     const slot = e.currentTarget;
     const location = slot.dataset.location;
-    const targetIndex = parseInt(slot.dataset.index);
-    const cols = parseInt(slot.dataset.cols);
-    
-    // Calculate max rows based on location
-    let maxRows = GRID_ROWS;
-    if (location === 'bank') {
-        maxRows = Math.ceil(BANK_SLOTS / cols);
-    }
-
+    const targetIndex = parseInt(slot.dataset.index, 10);
+    const cols = parseInt(slot.dataset.cols, 10);
+    const maxRows = location === 'bank' ? Math.ceil(BANK_SLOTS / cols) : GRID_ROWS;
     const grid = gameData[location];
+    const debugPlacement = (typeof window !== 'undefined' && window.DEBUG_PLACEMENT === true);
+
     if (!grid) {
-        console.error("Grid not found for location:", location);
-        // Restore item if drop location doesn't exist
-        const restoreShape = (typeof getItemBodyMatrix === 'function')
-            ? getItemBodyMatrix(draggedItem.item, draggedItem.rotationIndex || 0)
-            : (draggedItem.item?.body || draggedItem.previewShape);
-        const fallbackFromCols = draggedItem && draggedItem.fromCols ? draggedItem.fromCols : (draggedItem && draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
-        placeItemIntoGrid(
-            gameData[draggedItem.fromLocation],
-            draggedItem.fromIndex,
-            draggedItem.item,
-            restoreShape,
-            fallbackFromCols,
-            draggedItem.instanceId,
-            null,
-            draggedItem.rotatedAura || null,
-            draggedItem.rotationIndex
-        );
-        DragSystem.clearDraggedItem();
+        if (debugPlacement) console.debug('❌ Drop failed: missing target grid', { location });
+        _restoreDraggedItemFromSource();
         postDropRender();
         return;
     }
 
-    // previewShape is ALWAYS body (set in customDrag.js)
-    // Aura is never involved in placement logic
-    const bodyShape = draggedItem.previewShape;
-    const bodyW = bodyShape[0] ? bodyShape[0].length : 1;
-    const bodyH = bodyShape.length;
+    const searchRadius = location !== draggedItem.fromLocation ? 4 : 2;
+    const plan = _matchesStoredPreviewPlan(draggedItem, location, cols)
+        ? draggedItem.lastPreviewPlan.plan
+        : resolveDropPlacementPlan({
+            draggedItem,
+            location,
+            targetIndex,
+            cols,
+            maxRows,
+            grid,
+            searchRadius,
+            allowRadiusSearch: true
+        });
 
-    const item = draggedItem.item;
-
-    // Grid-to-Grid Snapping: Berechne den echten Ursprungsslot (Top-Left)
-    // If moving to a different grid, reset offset to safe default
-    let adjustedOffsetX = draggedItem.offsetX;
-    let adjustedOffsetY = draggedItem.offsetY;
-    
-    if (location !== draggedItem.fromLocation) {
-        // Cross-grid move: use center of item as anchor
-        adjustedOffsetX = Math.floor(bodyW / 2);
-        adjustedOffsetY = Math.floor(bodyH / 2);
+    if (!plan || !plan.ok) {
+        if (debugPlacement) console.debug('❌ Drop failed: invalid plan', { location, targetIndex, cols });
+        _restoreDraggedItemFromSource();
+        postDropRender();
+        return;
     }
-    
-    const mouseX = targetIndex % cols;
-    const mouseY = Math.floor(targetIndex / cols);
-    
-    const originX = mouseX - adjustedOffsetX;
-    const originY = mouseY - adjustedOffsetY;
-    const finalOriginIndex = originY * cols + originX;
-    
-    if (debugPlacement) console.debug('🔷 DROP ATTEMPT ->', { 
-        location, targetIndex, cols, maxRows,
-        bodyShape: JSON.stringify(bodyShape),
-        bodyDim: { h: bodyH, w: bodyW },
-        bodyDim: { h: bodyH, w: bodyW },
-        adjustedOffset: { x: adjustedOffsetX, y: adjustedOffsetY },
-        originXY: { x: originX, y: originY },
-        finalOriginIndex,
-        rightEdge: originX + bodyW,
-        bottomEdge: originY + bodyH,
-        crossGrid: location !== draggedItem.fromLocation
+
+    if (!plan.hasOverlap || !plan.canPlace) {
+        if (debugPlacement) console.debug('❌ Drop rejected by plan', {
+            reason: plan.reason,
+            hasOverlap: plan.hasOverlap,
+            canPlace: plan.canPlace
+        });
+        _restoreDraggedItemFromSource();
+        postDropRender();
+        return;
+    }
+
+    const tx = tryPlaceItemTransactional(grid, draggedItem.item, draggedItem.previewShape, plan.chosenIndex, cols, {
+        instanceId: draggedItem.instanceId,
+        maxRows,
+        rotatedAura: draggedItem.rotatedAura || null,
+        rotationIndex: draggedItem.rotationIndex
     });
-    
-    if (debugPlacement) console.debug('  📌 Grid bounds: cols=', cols, 'maxRows=', maxRows, '| Body would occupy X:', originX, 'to', originX + bodyW - 1, '| Y:', originY, 'to', originY + bodyH - 1);
 
-    // Helper: Check if body has ANY overlap with grid (not "fully inside")
-    // Backpack Battles: Body only needs 1 cell touching grid, can partially extend outside
-    function hasBodyOverlapWithGrid(bodyShape, originX, originY, cols, maxRows) {
-        const bodyW = bodyShape[0] ? bodyShape[0].length : 1;
-        const bodyH = bodyShape.length;
-        
-        for (let r = 0; r < bodyH; r++) {
-            for (let c = 0; c < bodyW; c++) {
-                if (!bodyShape[r][c]) continue; // Skip empty cells in shape
-                const x = originX + c;
-                const y = originY + r;
-                // Check if this cell is within grid bounds
-                if (x >= 0 && x < cols && y >= 0 && y < maxRows) {
-                    return true; // At least 1 cell touches grid
-                }
-            }
-        }
-        return false; // No part of body touches grid = fully outside
-    }
-
-    // Helper: Check if body placement is valid (no collisions, correct boundaries)
-    function tryFindNearestValid(grid, desiredOriginX, desiredOriginY, bodyShape, cols, maxRows, radius) {
-        const bodyW = bodyShape[0] ? bodyShape[0].length : 1;
-        const bodyH = bodyShape.length;
-        for (let d = 0; d <= radius; d++) {
-            for (let dx = -d; dx <= d; dx++) {
-                for (let dy = -d; dy <= d; dy++) {
-                    const ox = desiredOriginX + dx;
-                    const oy = desiredOriginY + dy;
-                    // Skip candidates with no body overlap (prevents picking placements fully off-grid)
-                    if (!hasBodyOverlapWithGrid(bodyShape, ox, oy, cols, maxRows)) continue;
-                    const oidx = oy * cols + ox;
-                    if (canPlaceItem(grid, oidx, bodyShape, cols, maxRows)) return oidx;
-                }
-            }
-        }
-        return null;
-    }
-
-    // BACKPACK BATTLES LOGIC:
-    // 1. If body has NO overlap with grid at all → Snap back immediately
-    // 2. If body has overlap but placement invalid → Try radius search
-    // 3. If overlap but no valid placement found → Snap back
-    const hasOverlap = hasBodyOverlapWithGrid(bodyShape, originX, originY, cols, maxRows);
-    
-    if (debugPlacement) console.debug('  🔍 Body overlap check:', hasOverlap ? '✅ HAS OVERLAP' : '❌ NO OVERLAP (completely outside)');
-    
-    if (!hasOverlap) {
-        if (debugPlacement) console.debug('❌ BODY COMPLETELY OUTSIDE GRID (no overlap) - snapping back to Storage');
-        const fromCols = draggedItem && draggedItem.fromCols ? draggedItem.fromCols : (draggedItem && draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
-        placeItemIntoGrid(
-            gameData[draggedItem.fromLocation],
-            draggedItem.fromIndex,
-            draggedItem.item,
-            bodyShape,
-            fromCols,
-            draggedItem.instanceId,
-            null,
-            draggedItem.rotatedAura || null,
-            draggedItem.rotationIndex
-        );
-        DragSystem.clearDraggedItem();
+    if (!tx.ok) {
+        if (debugPlacement) console.debug('❌ Drop commit failed', tx);
+        _restoreDraggedItemFromSource();
         postDropRender();
         return;
     }
 
-    // FIRST: Try direct placement (body must be fully inside and collision-free)
-    let canPlace = canPlaceItem(grid, finalOriginIndex, bodyShape, cols, maxRows);
-    if (debugPlacement) console.debug('  📍 Direct placement at origin index', finalOriginIndex, ':', canPlace ? '✅ VALID' : '❌ INVALID');
-    
-    if (!canPlace) {
-        if (debugPlacement) console.debug('    ⚠️ Reason: Body does not fit fully in grid or collision detected');
-    }
-
-    let chosenIndex = finalOriginIndex;
-    
-    // SECOND: If direct placement fails BUT body overlaps grid, search for nearby valid spot
-    // This allows partial placement like Backpack Battles
-    if (!canPlace) {
-        const searchRadius = location !== draggedItem.fromLocation ? 4 : 2;
-        if (debugPlacement) console.debug('  🔍 Searching for valid placement within radius', searchRadius, '(cross-grid:', location !== draggedItem.fromLocation, ')');
-        let searchAttempts = 0;
-        let skippedNoOverlap = 0;
-        
-        // Log original function to count attempts
-        const originalTryFindNearestValid = tryFindNearestValid;
-        const found = (() => {
-            const bodyW = bodyShape[0] ? bodyShape[0].length : 1;
-            const bodyH = bodyShape.length;
-            for (let d = 0; d <= searchRadius; d++) {
-                for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-                    for (let dy = -searchRadius; dy <= searchRadius; dy++) {
-                        if (Math.abs(dx) > d && Math.abs(dy) > d) continue; // Skip diagonal corners beyond current radius
-                        const ox = originX + dx;
-                        const oy = originY + dy;
-                        searchAttempts++;
-                        
-                        // Skip candidates with no body overlap (prevents picking placements fully off-grid)
-                        if (!hasBodyOverlapWithGrid(bodyShape, ox, oy, cols, maxRows)) {
-                            skippedNoOverlap++;
-                            continue;
-                        }
-                        
-                        const oidx = oy * cols + ox;
-                        if (canPlaceItem(grid, oidx, bodyShape, cols, maxRows)) {
-                            if (debugPlacement) console.debug('    ✅ Found valid at offset (dx=', dx, 'dy=', dy, ') → originXY (', ox, ',', oy, ') index=', oidx);
-                            return oidx;
-                        }
-                    }
-                }
-            }
-            return null;
-        })();
-        
-        if (debugPlacement) console.debug('    📊 Search stats: attempts=', searchAttempts, 'skipped(no overlap)=', skippedNoOverlap);
-        
-        if (found !== null) {
-            if (debugPlacement) console.debug('  ✅ Found valid placement at index', found, 'within radius', searchRadius);
-            chosenIndex = found;
-            canPlace = true;
-        } else {
-            if (debugPlacement) console.debug('  ✋ No valid placement found even with radius search');
-        }
-    }
-
-    // VALIDATION: If still invalid, snap back to original location
-    if (!canPlace) {
-        if (debugPlacement) console.debug("❌ Drop FAILED - restoring item to original location (no valid placement found)");
-        const fromCols = draggedItem && draggedItem.fromCols ? draggedItem.fromCols : (draggedItem && draggedItem.fromLocation === 'bank' ? ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6) : GRID_SIZE);
-        placeItemIntoGrid(
-            gameData[draggedItem.fromLocation],
-            draggedItem.fromIndex,
-            draggedItem.item,
-            bodyShape,
-            fromCols,
-            draggedItem.instanceId,
-            null,
-            draggedItem.rotatedAura || null,
-            draggedItem.rotationIndex
-        );
-        DragSystem.clearDraggedItem();
-        postDropRender();
-        return;
-    }
-
-    // Platzieren
-    // Store ONLY the body in grid to avoid aura blocking placements/edges
-    placeItemIntoGrid(
-        grid,
-        chosenIndex,
-        draggedItem.item,
-        bodyShape,
-        cols,
-        draggedItem.instanceId,
-        null,
-        draggedItem.rotatedAura || null,
-        draggedItem.rotationIndex
-    );
-    if (debugPlacement) console.debug('✅ PLACED ITEM', { itemId: draggedItem.item.id, instance: draggedItem.instanceId, location, index: chosenIndex });
     DragSystem.clearDraggedItem();
     postDropRender();
-    
     if (typeof saveGame === 'function') {
         saveGame();
     }
+}
+
+if (typeof window !== 'undefined') {
+    window.resolveDropPlacementPlan = resolveDropPlacementPlan;
 }

@@ -5,6 +5,7 @@
 
 const SAVE_KEY = "LoadoutLegends_v1";
 const SAVE_VERSION = 7;
+const ONE_TIME_RESET_MARKER_KEY = "LoadoutLegends_one_time_reset_2026_02_25";
 const DEFAULT_SETTINGS_AUDIO = Object.freeze({
     menu: 80,
     music: 70,
@@ -112,6 +113,17 @@ function getStorageAdapter() {
             }
         }
     };
+}
+
+function applyOneTimeForcedSaveReset(storage) {
+    if (!storage || typeof storage.getItem !== "function" || typeof storage.setItem !== "function" || typeof storage.removeItem !== "function") {
+        return;
+    }
+    const alreadyDone = storage.getItem(ONE_TIME_RESET_MARKER_KEY);
+    if (alreadyDone === "1") return;
+    storage.removeItem(SAVE_KEY);
+    storage.setItem(ONE_TIME_RESET_MARKER_KEY, "1");
+    console.warn("One-time save reset applied: existing save data was deleted.");
 }
 
 function cloneSaveData(data) {
@@ -318,7 +330,19 @@ function normalizeGridInstances(grid, cols) {
         const shapeCopy = shape.map(r => [...r]);
         const instanceId = cell.instanceId;
         const rotatedAura = cell.rotatedAura || null; // Preserve rotated aura if it was stored
-        placeItemIntoGrid(newGrid, k, item, shapeCopy, cols, instanceId, null, rotatedAura, rotationIndex);
+        const placed = placeItemIntoGrid(newGrid, k, item, shapeCopy, cols, instanceId, null, rotatedAura, rotationIndex);
+        if (placed) return;
+        const maxRows = (newGrid === gameData.bank) ? Math.ceil(BANK_SLOTS / cols) : GRID_ROWS;
+        for (let i = 0; i < cols * maxRows; i++) {
+            if (!canPlaceItem(newGrid, i, shapeCopy, cols, maxRows)) continue;
+            const fallbackPlaced = placeItemIntoGrid(newGrid, i, item, shapeCopy, cols, instanceId, null, rotatedAura, rotationIndex);
+            if (fallbackPlaced) return;
+        }
+        console.warn('normalizeGridInstances: failed to place item transactionally', {
+            itemId: cell.itemId,
+            instanceId,
+            originalIndex: k
+        });
     });
 
     return newGrid;
@@ -365,6 +389,7 @@ function saveGame() {
 
 function loadGame() {
     const storage = getStorageAdapter();
+    applyOneTimeForcedSaveReset(storage);
     const saved = storage.getItem(SAVE_KEY);
     if (saved) {
         try {
@@ -429,6 +454,9 @@ function loadGame() {
             if (typeof ensureItemInstanceIntegrity === "function") {
                 ensureItemInstanceIntegrity(gameData);
             }
+            if (typeof runGridIntegritySweep === 'function' && typeof window !== 'undefined' && window.DEBUG_GRID_INTEGRITY === true) {
+                runGridIntegritySweep(gameData, { debug: true });
+            }
 
             if (typeof ensureCharacterModelOnGameData === "function") {
                 ensureCharacterModelOnGameData(gameData);
@@ -460,6 +488,9 @@ function loadGame() {
         ensureSettingsDefaultsInData(gameData);
         if (typeof ensureItemInstanceIntegrity === "function") {
             ensureItemInstanceIntegrity(gameData);
+        }
+        if (typeof runGridIntegritySweep === 'function' && typeof window !== 'undefined' && window.DEBUG_GRID_INTEGRITY === true) {
+            runGridIntegritySweep(gameData, { debug: true });
         }
         if (typeof ensureCharacterModelOnGameData === "function") {
             ensureCharacterModelOnGameData(gameData);

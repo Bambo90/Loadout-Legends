@@ -9,11 +9,15 @@ let draggedItem = null; // Private drag state - only accessible via DragSystem A
 let _customFollowEl = null;
 let _customPointerMove = null;
 let _customPointerUp = null;
+let _customPointerCancel = null;
+let _windowBlurHandler = null;
 let _rotationKeyHandler = null;
 let _rotationWheelHandler = null;
 let _rotationCount = 0;
 let _lastKeyRotate = 0;
 let _lastWheelRotate = 0;
+let _dragCursorRootEl = null;
+let _dragCursorRootResolved = false;
 
 // ===== PERFORMANCE MONITORING =====
 let _perfFrameTimes = [];
@@ -235,10 +239,45 @@ function _debugDragAnchor(phase, rotationIndex, anchorLocalPx, mousePx) {
     );
 }
 
-function _restoreDragCursor() {
-    if (typeof document !== 'undefined' && document.body) {
-        document.body.style.cursor = '';
+function _ensureDragCursorStyle() {
+    if (typeof document === 'undefined') return;
+    if (document.getElementById('drag-cursor-style')) return;
+    const style = document.createElement('style');
+    style.id = 'drag-cursor-style';
+    style.textContent = '.is-dragging-item { cursor: none !important; }';
+    if (document.head) document.head.appendChild(style);
+}
+
+function _resolveDragCursorRoot(sourceElem) {
+    if (_dragCursorRootResolved) return _dragCursorRootEl;
+    let root = null;
+    if (sourceElem && typeof sourceElem.closest === 'function') {
+        root = sourceElem.closest('.workshop-content');
     }
+    if (!root && typeof document !== 'undefined') {
+        root = document.querySelector('.workshop-content')
+            || document.getElementById('tab-workshop')
+            || null;
+    }
+    _dragCursorRootEl = root;
+    _dragCursorRootResolved = true;
+    return _dragCursorRootEl;
+}
+
+function setDraggingCursorHidden(isHidden) {
+    if (typeof document === 'undefined') return;
+    const root = _resolveDragCursorRoot(null);
+    if (!root || !root.classList) return;
+    _ensureDragCursorStyle();
+    if (isHidden) {
+        root.classList.add('is-dragging-item');
+    } else {
+        root.classList.remove('is-dragging-item');
+    }
+}
+
+function _restoreDragCursor() {
+    setDraggingCursorHidden(false);
 }
 
 function _cleanupCustomDragArtifacts() {
@@ -246,10 +285,14 @@ function _cleanupCustomDragArtifacts() {
     _customFollowEl = null;
     if (_customPointerMove) window.removeEventListener('pointermove', _customPointerMove);
     if (_customPointerUp) window.removeEventListener('pointerup', _customPointerUp);
+    if (_customPointerCancel) window.removeEventListener('pointercancel', _customPointerCancel);
+    if (_windowBlurHandler) window.removeEventListener('blur', _windowBlurHandler);
     if (_rotationKeyHandler) window.removeEventListener('keydown', _rotationKeyHandler);
     if (_rotationWheelHandler) window.removeEventListener('wheel', _rotationWheelHandler);
     _customPointerMove = null;
     _customPointerUp = null;
+    _customPointerCancel = null;
+    _windowBlurHandler = null;
     _rotationKeyHandler = null;
     _rotationWheelHandler = null;
     _restoreDragCursor();
@@ -259,29 +302,121 @@ function _cleanupCustomDragArtifacts() {
     }
 }
 
-function _restoreDraggedItemToSourceIfNeeded() {
-    if (!draggedItem) return;
-    if (gameData[draggedItem.fromLocation]) {
-        const fromCols = draggedItem.fromCols || (draggedItem.fromLocation === 'bank'
-            ? (((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage') ? 10 : 6)
-            : GRID_SIZE);
-        const restoreShape = (typeof getItemBodyMatrix === 'function')
-            ? getItemBodyMatrix(draggedItem.item, draggedItem.rotationIndex || 0)
-            : (draggedItem.item?.body || draggedItem.previewShape);
-        placeItemIntoGrid(
-            gameData[draggedItem.fromLocation],
-            draggedItem.fromIndex,
-            draggedItem.item,
-            restoreShape,
-            fromCols,
-            draggedItem.instanceId,
-            null,
-            draggedItem.rotatedAura || null,
-            draggedItem.rotationIndex
-        );
+function _getGridRowsForLocation(location, cols) {
+    if (location === 'bank') {
+        return Math.ceil(BANK_SLOTS / cols);
     }
+    return GRID_ROWS;
+}
+
+function _findNearestValidOriginIndex(grid, desiredOriginX, desiredOriginY, bodyShape, cols, maxRows, radius) {
+    for (let d = 0; d <= radius; d++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                if (Math.abs(dx) > d && Math.abs(dy) > d) continue;
+                const ox = desiredOriginX + dx;
+                const oy = desiredOriginY + dy;
+                const originIndex = (oy * cols) + ox;
+                if (canPlaceItem(grid, originIndex, bodyShape, cols, maxRows)) {
+                    return originIndex;
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function _findFirstValidOriginIndex(grid, bodyShape, cols, maxRows) {
+    const total = cols * maxRows;
+    for (let i = 0; i < total; i++) {
+        if (canPlaceItem(grid, i, bodyShape, cols, maxRows)) return i;
+    }
+    return null;
+}
+
+function _findFirstBodyOffset(shape) {
+    if (!Array.isArray(shape)) return { r: 0, c: 0 };
+    for (let r = 0; r < shape.length; r++) {
+        const row = Array.isArray(shape[r]) ? shape[r] : [];
+        for (let c = 0; c < row.length; c++) {
+            if (row[c]) return { r, c };
+        }
+    }
+    return { r: 0, c: 0 };
+}
+
+function _restoreDraggedItemToSourceIfNeeded() {
+    if (!draggedItem) return false;
+
+    const snapshot = draggedItem.sourceSnapshot || {
+        location: draggedItem.fromLocation,
+        index: draggedItem.fromIndex,
+        cols: draggedItem.fromCols,
+        rotationIndex: draggedItem.rotationIndex,
+        rotatedAura: draggedItem.rotatedAura || null
+    };
+    const sourceLocation = snapshot.location;
+    const sourceGrid = sourceLocation ? gameData[sourceLocation] : null;
+    if (!sourceGrid) return false;
+
+    const fromCols = snapshot.cols || draggedItem.fromCols || (sourceLocation === 'bank' ? getBankCols() : GRID_SIZE);
+    const maxRows = _getGridRowsForLocation(sourceLocation, fromCols);
+    const rotationForRestore = getCanonicalRot(snapshot.rotationIndex);
+    const restoreShape = (typeof getItemBodyMatrix === 'function')
+        ? getItemBodyMatrix(draggedItem.item, rotationForRestore)
+        : (draggedItem.item?.body || draggedItem.previewShape);
+    const restoreAura = snapshot.rotatedAura || draggedItem.rotatedAura || null;
+
+    let chosenIndex = Number.isFinite(Number(snapshot.index))
+        ? Math.floor(Number(snapshot.index))
+        : draggedItem.fromIndex;
+    let tx = tryPlaceItemTransactional(sourceGrid, draggedItem.item, restoreShape, chosenIndex, fromCols, {
+        instanceId: draggedItem.instanceId,
+        maxRows,
+        rotatedAura: restoreAura,
+        rotationIndex: rotationForRestore
+    });
+
+    if (!tx.ok) {
+        const originX = chosenIndex % fromCols;
+        const originY = Math.floor(chosenIndex / fromCols);
+        const near = _findNearestValidOriginIndex(sourceGrid, originX, originY, restoreShape, fromCols, maxRows, Math.max(fromCols, maxRows));
+        if (near !== null) {
+            chosenIndex = near;
+            tx = tryPlaceItemTransactional(sourceGrid, draggedItem.item, restoreShape, chosenIndex, fromCols, {
+                instanceId: draggedItem.instanceId,
+                maxRows,
+                rotatedAura: restoreAura,
+                rotationIndex: rotationForRestore
+            });
+        }
+    }
+
+    if (!tx.ok) {
+        const fallback = _findFirstValidOriginIndex(sourceGrid, restoreShape, fromCols, maxRows);
+        if (fallback !== null) {
+            chosenIndex = fallback;
+            tx = tryPlaceItemTransactional(sourceGrid, draggedItem.item, restoreShape, chosenIndex, fromCols, {
+                instanceId: draggedItem.instanceId,
+                maxRows,
+                rotatedAura: restoreAura,
+                rotationIndex: rotationForRestore
+            });
+        }
+    }
+
+    if (!tx.ok) {
+        console.error('Failed to restore dragged item to source grid transactionally', {
+            instanceId: draggedItem.instanceId,
+            location: sourceLocation,
+            reason: tx.reason
+        });
+        return false;
+    }
+
     draggedItem = null;
     renderAllActiveGrids();
+    return true;
 }
 
 function _debugSpriteAnchorRotationGhost(item, instanceId, gridRotationIndex, rotGridLookupRot, spriteAnchoringRot, metaSource, metaItem) {
@@ -569,73 +704,88 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         console.error('❌ Item has no body shape!', item.id);
         return;
     }
+    const fromCols = (fromLocation === 'bank')
+        ? (typeof getBankCols === 'function' ? getBankCols() : 10)
+        : GRID_SIZE;
+    const initialAura = Array.isArray(rotatedAura)
+        ? rotatedAura.map((row) => Array.isArray(row) ? [...row] : [])
+        : ((typeof getItemAuraMatrix === 'function')
+            ? getItemAuraMatrix(item, initialRotationIndex)
+            : null);
+    const firstBodyOffset = _findFirstBodyOffset(baseShape);
+    const sourceOriginIndex = Number(fromIndex) - (firstBodyOffset.r * fromCols) - firstBodyOffset.c;
     draggedItem = {
         item: item,
         fromLocation: fromLocation,
         fromIndex: fromIndex,
         // store the originating grid column count so restores/drops use same geometry
-        fromCols: (fromLocation === 'bank') ? (typeof getBankCols === 'function' ? getBankCols() : ((document.querySelector('.workshop-content') && document.querySelector('.workshop-content').classList.contains('storage-mode')) || currentWorkshop === 'storage' ? 10 : 6)) : GRID_SIZE,
+        fromCols: fromCols,
         offsetX: offsetX || 0,
         offsetY: offsetY || 0,
         previewShape: baseShape.map(r => [...r]),
-        rotatedAura: (typeof getItemAuraMatrix === 'function')
-            ? getItemAuraMatrix(item, initialRotationIndex)
-            : (rotatedAura || null),
+        rotatedAura: initialAura,
         rotationIndex: initialRotationIndex,
         instanceId: instanceId, // Store instance ID for tracking
-        pointerToAnchorOffsetPx: null
+        pointerToAnchorOffsetPx: null,
+        sourceSnapshot: {
+            location: fromLocation,
+            index: sourceOriginIndex,
+            cols: fromCols,
+            rotationIndex: initialRotationIndex,
+            rotatedAura: initialAura ? initialAura.map((row) => [...row]) : null
+        },
+        lastPreviewPlan: null
     };
 
     // Mark drag state for performance-friendly styling
     document.body.classList.add('dragging');
+    _resolveDragCursorRoot(sourceElem);
+    setDraggingCursorHidden(true);
 
-    // Show all auras during drag
-    showAllAuras();
-
-    // Hide cursor during drag for cleaner feel
-    document.body.style.cursor = 'none';
-
-    // remove item from grid for preview
-    clearItemFromGrid(gameData[fromLocation], instanceId);
-    renderAllActiveGrids();
-
-    // create follow element
-    _customFollowEl = document.createElement('div');
-    _customFollowEl.className = 'item follow-item ' + (item.rarity || 'common');
-    _customFollowEl.style.position = 'fixed';
-    _customFollowEl.style.pointerEvents = 'none';
-    _customFollowEl.style.zIndex = 99999;
-    _customFollowEl.style.willChange = 'transform'; // Compositor optimization
-
-    const shape = draggedItem.previewShape || [[1]];
-    const rows = shape.length;
-    const cols = shape[0] ? shape[0].length : 1;
-    const sourceGrid = (sourceElem && sourceElem.closest) ? sourceElem.closest('.inventory-grid') : document.getElementById('bank-grid');
-    // Determine columns for source grid (bank vs active)
-    let sourceGridCols = GRID_SIZE;
+    let _dragStartInitialized = false;
     try {
-        if (sourceGrid && sourceGrid.id === 'bank-grid') sourceGridCols = (typeof getBankCols === 'function') ? getBankCols() : 6;
-        else sourceGridCols = GRID_SIZE;
-    } catch (e) { sourceGridCols = GRID_SIZE; }
-    const geo = getCellGeometry(sourceGrid || document.body, sourceGridCols);
-    const slotSize = geo.slotSize;
-    const gap = geo.gap;
-    const cellW2 = geo.cellW;
-    const cellH2 = geo.cellH;
-    // (debug logging removed)
+        // Show all auras during drag
+        showAllAuras();
+
+        // remove item from grid for preview
+        clearItemFromGrid(gameData[fromLocation], instanceId);
+        renderAllActiveGrids();
+
+        // create follow element
+        _customFollowEl = document.createElement('div');
+        _customFollowEl.className = 'item follow-item ' + (item.rarity || 'common');
+        _customFollowEl.style.position = 'fixed';
+        _customFollowEl.style.pointerEvents = 'none';
+        _customFollowEl.style.zIndex = 99999;
+        _customFollowEl.style.willChange = 'transform'; // Compositor optimization
+
+        const shape = draggedItem.previewShape || [[1]];
+        const rows = shape.length;
+        const cols = shape[0] ? shape[0].length : 1;
+        const sourceGrid = (sourceElem && sourceElem.closest) ? sourceElem.closest('.inventory-grid') : document.getElementById('bank-grid');
+        // Determine columns for source grid (bank vs active)
+        let sourceGridCols = GRID_SIZE;
+        try {
+            if (sourceGrid && sourceGrid.id === 'bank-grid') sourceGridCols = (typeof getBankCols === 'function') ? getBankCols() : 6;
+            else sourceGridCols = GRID_SIZE;
+        } catch (e) { sourceGridCols = GRID_SIZE; }
+        const geo = getCellGeometry(sourceGrid || document.body, sourceGridCols);
+        const slotSize = geo.slotSize;
+        const gap = geo.gap;
+        const cellW2 = geo.cellW;
+        const cellH2 = geo.cellH;
+        // Compute total follow-element dimensions: rows/cols * slotSize with gaps between
+        const followElWidth = cols * slotSize + (cols > 1 ? (cols - 1) * gap : 0);
+        const followElHeight = rows * slotSize + (rows > 1 ? (rows - 1) * gap : 0);
+
+        _customFollowEl.style.width = followElWidth + 'px';
+        _customFollowEl.style.height = followElHeight + 'px';
     
-    // Compute total follow-element dimensions: rows/cols * slotSize with gaps between
-    const followElWidth = cols * slotSize + (cols > 1 ? (cols - 1) * gap : 0);
-    const followElHeight = rows * slotSize + (rows > 1 ? (rows - 1) * gap : 0);
-    
-    _customFollowEl.style.width = followElWidth + 'px';
-    _customFollowEl.style.height = followElHeight + 'px';
-    
-    // CRITICAL: Use relative positioning to allow absolute children (aura, icon)
-    _customFollowEl.style.position = 'fixed'; 
-    _customFollowEl.style.display = 'block'; // Not grid! We'll use a wrapper for grid
-    _customFollowEl.style.opacity = '0.9';
-    _customFollowEl.style.transition = 'none';
+        // CRITICAL: Use relative positioning to allow absolute children (aura, icon)
+        _customFollowEl.style.position = 'fixed'; 
+        _customFollowEl.style.display = 'block'; // Not grid! We'll use a wrapper for grid
+        _customFollowEl.style.opacity = '0.9';
+        _customFollowEl.style.transition = 'none';
     
     // Create grid wrapper for shape blocks
     const gridWrapper = document.createElement('div');
@@ -879,7 +1029,6 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         } catch (e) {
             gridEl = document.querySelector('.inventory-grid') || document.body;
         }
-        const debugGridInfo = { gridEl: gridEl && (gridEl.id || gridEl.className), fromLocation: draggedItem && draggedItem.fromLocation };
         // compute grid columns for gridEl when possible
         let gridColsLocal = GRID_SIZE;
         try {
@@ -887,7 +1036,6 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             else gridColsLocal = GRID_SIZE;
         } catch (e) { gridColsLocal = GRID_SIZE; }
         const geo2 = getCellGeometry(gridEl, gridColsLocal);
-        // (debug logging removed)
         const slotSize2 = geo2.slotSize;
         const gap2 = geo2.gap;
         const cellWLocal = geo2.cellW;
@@ -1215,13 +1363,6 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         // update hover target via elementsFromPoint
         try {
             const elems = document.elementsFromPoint(ev.clientX, ev.clientY);
-            // Targeted snapshot for problematic armor item to diagnose left-storage tearing
-            try {
-                if (window.DEBUG_DRAG && draggedItem && draggedItem.item && draggedItem.item.id === 'armor_new_2') {
-                    const snap = elems.slice(0,8).map(el => ({ tag: el.tagName, id: el.id || null, class: el.className || null, dataset: el.dataset && { location: el.dataset.location, index: el.dataset.index } }));
-                    // (debug logging removed)
-                }
-            } catch (e) { /* ignore */ }
             const slot = elems && elems.find(el => el.classList && el.classList.contains('grid-slot')) || null;
             if (slot) {
                 const loc = slot.dataset.location;
@@ -1304,6 +1445,18 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 
     window.addEventListener('pointermove', _customPointerMove);
     window.addEventListener('pointerup', _customPointerUp, { once: true });
+    _customPointerCancel = () => {
+        if (!draggedItem) return;
+        _restoreDraggedItemToSourceIfNeeded();
+        _cleanupCustomDragArtifacts();
+    };
+    _windowBlurHandler = () => {
+        if (!draggedItem) return;
+        _restoreDraggedItemToSourceIfNeeded();
+        _cleanupCustomDragArtifacts();
+    };
+    window.addEventListener('pointercancel', _customPointerCancel);
+    window.addEventListener('blur', _windowBlurHandler);
     
     // Attach rotation listeners (active only during drag)
     _rotationKeyHandler = (e) => {
@@ -1343,6 +1496,13 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     
     window.addEventListener('keydown', _rotationKeyHandler);
     window.addEventListener('wheel', _rotationWheelHandler, { passive: false });
+    _dragStartInitialized = true;
+    } finally {
+        if (!_dragStartInitialized) {
+            draggedItem = null;
+            _cleanupCustomDragArtifacts();
+        }
+    }
 }
 
 // ===== PUBLIC API =====
@@ -1350,6 +1510,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
 window.DragSystem = {
     // Drag state access
     getDraggedItem: () => draggedItem,
+    restoreDraggedItemToSource: () => _restoreDraggedItemToSourceIfNeeded(),
     clearDraggedItem: () => {
         draggedItem = null;
         _cleanupCustomDragArtifacts();

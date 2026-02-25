@@ -2492,16 +2492,20 @@ function _moveBattlefieldEntryToBank(entry) {
     for (let i = 0; i < BANK_SLOTS; i++) {
         if (!canPlaceItem(bankGrid, i, shape, bankCols, bankRows)) continue;
         const shapeCopy = shape.map((row) => [...row]);
-        const placedInstanceId = placeItemIntoGrid(bankGrid, i, item, shapeCopy, bankCols, instanceId, null, null, 0);
-        if (placedInstanceId && typeof registerItemInstance === 'function') {
+        const tx = tryPlaceItemTransactional(bankGrid, item, shapeCopy, i, bankCols, {
+            instanceId,
+            maxRows: bankRows,
+            rotationIndex: 0
+        });
+        if (tx.ok && typeof registerItemInstance === 'function') {
             const existing = (typeof getItemInstanceData === 'function')
-                ? getItemInstanceData(gameData, placedInstanceId)
+                ? getItemInstanceData(gameData, tx.instanceId)
                 : null;
             if (!existing || existing.itemId !== entry.cell.itemId) {
-                registerItemInstance(gameData, placedInstanceId, entry.cell.itemId, ilvl, { source: 'battlefield_store' });
+                registerItemInstance(gameData, tx.instanceId, entry.cell.itemId, ilvl, { source: 'battlefield_store' });
             }
         }
-        return true;
+        if (tx.ok) return true;
     }
 
     return false;
@@ -3319,27 +3323,30 @@ function buyItem(itemId) {
     }
     const bankGrid = gameData.bank;
 
-    // Freien Slot in der Bank suchen
+    const bankCols = getBankCols();
+    const bankRows = Math.ceil(BANK_SLOTS / bankCols);
+    const baseBody = (typeof getItemBodyMatrix === 'function')
+        ? getItemBodyMatrix(item, 0)
+        : (item.body || [[1]]);
+    const bodyCopy = baseBody.map((r) => [...r]);
+
     for (let i = 0; i < BANK_SLOTS; i++) {
-        if (!bankGrid[i]) {
-            addGold(-item.price, 'shop_buy');
-            // Nutzt die Gridengine.js (pass a copy of item.body)
-            if (typeof placeItemIntoGrid === 'function') {
-                const baseBody = (typeof getItemBodyMatrix === 'function')
-                    ? getItemBodyMatrix(item, 0)
-                    : (item.body || [[1]]);
-                const bodyCopy = baseBody.map(r => [...r]);
-                const instanceId = placeItemIntoGrid(bankGrid, i, item, bodyCopy, getBankCols(), null, null, null, 0);
-                if (instanceId && typeof registerItemInstance === 'function') {
-                    registerItemInstance(gameData, instanceId, item.id, Math.max(1, gameData.level), { source: 'shop' });
-                }
-            }
-            if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
-            updateUI();
-            playUISound('itemBought');
-            if (typeof saveGame === 'function') saveGame();
-            return;
+        if (!canPlaceItem(bankGrid, i, bodyCopy, bankCols, bankRows)) continue;
+        const tx = tryPlaceItemTransactional(bankGrid, item, bodyCopy, i, bankCols, {
+            maxRows: bankRows,
+            rotationIndex: 0
+        });
+        if (!tx.ok) continue;
+
+        addGold(-item.price, 'shop_buy');
+        if (tx.instanceId && typeof registerItemInstance === 'function') {
+            registerItemInstance(gameData, tx.instanceId, item.id, Math.max(1, gameData.level), { source: 'shop' });
         }
+        if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
+        updateUI();
+        playUISound('itemBought');
+        if (typeof saveGame === 'function') saveGame();
+        return;
     }
 }
 
@@ -3563,22 +3570,25 @@ function addItemToBank(itemId, itemLevel) {
     }
     const bankGrid = gameData.bank;
     
-    // Find first empty slot
+    const bankCols = getBankCols();
+    const bankRows = Math.ceil(BANK_SLOTS / bankCols);
+    const baseBody = (typeof getItemBodyMatrix === 'function')
+        ? getItemBodyMatrix(item, 0)
+        : (item.body || [[1]]);
+    const bodyCopy = baseBody.map((r) => [...r]);
+
     for (let i = 0; i < BANK_SLOTS; i++) {
-        if (!bankGrid[i]) {
-            if (typeof placeItemIntoGrid === 'function') {
-                const baseBody = (typeof getItemBodyMatrix === 'function')
-                    ? getItemBodyMatrix(item, 0)
-                    : (item.body || [[1]]);
-                const bodyCopy = baseBody.map(r => [...r]);
-                const instanceId = placeItemIntoGrid(bankGrid, i, item, bodyCopy, getBankCols(), null, null, null, 0);
-                if (instanceId && typeof registerItemInstance === 'function') {
-                    const ilvl = Number.isFinite(itemLevel) ? itemLevel : Math.max(1, gameData.level);
-                    registerItemInstance(gameData, instanceId, item.id, ilvl, { source: 'drop' });
-                }
-                return true;
-            }
+        if (!canPlaceItem(bankGrid, i, bodyCopy, bankCols, bankRows)) continue;
+        const tx = tryPlaceItemTransactional(bankGrid, item, bodyCopy, i, bankCols, {
+            maxRows: bankRows,
+            rotationIndex: 0
+        });
+        if (!tx.ok) continue;
+        if (tx.instanceId && typeof registerItemInstance === 'function') {
+            const ilvl = Number.isFinite(itemLevel) ? itemLevel : Math.max(1, gameData.level);
+            registerItemInstance(gameData, tx.instanceId, item.id, ilvl, { source: 'drop' });
         }
+        return true;
     }
     
     return false; // Bank full
@@ -3669,25 +3679,57 @@ function renderDragPreviewForGrid(container, location, cols, totalSlots) {
         return;
     }
 
-    const hoverX = hoverIndex % cols;
-    const hoverY = Math.floor(hoverIndex / cols);
-    const originX = hoverX - draggedItem.offsetX;
-    const originY = hoverY - draggedItem.offsetY;
-    const originIndex = originY * cols + originX;
-
-    // Use the rotated preview shape for body placement/preview
-    const bodyShape = draggedItem.previewShape || draggedItem.item?.body || [[1]];
     const maxRows = Math.ceil(totalSlots / cols);
+    const bodyShape = draggedItem.previewShape || draggedItem.item?.body || [[1]];
+    let placementValid = false;
+    let previewOriginIndex = 0;
+    let previewOriginX = 0;
+    let previewOriginY = 0;
+    let plan = null;
 
-    // Placement validity is computed once using BODY ONLY (aura can extend outside)
-    const placementValid = canPlaceItem(gameData[location], originIndex, bodyShape, cols, maxRows);
+    if (typeof resolveDropPlacementPlan === 'function') {
+        const searchRadius = location !== draggedItem.fromLocation ? 4 : 2;
+        plan = resolveDropPlacementPlan({
+            draggedItem,
+            location,
+            targetIndex: hoverIndex,
+            cols,
+            maxRows,
+            grid: gameData[location],
+            searchRadius,
+            allowRadiusSearch: true
+        });
+    }
+
+    if (plan && plan.ok) {
+        previewOriginIndex = plan.canPlace ? plan.chosenIndex : plan.originIndex;
+        placementValid = !!plan.canPlace;
+        previewOriginX = previewOriginIndex % cols;
+        previewOriginY = Math.floor(previewOriginIndex / cols);
+        draggedItem.lastPreviewPlan = {
+            location,
+            targetIndex: hoverIndex,
+            cols,
+            rotationIndex: draggedItem.rotationIndex,
+            offsetX: draggedItem.offsetX,
+            offsetY: draggedItem.offsetY,
+            plan
+        };
+    } else {
+        const hoverX = hoverIndex % cols;
+        const hoverY = Math.floor(hoverIndex / cols);
+        previewOriginX = hoverX - draggedItem.offsetX;
+        previewOriginY = hoverY - draggedItem.offsetY;
+        previewOriginIndex = previewOriginY * cols + previewOriginX;
+        placementValid = canPlaceItem(gameData[location], previewOriginIndex, bodyShape, cols, maxRows);
+    }
 
     // Render preview for body only
     for (let r = 0; r < bodyShape.length; r++) {
         for (let c = 0; c < bodyShape[0].length; c++) {
             if (!bodyShape[r][c]) continue;
-            const tx = originX + c;
-            const ty = originY + r;
+            const tx = previewOriginX + c;
+            const ty = previewOriginY + r;
             const tidx = ty * cols + tx;
 
             const slotEl = container.querySelector(`.grid-slot[data-index="${tidx}"]`);

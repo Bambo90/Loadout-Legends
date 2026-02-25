@@ -505,31 +505,39 @@ function autoSortStorage(gridKey) {
     });
 
     const cols = targetKey === "bank" ? STORAGE_PAGE_COLS : GRID_SIZE;
-    Object.keys(grid).forEach((key) => delete grid[key]);
+    const rows = targetKey === "bank" ? Math.ceil(BANK_SLOTS / cols) : GRID_ROWS;
+    const maxSlots = cols * rows;
+    const stagedGrid = {};
 
-    let currentIndex = 0;
     for (const entry of items) {
         const bodyShape = getItemBodyMatrix(entry.item, entry.cell.rotationIndex || 0);
         const bodyCopy = bodyShape.map((r) => [...r]);
         const rotatedAura = entry.cell.rotatedAura || null;
 
-        placeItemIntoGrid(
-            grid,
-            currentIndex,
-            entry.item,
-            bodyCopy,
-            cols,
-            entry.cell.instanceId,
-            null,
-            rotatedAura,
-            entry.cell.rotationIndex || 0
-        );
+        let placed = false;
+        for (let idx = 0; idx < maxSlots; idx++) {
+            if (!canPlaceItem(stagedGrid, idx, bodyCopy, cols, rows)) continue;
+            const tx = tryPlaceItemTransactional(stagedGrid, entry.item, bodyCopy, idx, cols, {
+                instanceId: entry.cell.instanceId,
+                maxRows: rows,
+                rotatedAura,
+                rotationIndex: entry.cell.rotationIndex || 0
+            });
+            if (!tx.ok) continue;
+            placed = true;
+            break;
+        }
 
-        currentIndex++;
-        while (grid[currentIndex] && !grid[currentIndex].root) {
-            currentIndex++;
+        if (!placed) {
+            _showStorageToast("Auto-sort aborted (no valid layout)");
+            return;
         }
     }
+
+    Object.keys(grid).forEach((key) => delete grid[key]);
+    Object.keys(stagedGrid).forEach((key) => {
+        grid[key] = stagedGrid[key];
+    });
 
     if (typeof saveGame === "function") saveGame();
     if (typeof renderWorkshopGrids === "function") {
