@@ -124,6 +124,10 @@ const BATTLEFIELD_SLOT_LAYOUT_VERSION = 1;
 const MUSIC_GAP_MS = 60000;
 const AMBIENT_GAP_MS = 40000;
 const AUDIO_FADE_MS = 5000;
+// Dev-only hotkey block for quick economy testing.
+const DEV_MODE_GOLD_HOTKEY_CODE = 'KeyG';
+const DEV_MODE_GOLD_GRANT_AMOUNT = 10000;
+const DEV_MODE_LEVEL_HOTKEY_CODE = 'KeyL';
 
 let currentWorkshop = null;
 let lastMonsterAttack = Date.now();
@@ -722,8 +726,63 @@ function _onRebindKeyCapture(event) {
     setActionKeybinding(actionId, binding);
 }
 
+function _isTextInputTarget(target) {
+    return !!(target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+    ));
+}
+
+function _onDevModeGlobalKeyDown(event) {
+    if (!event || event.repeat) return;
+    if (!isDevModeEnabled()) return;
+    if (typeof window.isKeybindCaptureActive === 'function' && window.isKeybindCaptureActive()) return;
+    if (_isTextInputTarget(event.target)) return;
+
+    const isGrantGoldKey = event.code === DEV_MODE_GOLD_HOTKEY_CODE
+        || (typeof event.key === 'string' && event.key.toLowerCase() === 'g');
+    const isGrantLevelKey = event.code === DEV_MODE_LEVEL_HOTKEY_CODE
+        || (typeof event.key === 'string' && event.key.toLowerCase() === 'l');
+    if (!isGrantGoldKey && !isGrantLevelKey) return;
+
+    if (isGrantGoldKey) {
+        const granted = (typeof addGold === 'function')
+            ? addGold(DEV_MODE_GOLD_GRANT_AMOUNT, 'dev_mode_hotkey')
+            : 0;
+        if (granted <= 0) return;
+        if (typeof updateUI === 'function') updateUI();
+        if (typeof saveGame === 'function') saveGame();
+        console.info(`[DEV] Granted ${granted} gold via ${DEV_MODE_GOLD_HOTKEY_CODE}.`);
+        event.preventDefault();
+        return;
+    }
+
+    if (typeof ensureCharacterModelOnGameData === 'function') {
+        ensureCharacterModelOnGameData(gameData);
+    }
+    const base = (gameData.character && gameData.character.base) ? gameData.character.base : null;
+    const currentLevel = Number.isFinite(base && base.level) ? Math.max(1, Math.floor(base.level)) : Math.max(1, Math.floor(gameData.level || 1));
+    const currentXp = Number.isFinite(base && base.xp) ? Math.max(0, base.xp) : Math.max(0, Number(gameData.xp) || 0);
+    const xpToNext = (typeof calculateXpToNextLevel === 'function')
+        ? calculateXpToNextLevel(currentLevel)
+        : Math.max(1, Math.floor(Number(gameData.xpNextLevel) || 1));
+    const xpNeededForLevel = Math.max(1, Math.ceil(xpToNext - currentXp));
+    const xpResult = (typeof grantXP === 'function')
+        ? grantXP(xpNeededForLevel, 'dev_mode_hotkey_level', getActiveCombatGridKey())
+        : { levelsGained: 0, gainedXP: 0 };
+    if (!xpResult || xpResult.levelsGained < 1) return;
+
+    console.info(`[DEV] Granted +1 level via ${DEV_MODE_LEVEL_HOTKEY_CODE} (${xpResult.gainedXP} XP).`);
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof saveGame === 'function') saveGame();
+    event.preventDefault();
+}
+
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('keydown', _onRebindKeyCapture, true);
+    document.addEventListener('keydown', _onDevModeGlobalKeyDown, true);
 }
 
 ensureSettingsDefaults();

@@ -39,6 +39,17 @@ function _normalizeRotationIndex(value) {
     return ((truncated % 4) + 4) % 4;
 }
 
+function _findFirstBodyCellOffset(shape) {
+    if (!Array.isArray(shape)) return { r: 0, c: 0 };
+    for (let r = 0; r < shape.length; r++) {
+        const row = Array.isArray(shape[r]) ? shape[r] : [];
+        for (let c = 0; c < row.length; c++) {
+            if (row[c]) return { r, c };
+        }
+    }
+    return { r: 0, c: 0 };
+}
+
 function _resolveSpriteMetaItemForPlaced(cellItemId, fallbackItem) {
     const defId = cellItemId || (fallbackItem && (fallbackItem.baseId || fallbackItem.id));
     const fromDef = (typeof getItemDefById === 'function')
@@ -260,6 +271,9 @@ function createSlot(container, location, index, cols) {
     const geo = (typeof getCellGeometry === 'function') ? getCellGeometry(container, cols) : { slotSize: 64, gap: 8, cellW: 72, cellH: 72 };
     const slotSize = geo.slotSize;
     const gap = geo.gap;
+    const firstBodyOffset = _findFirstBodyCellOffset(shape);
+    itemEl.style.left = `${1 - (firstBodyOffset.c * geo.cellW)}px`;
+    itemEl.style.top = `${1 - (firstBodyOffset.r * geo.cellH)}px`;
     itemEl.style.width = ((colsShape * slotSize) + ((colsShape - 1) * gap)) + "px";
     itemEl.style.height = ((rows * slotSize) + ((rows - 1) * gap)) + "px";
     itemEl.style.display = "grid";

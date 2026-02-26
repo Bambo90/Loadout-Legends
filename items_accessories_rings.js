@@ -17,10 +17,10 @@ const ITEMS_ACCESSORIES_RINGS = [
         life: 10,
         desc: "Ein einfacher Kupferring mit lebenssteigernden Eigenschaften.",
         rotations: {
-            0: { grid: [["AB", "AB", "A"], ["AB", "B", "A"], ["A", "A", "A"]] },
-            1: { grid: [["AB", "AB", "A"], ["AB", "B", "A"], ["A", "A", "A"]] },
-            2: { grid: [["AB", "AB", "A"], ["AB", "B", "A"], ["A", "A", "A"]] },
-            3: { grid: [["AB", "AB", "A"], ["AB", "B", "A"], ["A", "A", "A"]] }
+            0: { grid: [["0", "A", "A", "0"], ["A", "B", "B", "A"], ["A", "B", "B", "A"], ["0", "A", "A", "0"]] },
+            1: { grid: [["0", "A", "A", "0"], ["A", "B", "B", "A"], ["A", "B", "B", "A"], ["0", "A", "A", "0"]] },
+            2: { grid: [["0", "A", "A", "0"], ["A", "B", "B", "A"], ["A", "B", "B", "A"], ["0", "A", "A", "0"]] },
+            3: { grid: [["0", "A", "A", "0"], ["A", "B", "B", "A"], ["A", "B", "B", "A"], ["0", "A", "A", "0"]] }
         }
     },
     {
