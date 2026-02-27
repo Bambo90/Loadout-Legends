@@ -824,9 +824,11 @@ body {
     position: absolute;
     inset: 0;
     border-radius: 6px;
-    opacity: 0.55;
+    opacity: 0.9;
     pointer-events: none;
     z-index: 250;
+    border: 2px solid rgba(170, 240, 160, 0.95);
+    box-shadow: inset 0 0 8px rgba(90, 170, 95, 0.45), 0 0 10px rgba(90, 170, 95, 0.55);
 }
 .preview-block.invalid { background: rgba(255, 0, 0, 0.45); }
 .preview-block.preview-common { background: rgba(255,255,255,0.15); }
@@ -834,6 +836,11 @@ body {
 .preview-block.preview-rare { background: rgba(255,215,0,0.35); }
 .preview-block.preview-unique { background: rgba(249,115,22,0.35); }
 .preview-block.preview-legendary { background: rgba(168,85,247,0.35); }
+body.dragging .preview-block:not(.invalid) { background: rgba(78, 160, 82, 0.62) !important; }
+body.dragging .preview-block.invalid {
+    border-color: rgba(255, 110, 110, 0.95);
+    box-shadow: inset 0 0 8px rgba(255, 80, 80, 0.45), 0 0 10px rgba(255, 80, 80, 0.55);
+}
 
 /* =========================================
    7. ITEM SHAPES & VISUALS (GRID)
@@ -881,8 +888,10 @@ body.dragging .item.magic,
 body.dragging .item.common {
     box-shadow: none !important;
 }
+body.dragging .shape-block { opacity: 0.8; }
 body.dragging .item-icon-overlay { text-shadow: none; }
-body.dragging .aura-overlay { opacity: 0.35 !important; }
+body.dragging .aura-overlay { opacity: 0.25 !important; }
+body.dragging .item-sprite { opacity: 0.6; }
 
 /* Das Icon-Overlay (Absolute Zentrierung über die Form) */
 .item-icon-overlay {
