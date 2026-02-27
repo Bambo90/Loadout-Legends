@@ -14,7 +14,7 @@ const ITEM_STATIC_FIELDS = Object.freeze([
     "life", "mana", "allResist", "lifeLeech", "damageBonus", "magicBonus",
     "magicReduction", "physicalBonus", "physicalReduction", "spectralDefense",
     "accuracy", "piercing", "armorIgnore", "fireBonus", "coldBonus", "chainBonus",
-    "blockChance", "blockValue", "counterAttack", "magicAbsorption", "durability",
+    "blockChance", "blockValue", "counterAttack", "magicAbsorption",
     "critMulti",
     "actions", "resourceCost", "staminaCost", "manaCost",
     // PoE-style base schema
@@ -73,6 +73,8 @@ const _AFFIX_CATEGORY_BY_TYPE = Object.freeze({
     jewelry: "jewelry",
     accessory: "jewelry"
 });
+
+const _BASE_STAT_DEDUP_DECIMALS = 6;
 
 function _isFiniteNumber(value) {
     return typeof value === "number" && Number.isFinite(value);
@@ -141,6 +143,24 @@ function _collectItemArrays() {
     if (typeof ITEMS_ENHANCEMENTS_ALL !== "undefined") arrays.push(ITEMS_ENHANCEMENTS_ALL);
     if (typeof ITEMS_CONSUMABLES_ALL !== "undefined") arrays.push(ITEMS_CONSUMABLES_ALL);
     return arrays;
+}
+
+function _dedupeAndMergeModifiers(modifiers) {
+    if (!Array.isArray(modifiers) || modifiers.length === 0) return [];
+    const mergedByKey = new Map();
+    modifiers.forEach((modifier) => {
+        const normalized = _normalizeModifier(modifier);
+        if (!normalized) return;
+        const key = `${normalized.statPath}|${normalized.type}`;
+        const existing = mergedByKey.get(key);
+        if (!existing) {
+            mergedByKey.set(key, { ...normalized });
+            return;
+        }
+        const combined = Number(existing.value) + Number(normalized.value);
+        existing.value = Number(combined.toFixed(_BASE_STAT_DEDUP_DECIMALS));
+    });
+    return Array.from(mergedByKey.values());
 }
 
 function _isWeaponLikeItem(item) {
@@ -249,6 +269,7 @@ function _resolveLegacyAuraShieldValue(item, armourValue) {
     const direct = Number(item && item.auraShield);
     if (_isFiniteNumber(direct)) return Math.max(0, Math.round(direct));
 
+    // Legacy migration fallback for old data-only defs.
     const spectral = Number(item && item.spectralDefense);
     if (_isFiniteNumber(spectral)) {
         return _normalizeLegacyRatingValue(spectral, armourValue, 8) || 0;
@@ -301,7 +322,8 @@ function _buildLegacyBaseStats(item) {
     if (_isFiniteNumber(item.xpBonus)) {
         add({ statPath: "xpGainMultiplier", type: "percent", value: item.xpBonus - 1 });
     }
-    if (_isFiniteNumber(item.defense)) {
+    const hasModernArmour = _isFiniteNumber(item.armour);
+    if (_isFiniteNumber(item.defense) && !_isArmorLikeItem(item) && !hasModernArmour) {
         add({ statPath: "armour", type: "flat", value: item.defense });
     }
     if (_isFiniteNumber(item.allResist)) {
@@ -335,14 +357,14 @@ function _buildLegacyBaseStats(item) {
         item.modifiers.forEach((modifier) => add(modifier));
     }
 
-    return output;
+    return _dedupeAndMergeModifiers(output);
 }
 
 function _normalizeBaseStats(baseStats, item) {
     if (Array.isArray(baseStats)) {
-        return baseStats
+        return _dedupeAndMergeModifiers(baseStats
             .map(_normalizeModifier)
-            .filter(Boolean);
+            .filter(Boolean));
     }
     if (baseStats && typeof baseStats === "object") {
         const output = [];
@@ -357,7 +379,7 @@ function _normalizeBaseStats(baseStats, item) {
                 if (normalized) output.push(normalized);
             }
         });
-        return output;
+        return _dedupeAndMergeModifiers(output);
     }
     return _buildLegacyBaseStats(item);
 }
@@ -482,6 +504,40 @@ function _syncModernItemScalarFields(item) {
     }
 }
 
+function _sanitizeRuntimeCombatScalarFields(item) {
+    if (!item || typeof item !== "object") return item;
+    const min = Number(item.physicalDamageMin);
+    const max = Number(item.physicalDamageMax);
+    const aps = Number(item.attacksPerSecond);
+    const armour = Number(item.armour);
+    const evasion = Number(item.evasion);
+    const auraShield = Number(item.auraShield);
+    const critChance = Number(item.critChance);
+
+    item.physicalDamageMin = _isFiniteNumber(min) ? Math.max(0, min) : 0;
+    item.physicalDamageMax = _isFiniteNumber(max)
+        ? Math.max(item.physicalDamageMin, max)
+        : item.physicalDamageMin;
+    item.armour = _isFiniteNumber(armour) ? Math.max(0, armour) : 0;
+    item.evasion = _isFiniteNumber(evasion) ? Math.max(0, evasion) : 0;
+    item.auraShield = _isFiniteNumber(auraShield) ? Math.max(0, auraShield) : 0;
+    item.critChance = _isFiniteNumber(critChance) ? Math.max(0, critChance) : 0;
+
+    if (_isFiniteNumber(aps) && aps > 0) {
+        item.attacksPerSecond = aps;
+        item.attackIntervalMs = 1000 / aps;
+    } else if (_isFiniteNumber(item.attackIntervalMs) && item.attackIntervalMs > 0) {
+        item.attacksPerSecond = 1000 / item.attackIntervalMs;
+    } else if (_isFiniteNumber(item.attackCooldownMs) && item.attackCooldownMs > 0) {
+        item.attacksPerSecond = 1000 / item.attackCooldownMs;
+        item.attackIntervalMs = item.attackCooldownMs;
+    } else {
+        item.attacksPerSecond = 0;
+    }
+
+    return item;
+}
+
 function _normalizeItemDefinition(rawItem) {
     if (!rawItem || typeof rawItem !== "object") return null;
     const item = { ...rawItem };
@@ -496,6 +552,7 @@ function _normalizeItemDefinition(rawItem) {
     item.weight = _isFiniteNumber(item.weight) ? Math.max(0, item.weight) : _countBodyCellsFromItem(item);
     item.baseStats = _normalizeBaseStats(item.baseStats, item);
     _syncModernItemScalarFields(item);
+    _sanitizeRuntimeCombatScalarFields(item);
     item.prefixSlots = _normalizeSlotValue(item.prefixSlots, item.rarity, "prefixSlots");
     item.suffixSlots = _normalizeSlotValue(item.suffixSlots, item.rarity, "suffixSlots");
     const explicitImplicitPool = _normalizeAffixPool(item.implicitPool);
@@ -861,7 +918,7 @@ function resolveRuntimeItemFromCell(gameData, cell) {
         runtimeItem.suffixes = instanceData.suffixes;
     }
 
-    return runtimeItem;
+    return _sanitizeRuntimeCombatScalarFields(runtimeItem);
 }
 
 function getRuntimeItemDefinition(gameData, itemId, cellOrInstanceId) {

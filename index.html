@@ -33,7 +33,10 @@
             <header id="top-bar">
                 <div class="stat-item"><span class="label">GOLD</span><span id="gold-display" class="value">0</span></div>
                 <div class="stat-item"><span class="label">LEVEL</span><span id="level-display" class="value">1</span></div>
-                <div class="hp-header-container"><div id="hp-fill-header"></div><span id="hp-text-header">HP: 100 / 100</span></div>
+                <div class="hp-header-wrap">
+                    <div id="hp-header-container" class="hp-header-container"><div id="as-ring-header" class="as-ring-header"></div><div id="hp-fill-header"></div><span id="hp-text-header">HP: 100 / 100</span></div>
+                    <div id="aura-text-header" class="aura-text-header">AS: 0 / 0</div>
+                </div>
                 <div class="stamina-header-container"><div id="stamina-fill-header"></div><span id="stamina-text-header">STA: 100 / 100</span></div>
                 <div class="mana-header-container"><div id="mana-fill-header"></div><span id="mana-text-header">MANA: 60 / 60</span></div>
                 <div class="xp-header-container"><div id="xp-fill-header"></div><span id="xp-text-header">XP: 0 / 500</span></div>
@@ -247,6 +250,9 @@
                                     <button onclick="openWorkshop('pve')" class="character-setup-btn">PvE</button>
                                     <button onclick="openWorkshop('pvp')" class="character-setup-btn">PvP</button>
                                     <button onclick="openWorkshop('sort')" class="character-setup-btn">SORT</button>
+                                </div>
+                                <div class="workshop-active-grid-control">
+                                    <button id="set-active-grid-btn" type="button" class="workshop-active-grid-btn" onclick="setCurrentWorkshopAsActiveGrid()">Set Active Grid</button>
                                 </div>
                                 <div id="active-setup-grid" class="inventory-grid"></div>
                             </div>

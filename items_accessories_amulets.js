@@ -14,7 +14,9 @@ const ITEMS_ACCESSORIES_AMULETS = [
         inShop: true,
         req: 1,
         tags: ["jewelry", "amulet"],
-        defense: 3,
+        baseStats: [
+            { statPath: "armour", type: "flat", value: 3 }
+        ],
         desc: "Eine verstärkte Schließe für jede Robe.",
         rotations: {
             0: { grid: [["A", "A", "A"], ["A", "B", "A"], ["A", "A", "A"]] },
@@ -33,8 +35,10 @@ const ITEMS_ACCESSORIES_AMULETS = [
         inShop: true,
         req: 5,
         tags: ["jewelry", "amulet"],
-        defense: 6,
-        evasion: 0.1,
+        baseStats: [
+            { statPath: "armour", type: "flat", value: 6 },
+            { statPath: "evasion", type: "flat", value: 4 }
+        ],
         desc: "Eine kunstvoll gestaltete Schließe.",
         rotations: {
             0: { grid: [["A", "A", "A"], ["A", "B", "A"], ["A", "A", "A"]] },

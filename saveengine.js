@@ -17,6 +17,8 @@ const DEFAULT_SETTINGS_KEYBINDS = Object.freeze({
     toggleAffixDetails: "KeyA",
     cancelAction: "Escape"
 });
+const DEFAULT_ACTIVE_GRID_KEY = "farmGrid";
+const VALID_ACTIVE_GRID_KEYS = Object.freeze(["farmGrid", "pveGrid", "pvpGrid", "sortGrid"]);
 const SAVEENGINE_BATTLEFIELD_MAX_PAGES = 9;
 const SAVEENGINE_BATTLEFIELD_DEFAULT_UNLOCKED_PAGES = 2;
 
@@ -38,6 +40,9 @@ function ensureSettingsDefaultsInData(target) {
     if (typeof target.settings.devMode !== "boolean") {
         target.settings.devMode = false;
     }
+    if (typeof target.settings.activeGridKey !== "string" || !VALID_ACTIVE_GRID_KEYS.includes(target.settings.activeGridKey)) {
+        target.settings.activeGridKey = DEFAULT_ACTIVE_GRID_KEY;
+    }
     if (!target.settings.keybinds || typeof target.settings.keybinds !== "object" || Array.isArray(target.settings.keybinds)) {
         target.settings.keybinds = {};
     }
@@ -56,6 +61,13 @@ function ensureSettingsDefaultsInData(target) {
     target.settings.audio.music = _clampVolumePercent(target.settings.audio.music, DEFAULT_SETTINGS_AUDIO.music);
     target.settings.audio.ambient = _clampVolumePercent(target.settings.audio.ambient, DEFAULT_SETTINGS_AUDIO.ambient);
     return target;
+}
+
+function _resolveConfiguredActiveGridKeyFromData(target) {
+    if (!target || typeof target !== "object") return DEFAULT_ACTIVE_GRID_KEY;
+    const settings = target.settings && typeof target.settings === "object" ? target.settings : null;
+    const configured = settings && typeof settings.activeGridKey === "string" ? settings.activeGridKey : DEFAULT_ACTIVE_GRID_KEY;
+    return VALID_ACTIVE_GRID_KEYS.includes(configured) ? configured : DEFAULT_ACTIVE_GRID_KEY;
 }
 
 function ensureBattlefieldDefaultsInData(target) {
@@ -365,8 +377,9 @@ function saveGame() {
     if (typeof markCharacterStatsDirty === "function") {
         markCharacterStatsDirty(gameData);
     }
+    const activeGridKey = _resolveConfiguredActiveGridKeyFromData(gameData);
     if (typeof getCharacterDerivedStats === "function") {
-        getCharacterDerivedStats(gameData, { gridKey: "farmGrid" });
+        getCharacterDerivedStats(gameData, { gridKey: activeGridKey });
     }
 
     // Persist only dynamic instance data in saves. Static base values come from itemDefs by itemId.
@@ -465,8 +478,9 @@ function loadGame() {
             if (typeof markCharacterStatsDirty === "function") {
                 markCharacterStatsDirty(gameData);
             }
+            const activeGridKey = _resolveConfiguredActiveGridKeyFromData(gameData);
             if (typeof getCharacterDerivedStats === "function") {
-                getCharacterDerivedStats(gameData, { gridKey: "farmGrid" });
+                getCharacterDerivedStats(gameData, { gridKey: activeGridKey });
             }
 
             console.log("Spielstand erfolgreich geladen.");
@@ -499,8 +513,9 @@ function loadGame() {
         if (typeof markCharacterStatsDirty === "function") {
             markCharacterStatsDirty(gameData);
         }
+        const activeGridKey = _resolveConfiguredActiveGridKeyFromData(gameData);
         if (typeof getCharacterDerivedStats === "function") {
-            getCharacterDerivedStats(gameData, { gridKey: "farmGrid" });
+            getCharacterDerivedStats(gameData, { gridKey: activeGridKey });
         }
     }
 

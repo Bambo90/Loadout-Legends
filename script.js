@@ -38,7 +38,8 @@ let gameData = {
     settings: {
         itemTooltipsEnabled: true,
         devMode: false,
-        affixDetailsEnabled: false
+        affixDetailsEnabled: false,
+        activeGridKey: 'farmGrid'
     },
     character: (typeof createDefaultCharacterState === "function")
         ? createDefaultCharacterState()
@@ -117,6 +118,13 @@ const ZONE_DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE = Object.freeze({
     weapon: 1600
 });
 const ZONE_DEFAULT_WEAPON_STAMINA_COST = 10;
+const ZONE_COMBAT_DEFENSE_CONFIG = Object.freeze({
+    auraShieldFirst: true,
+    evasionToDodgeCurve: 1200,
+    maxDodgeChance: 0.75,
+    armourDamageFactor: 10,
+    maxArmourMitigation: 0.9
+});
 const BATTLEFIELD_PAGE_COLS = 8;
 const BATTLEFIELD_PAGE_ROWS = 3;
 const BATTLEFIELD_PAGE_SLOTS = BATTLEFIELD_PAGE_COLS * BATTLEFIELD_PAGE_ROWS;
@@ -137,6 +145,13 @@ const SHOP_RARITY_SORT_ORDER = Object.freeze({
     unique: 3,
     legendary: 4
 });
+const ACTIVE_GRID_KEYS = Object.freeze(['farmGrid', 'pveGrid', 'pvpGrid', 'sortGrid']);
+const ACTIVE_GRID_LABELS = Object.freeze({
+    farmGrid: 'Farm',
+    pveGrid: 'PVE',
+    pvpGrid: 'PVP',
+    sortGrid: 'Sort'
+});
 
 function hasPrivilegedDevAccess() {
     if (typeof window === 'undefined') return false;
@@ -151,6 +166,7 @@ let characterHubActiveSetup = 'farm';
 let _lastHoveredMenuButton = null;
 let _lastMenuHoverSoundAt = 0;
 let _pendingRebindAction = null;
+let _lastDerivedGridKey = null;
 const _uiSoundBases = Object.create(null);
 const audioRuntime = {
     musicEl: null,
@@ -229,6 +245,9 @@ function ensureSettingsDefaults() {
     }
     if (typeof gameData.settings.affixDetailsEnabled !== 'boolean') {
         gameData.settings.affixDetailsEnabled = false;
+    }
+    if (typeof gameData.settings.activeGridKey !== 'string' || !ACTIVE_GRID_KEYS.includes(gameData.settings.activeGridKey)) {
+        gameData.settings.activeGridKey = 'farmGrid';
     }
     if (!gameData.settings.keybinds || typeof gameData.settings.keybinds !== 'object' || Array.isArray(gameData.settings.keybinds)) {
         gameData.settings.keybinds = {};
@@ -1185,14 +1204,29 @@ function getItemDefinition(itemId, cell) {
 }
 
 function getDerivedCharacterStats(gridKey = 'farmGrid') {
+    const resolvedGridKey = _normalizeActiveGridKey(gridKey);
     if (typeof ensureCharacterModelOnGameData === 'function') {
         ensureCharacterModelOnGameData(gameData);
     }
-    if (typeof getCharacterDerivedStats === 'function') {
-        return getCharacterDerivedStats(gameData, {
-            gridKey,
+    const needsGridRecompute = _lastDerivedGridKey !== resolvedGridKey;
+    if (needsGridRecompute && typeof markCharacterStatsDirty === 'function') {
+        markCharacterStatsDirty(gameData);
+    }
+    if (needsGridRecompute && typeof recomputeCharacterDerivedStats === 'function') {
+        const derived = recomputeCharacterDerivedStats(gameData, {
+            gridKey: resolvedGridKey,
             resolver: (itemId, cell) => getItemDefinition(itemId, cell)
         });
+        _lastDerivedGridKey = resolvedGridKey;
+        return derived;
+    }
+    if (typeof getCharacterDerivedStats === 'function') {
+        const derived = getCharacterDerivedStats(gameData, {
+            gridKey: resolvedGridKey,
+            resolver: (itemId, cell) => getItemDefinition(itemId, cell)
+        });
+        _lastDerivedGridKey = resolvedGridKey;
+        return derived;
     }
     return null;
 }
@@ -1277,6 +1311,79 @@ function getWorkshopOverlayGridKey(workshopType) {
     return 'farmGrid';
 }
 
+function _normalizeActiveGridKey(rawGridKey) {
+    if (typeof rawGridKey !== 'string') return 'farmGrid';
+    return ACTIVE_GRID_KEYS.includes(rawGridKey) ? rawGridKey : 'farmGrid';
+}
+
+function getConfiguredActiveGridKey() {
+    const settings = ensureSettingsDefaults();
+    return _normalizeActiveGridKey(settings && settings.activeGridKey);
+}
+
+function _getActiveGridLabel(gridKey) {
+    const normalized = _normalizeActiveGridKey(gridKey);
+    return ACTIVE_GRID_LABELS[normalized] || 'Farm';
+}
+
+function _updateSetActiveGridButtonState() {
+    const button = document.getElementById('set-active-grid-btn');
+    if (!button) return;
+    const activeGridKey = getConfiguredActiveGridKey();
+    const activeLabel = _getActiveGridLabel(activeGridKey);
+    const canUseCurrentWorkshop = !!currentWorkshop && currentWorkshop !== 'storage';
+    if (!canUseCurrentWorkshop) {
+        button.disabled = true;
+        button.textContent = `Active Grid: ${activeLabel}`;
+        return;
+    }
+    const workshopGridKey = getWorkshopOverlayGridKey(currentWorkshop);
+    const workshopLabel = _getActiveGridLabel(workshopGridKey);
+    const alreadyActive = workshopGridKey === activeGridKey;
+    button.disabled = alreadyActive;
+    button.textContent = alreadyActive
+        ? `Active Grid: ${activeLabel}`
+        : `Set Active: ${workshopLabel}`;
+}
+
+function setActiveGridKey(gridKey, options) {
+    const normalizedGridKey = _normalizeActiveGridKey(gridKey);
+    const opts = (options && typeof options === 'object') ? options : {};
+    ensureSettingsDefaults();
+    gameData.settings.activeGridKey = normalizedGridKey;
+    if (!gameData[normalizedGridKey] || typeof gameData[normalizedGridKey] !== 'object') {
+        gameData[normalizedGridKey] = {};
+    }
+    markCharacterDirty();
+    _lastDerivedGridKey = null;
+    getDerivedCharacterStats(normalizedGridKey);
+    dispatchCharacterStatsUpdated(normalizedGridKey);
+    updateUI();
+    refreshCharacterPanels();
+    if (currentWorkshop) {
+        renderItemMutatorSummary(currentWorkshop);
+    }
+    _updateSetActiveGridButtonState();
+    if (opts.save !== false && typeof saveGame === 'function') {
+        saveGame();
+    }
+    return normalizedGridKey;
+}
+
+function setCurrentWorkshopAsActiveGrid() {
+    if (!currentWorkshop || currentWorkshop === 'storage') {
+        _updateSetActiveGridButtonState();
+        return null;
+    }
+    const workshopGridKey = getWorkshopOverlayGridKey(currentWorkshop);
+    return setActiveGridKey(workshopGridKey, { save: true });
+}
+
+if (typeof window !== 'undefined') {
+    window.setCurrentWorkshopAsActiveGrid = setCurrentWorkshopAsActiveGrid;
+    window.setActiveGridKey = setActiveGridKey;
+}
+
 function getCharacterHubGridKey() {
     return getWorkshopGridKey(characterHubActiveSetup);
 }
@@ -1295,7 +1402,7 @@ function getActiveCombatGridKey() {
     if (currentWorkshop === 'farm' || currentWorkshop === 'pvp') {
         return getWorkshopGridKey(currentWorkshop);
     }
-    return _getGridKeyForSetup(characterHubActiveSetup);
+    return getConfiguredActiveGridKey();
 }
 
 function _getFreshDerivedCharacterStats(gridKey) {
@@ -1371,11 +1478,6 @@ function buildCharacterPanelPayload(gridKey) {
     const base = gameData.character && gameData.character.base ? gameData.character.base : null;
     if (!base) return null;
 
-    if (key === 'farmGrid') {
-        const derived = (gameData.character && gameData.character.derived) || getDerivedCharacterStats('farmGrid');
-        return { gridKey: key, base, derived };
-    }
-
     if (typeof computeCharacterStats === 'function' && typeof collectEquippedItemEntries === 'function') {
         const equippedGrid = gameData[key] && typeof gameData[key] === 'object' ? gameData[key] : {};
         const equippedItemEntries = collectEquippedItemEntries(equippedGrid, (itemId, cell) => getItemDefinition(itemId, cell));
@@ -1386,7 +1488,7 @@ function buildCharacterPanelPayload(gridKey) {
         return { gridKey: key, base, derived };
     }
 
-    return { gridKey: key, base, derived: null };
+    return { gridKey: key, base, derived: getDerivedCharacterStats(key) };
 }
 
 function mountCharacterPanels() {
@@ -1738,6 +1840,114 @@ function _applyPercentDelta(base, delta) {
     if (!Number.isFinite(value)) return 0;
     if (!Number.isFinite(mod)) return value;
     return value * (1 + mod);
+}
+
+function _rollCombatChance(chance) {
+    const safeChance = Math.max(0, Math.min(1, Number(chance) || 0));
+    return Math.random() < safeChance;
+}
+
+function _resolveDefenseSnapshot(stats) {
+    const safeStats = stats && typeof stats === 'object' ? stats : {};
+    return {
+        armour: Math.max(0, Number(safeStats.armour) || 0),
+        evasion: Math.max(0, Number(safeStats.evasion) || 0),
+        auraShield: Math.max(0, Number(safeStats.auraShield) || 0),
+        maxLife: Math.max(1, Number(safeStats.life) || 1)
+    };
+}
+
+function _resolveDodgeChanceFromEvasion(evasion) {
+    const safeEvasion = Math.max(0, Number(evasion) || 0);
+    if (safeEvasion <= 0) return 0;
+    const curve = Math.max(1, Number(ZONE_COMBAT_DEFENSE_CONFIG.evasionToDodgeCurve) || 1200);
+    const baseChance = safeEvasion / (safeEvasion + curve);
+    const maxChance = Math.max(0, Math.min(1, Number(ZONE_COMBAT_DEFENSE_CONFIG.maxDodgeChance) || 0.75));
+    return Math.max(0, Math.min(maxChance, baseChance));
+}
+
+function _resolveArmourMitigationRatio(armour, incomingPhysicalDamage) {
+    const safeArmour = Math.max(0, Number(armour) || 0);
+    const safeHit = Math.max(0, Number(incomingPhysicalDamage) || 0);
+    if (safeArmour <= 0 || safeHit <= 0) return 0;
+    const damageFactor = Math.max(1, Number(ZONE_COMBAT_DEFENSE_CONFIG.armourDamageFactor) || 10);
+    const denominator = safeArmour + (damageFactor * safeHit);
+    if (!Number.isFinite(denominator) || denominator <= 0) return 0;
+    const rawRatio = safeArmour / denominator;
+    const maxRatio = Math.max(0, Math.min(1, Number(ZONE_COMBAT_DEFENSE_CONFIG.maxArmourMitigation) || 0.9));
+    return Math.max(0, Math.min(maxRatio, rawRatio));
+}
+
+function _applyIncomingPhysicalHitToCharacter(rawDamage, stats) {
+    const incomingDamage = Math.max(0, Number(rawDamage) || 0);
+    const defense = _resolveDefenseSnapshot(stats);
+    const base = (gameData.character && gameData.character.base) ? gameData.character.base : null;
+
+    if (base) {
+        if (!Number.isFinite(base.currentLife)) {
+            base.currentLife = defense.maxLife;
+        }
+        if (!Number.isFinite(base.currentAuraShield)) {
+            base.currentAuraShield = defense.auraShield;
+        }
+        base.currentLife = Math.max(0, Math.min(defense.maxLife, Number(base.currentLife) || 0));
+        base.currentAuraShield = Math.max(0, Math.min(defense.auraShield, Number(base.currentAuraShield) || 0));
+    }
+
+    const dodgeChance = _resolveDodgeChanceFromEvasion(defense.evasion);
+    const dodged = incomingDamage > 0 && dodgeChance > 0 && _rollCombatChance(dodgeChance);
+    const lifeBefore = base ? Math.max(0, Number(base.currentLife) || 0) : Math.max(0, Number(gameData.hp) || 0);
+    const auraBefore = base ? Math.max(0, Number(base.currentAuraShield) || 0) : 0;
+    if (dodged) {
+        return {
+            incomingDamage,
+            dodged: true,
+            dodgeChance,
+            armourMitigationRatio: 0,
+            mitigatedByArmour: 0,
+            postArmourDamage: incomingDamage,
+            auraBefore,
+            auraAbsorbed: 0,
+            auraAfter: auraBefore,
+            lifeBefore,
+            lifeDamage: 0,
+            lifeAfter: lifeBefore
+        };
+    }
+
+    const armourMitigationRatio = _resolveArmourMitigationRatio(defense.armour, incomingDamage);
+    const mitigatedByArmour = incomingDamage * armourMitigationRatio;
+    const postArmourDamage = Math.max(0, incomingDamage - mitigatedByArmour);
+
+    let remainingDamage = postArmourDamage;
+    let auraAbsorbed = 0;
+    if (ZONE_COMBAT_DEFENSE_CONFIG.auraShieldFirst && base && remainingDamage > 0) {
+        auraAbsorbed = Math.min(auraBefore, remainingDamage);
+        base.currentAuraShield = Math.max(0, auraBefore - auraAbsorbed);
+        remainingDamage -= auraAbsorbed;
+    }
+
+    const lifeDamage = Math.max(0, remainingDamage);
+    if (base) {
+        base.currentLife = Math.max(0, lifeBefore - lifeDamage);
+    } else if (Number.isFinite(gameData.hp)) {
+        gameData.hp = Math.max(0, gameData.hp - lifeDamage);
+    }
+
+    return {
+        incomingDamage,
+        dodged: false,
+        dodgeChance,
+        armourMitigationRatio,
+        mitigatedByArmour,
+        postArmourDamage,
+        auraBefore,
+        auraAbsorbed,
+        auraAfter: base ? Math.max(0, Number(base.currentAuraShield) || 0) : 0,
+        lifeBefore,
+        lifeDamage,
+        lifeAfter: base ? Math.max(0, Number(base.currentLife) || 0) : Math.max(0, Number(gameData.hp) || 0)
+    };
 }
 
 function _resolveWeaponActionCooldownMs(item) {
@@ -2154,18 +2364,34 @@ function _processZoneCombatMonsterAttack(stepMs, monster, stats) {
     zoneCombatState.monsterTimerMs = Math.max(0, zoneCombatState.monsterTimerMs - stepMs);
     if (zoneCombatState.monsterTimerMs > 0) return;
 
-    const monsterDamage = Math.max(0, Math.floor(Number.isFinite(monster.damage) ? monster.damage : 0));
-    const base = (gameData.character && gameData.character.base) ? gameData.character.base : null;
-    if (base) {
-        const maxLife = Number.isFinite(stats && stats.life) ? Math.max(1, stats.life) : Math.max(1, Number(base.baseLife) || 1);
-        if (!Number.isFinite(base.currentLife)) {
-            base.currentLife = maxLife;
-        }
-        base.currentLife = Math.max(0, base.currentLife - monsterDamage);
-    } else if (Number.isFinite(gameData.hp)) {
-        gameData.hp = Math.max(0, gameData.hp - monsterDamage);
+    const monsterDamage = Math.max(0, Number.isFinite(monster.damage) ? monster.damage : 0);
+    const defenseOutcome = _applyIncomingPhysicalHitToCharacter(monsterDamage, stats);
+    if (defenseOutcome.dodged) {
+        _appendZoneCombatLog(`Dodged (${Math.round(defenseOutcome.dodgeChance * 100)}%)`);
+        _appendZoneCombatEvent('player_dodged', {
+            damage: 0,
+            summary: `chance ${Math.round(defenseOutcome.dodgeChance * 100)}%`
+        });
+        zoneCombatState.monsterTimerMs = intervalMs;
+        return;
     }
-    _appendZoneCombatLog(`Monster dealt ${monsterDamage} dmg`);
+    const lifeDamage = Math.max(0, defenseOutcome.lifeDamage);
+    const auraBlocked = Math.max(0, defenseOutcome.auraAbsorbed);
+    const armourBlocked = Math.max(0, defenseOutcome.mitigatedByArmour);
+    const auraBefore = Math.max(0, defenseOutcome.auraBefore);
+    const auraAfter = Math.max(0, defenseOutcome.auraAfter);
+    const details = [
+        `life -${Math.round(lifeDamage)}`
+    ];
+    if (auraBefore > 0 || auraBlocked > 0 || auraAfter > 0) {
+        details.push(`Aura ${Math.round(auraBefore)}->${Math.round(auraAfter)} (-${Math.round(auraBlocked)})`);
+    }
+    if (armourBlocked > 0) details.push(`armour blocked ${Math.round(armourBlocked)}`);
+    _appendZoneCombatLog(`Monster hit ${Math.round(monsterDamage)} (${details.join(', ')})`);
+    _appendZoneCombatEvent('player_hit', {
+        damage: lifeDamage,
+        summary: `raw ${Math.round(monsterDamage)} | armour ${Math.round(armourBlocked)} | aura ${Math.round(auraBlocked)}`
+    });
     zoneCombatState.monsterTimerMs = intervalMs;
 }
 
@@ -2271,6 +2497,9 @@ function _renderZoneCombatHud() {
     const ui = zoneCombatState.ui;
     const hud = _getHudStats();
     ui.playerHpText.textContent = `HP: ${Math.ceil(hud.currentLife)} / ${Math.ceil(hud.maxLife)}`;
+    if (ui.playerAuraText) {
+        ui.playerAuraText.textContent = `Aura Shield: ${Math.ceil(hud.currentAuraShield)} / ${Math.ceil(hud.maxAuraShield)} (+${hud.auraShieldRegen.toFixed(2)}/s)`;
+    }
 
     const monster = gameData.currentMonster;
     if (monster) {
@@ -3038,6 +3267,7 @@ function renderZoneView(zoneId) {
     playerBlock.innerHTML =
         '<div class="zone-combat-hud-title">Player</div>' +
         '<div class="zone-combat-hud-row" id="zone-hud-player-hp">HP: -- / --</div>' +
+        '<div class="zone-combat-hud-row" id="zone-hud-player-aura">Aura Shield: -- / --</div>' +
         '<div class="zone-combat-hud-row zone-combat-cd-row"><span>ATK CD</span><span id="zone-hud-player-cd-text">--</span></div>';
     const playerCdBar = document.createElement('div');
     playerCdBar.classList.add('zone-combat-cd-bar');
@@ -3140,6 +3370,7 @@ function renderZoneView(zoneId) {
         logBody,
         toggleBtn: toggleCombatBtn,
         playerHpText: playerBlock.querySelector('#zone-hud-player-hp'),
+        playerAuraText: playerBlock.querySelector('#zone-hud-player-aura'),
         playerCdFill,
         playerCdText: playerBlock.querySelector('#zone-hud-player-cd-text'),
         staminaText: staminaRow,
@@ -3231,6 +3462,7 @@ function renderZoneView(zoneId) {
 function renderEquipmentHub() {
     renderPreviewGrid('preview-farm', 'farmGrid');
     renderPreviewGrid('preview-pve', 'pveGrid');
+    renderPreviewGrid('preview-pvp', 'pvpGrid');
     renderPreviewGrid('preview-bank-small', 'bank');
 }
 
@@ -3374,6 +3606,7 @@ function openWorkshop(type) {
             renderStoragePageTabs();
         }
     }
+    _updateSetActiveGridButtonState();
     
     // Ruft die Funktion aus der Workshopengine.js auf
     setTimeout(() => {
@@ -3406,8 +3639,10 @@ function closeWorkshop() {
         overlay.style.backgroundPosition = '';
         overlay.style.backgroundRepeat = '';
     }
+    _updateSetActiveGridButtonState();
     
     if (typeof saveGame === 'function') saveGame();
+    setActiveGridKey(getConfiguredActiveGridKey(), { save: false });
     renderEquipmentHub();
     refreshCharacterPanels();
 }
@@ -3472,19 +3707,37 @@ function updateLogic() {
 
     const combatGridKey = getActiveCombatGridKey();
     const shouldUseCombatGridStats = zoneCombatState.active || _isCoastZoneViewActive();
+    const configuredActiveGridKey = getConfiguredActiveGridKey();
     const characterStats = shouldUseCombatGridStats
         ? _getFreshDerivedCharacterStats(combatGridKey)
-        : getDerivedCharacterStats('farmGrid');
+        : getDerivedCharacterStats(configuredActiveGridKey);
 
     if (characterStats && gameData.character && gameData.character.base) {
         const base = gameData.character.base;
         const lifeRegen = (typeof characterStats.lifeRegen === 'number') ? characterStats.lifeRegen : gameData.hpRegen;
         const staminaRegen = (typeof characterStats.staminaRegen === 'number') ? characterStats.staminaRegen : 1;
+        const auraShieldRegen = (typeof characterStats.auraShieldRegen === 'number')
+            ? Math.max(0, characterStats.auraShieldRegen)
+            : ((Number(characterStats.auraShield) || 0) > 0 ? 1 : 0);
         if (typeof base.currentLife !== 'number') {
             base.currentLife = characterStats.life;
         }
+        if (typeof base.currentAuraShield !== 'number') {
+            base.currentAuraShield = Math.max(0, Number(characterStats.auraShield) || 0);
+        }
         if (typeof base.currentStamina !== 'number') {
             base.currentStamina = characterStats.stamina;
+        }
+        base.currentAuraShield = Math.max(
+            0,
+            Math.min(
+                Math.max(0, Number(characterStats.auraShield) || 0),
+                Number(base.currentAuraShield) || 0
+            )
+        );
+        if (base.currentAuraShield < characterStats.auraShield) {
+            const regenDeltaSec = dt > 0 ? dt : fixedStepSec;
+            base.currentAuraShield = Math.min(characterStats.auraShield, base.currentAuraShield + (auraShieldRegen * regenDeltaSec));
         }
         if (base.currentLife < characterStats.life) {
             base.currentLife = Math.min(characterStats.life, base.currentLife + (lifeRegen * dt));
@@ -3526,6 +3779,18 @@ function _getHudStats() {
                 : (Number.isFinite(gameData.hp) ? gameData.hp : 0)
         )
     );
+    const maxAuraShield = Math.max(
+        0,
+        Number.isFinite(derived.maxAuraShield) ? derived.maxAuraShield
+            : (Number.isFinite(derived.auraShield) ? derived.auraShield : 0)
+    );
+    const currentAuraShield = Math.max(
+        0,
+        Math.min(
+            maxAuraShield,
+            Number.isFinite(base.currentAuraShield) ? base.currentAuraShield : maxAuraShield
+        )
+    );
     const maxMana = Math.max(
         0,
         Number.isFinite(derived.maxMana) ? derived.maxMana
@@ -3555,10 +3820,19 @@ function _getHudStats() {
     const xpToNextLevel = Number.isFinite(derived.xpToNextLevel)
         ? derived.xpToNextLevel
         : (Number.isFinite(gameData.xpNextLevel) ? gameData.xpNextLevel : calculateXpToNextLevel(gameData.level || base.level || 1));
+    const auraShieldRegen = Math.max(
+        0,
+        Number.isFinite(derived.auraShieldRegen)
+            ? derived.auraShieldRegen
+            : (maxAuraShield > 0 ? 1 : 0)
+    );
 
     return {
         currentLife,
         maxLife,
+        currentAuraShield,
+        maxAuraShield,
+        auraShieldRegen,
         currentMana,
         maxMana,
         currentStamina,
@@ -3595,6 +3869,32 @@ function updateUI() {
     setT('stamina-text-header', `STA: ${Math.ceil(hud.currentStamina)} / ${Math.ceil(hud.maxStamina)}`);
     setT('mana-text-header', `MANA: ${Math.ceil(hud.currentMana)} / ${Math.ceil(hud.maxMana)}`);
     setT('xp-text-header', `XP: ${Math.floor(hud.xp)} / ${Math.floor(hud.xpToNextLevel)}`);
+    const hpHeaderContainer = document.getElementById('hp-header-container');
+    const auraTextHeader = document.getElementById('aura-text-header');
+    const asRingHeader = document.getElementById('as-ring-header');
+    const hasAuraShield = hud.maxAuraShield > 0;
+    if (hpHeaderContainer) {
+        hpHeaderContainer.classList.toggle('aura-active', hasAuraShield && hud.currentAuraShield > 0);
+    }
+    if (asRingHeader) {
+        if (hasAuraShield) {
+            const asFillPct = Math.max(0, Math.min(100, (hud.currentAuraShield / hud.maxAuraShield) * 100));
+            asRingHeader.style.width = `${asFillPct.toFixed(2)}%`;
+            asRingHeader.classList.add('visible');
+        } else {
+            asRingHeader.style.width = '0%';
+            asRingHeader.classList.remove('visible');
+        }
+    }
+    if (auraTextHeader) {
+        if (hasAuraShield) {
+            auraTextHeader.textContent = `AS: ${Math.ceil(hud.currentAuraShield)} / ${Math.ceil(hud.maxAuraShield)}`;
+            auraTextHeader.classList.add('visible');
+        } else {
+            auraTextHeader.textContent = '';
+            auraTextHeader.classList.remove('visible');
+        }
+    }
     
     if (gameData.currentMonster) {
         setW('monster-hp-fill', (gameData.currentMonster.hp / gameData.currentMonster.maxHp) * 100);
@@ -3979,6 +4279,7 @@ function renderWorkshopGrids() {
     }
 
     renderItemMutatorSummary(currentWorkshop);
+    _updateSetActiveGridButtonState();
 }
 
 // Queueing render to avoid re-render storms during drag operations
@@ -4093,6 +4394,7 @@ window.onload = () => {
         ensureBattlefieldData(gameData);
     }
     ensureSettingsDefaults();
+    _lastDerivedGridKey = null;
     audioRuntime.settingsReady = true;
     _syncAudioVolumeLabelsAndSliders();
     _syncDevModeOptionToggle();
@@ -4100,8 +4402,9 @@ window.onload = () => {
     _syncActiveAudioVolumes();
     _ensureMusicLoopRunning(true);
     markCharacterDirty();
-    getDerivedCharacterStats('farmGrid');
+    getDerivedCharacterStats(getConfiguredActiveGridKey());
     mountCharacterPanels();
+    _updateSetActiveGridButtonState();
     
     // 3. Initiales UI Rendering
     spawnMonster(0);

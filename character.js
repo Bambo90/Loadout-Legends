@@ -196,6 +196,7 @@ function createDefaultCharacterBase() {
         weightLimit: _calculateWeightLimitFromStrength(baseAttributes.str),
         currentWeight: 0,
         currentLife: baseLife,
+        currentAuraShield: 0,
         currentMana: baseMana,
         currentStamina: baseStamina
     };
@@ -220,6 +221,9 @@ function normalizeCharacterBase(rawBase) {
 
     const weightLimit = Math.max(1, _num(base.weightLimit, _calculateWeightLimitFromStrength(baseAttributes.str)));
 
+    const baseDefense = normalizeArmorMap(base.baseDefense || defaults.baseDefense);
+    const currentAuraShield = Math.max(0, _num(base.currentAuraShield, defaults.currentAuraShield));
+
     return {
         level: Math.max(1, Math.floor(_num(base.level, defaults.level))),
         xp: Math.max(0, _num(base.xp, defaults.xp)),
@@ -228,10 +232,11 @@ function normalizeCharacterBase(rawBase) {
         baseMana: Math.max(0, _num(base.baseMana, defaults.baseMana)),
         baseStamina: Math.max(1, _num(base.baseStamina, defaults.baseStamina)),
         baseDamage: normalizeDamageMap(base.baseDamage || defaults.baseDamage),
-        baseDefense: normalizeArmorMap(base.baseDefense || defaults.baseDefense),
+        baseDefense,
         weightLimit,
         currentWeight: Math.max(0, _num(base.currentWeight, defaults.currentWeight)),
         currentLife: Math.max(0, _num(base.currentLife, base.baseLife)),
+        currentAuraShield,
         currentMana: Math.max(0, _num(base.currentMana, base.baseMana)),
         currentStamina: Math.max(0, _num(base.currentStamina, base.baseStamina))
     };
@@ -262,6 +267,7 @@ function _buildCharacterBaseFromLegacyState(sourceData) {
         weightLimit: _num(source.weightLimit, undefined),
         currentWeight: _num(source.currentWeight, defaults.currentWeight),
         currentLife: _num(source.hp, _num(source.maxHp, defaults.baseLife)),
+        currentAuraShield: _num(source.currentAuraShield, undefined),
         currentMana: _num(source.currentMana, defaults.baseMana),
         currentStamina: _num(source.currentStamina, defaults.baseStamina)
     };
@@ -606,6 +612,7 @@ function _createRuntimeStatsFromBase(base) {
         armour: baseDefense.armour,
         evasion: baseDefense.evasion,
         auraShield: baseDefense.auraShield,
+        auraShieldRegen: 1,
         life: base.baseLife,
         mana: base.baseMana,
         stamina: base.baseStamina,
@@ -689,6 +696,8 @@ function computeCharacterStats(params) {
     const finalLife = Math.max(1, runtime.life);
     const finalMana = Math.max(0, runtime.mana);
     const finalStamina = Math.max(1, runtime.stamina);
+    const maxAuraShield = Math.max(0, _num(finalArmor.auraShield, 0));
+    const currentAuraShield = _clamp(_num(base.currentAuraShield, maxAuraShield), 0, maxAuraShield);
     const currentLife = _clamp(_num(base.currentLife, finalLife), 0, finalLife);
     const currentMana = _clamp(_num(base.currentMana, finalMana), 0, finalMana);
     const currentStamina = _clamp(_num(base.currentStamina, finalStamina), 0, finalStamina);
@@ -696,6 +705,7 @@ function computeCharacterStats(params) {
     const attackIntervalMs = 1000 / attacksPerSecond;
     const critChance = _clamp(runtime.critChance, 0, 1);
     const staminaRegen = Math.max(0, runtime.staminaRegen);
+    const auraShieldRegen = Math.max(0, _num(runtime.auraShieldRegen, 0));
     const staminaCostMultiplier = Math.max(0.1, runtime.staminaCostMultiplier);
     const xpGainMultiplier = Math.max(0.1, runtime.xpGainMultiplier);
 
@@ -707,11 +717,14 @@ function computeCharacterStats(params) {
         armour: finalArmor.armour,
         evasion: finalArmor.evasion,
         auraShield: finalArmor.auraShield,
+        maxAuraShield,
+        currentAuraShield,
         attacksPerSecond,
         attackIntervalMs,
         attackSpeed: attacksPerSecond,
         critChance,
         staminaRegen,
+        auraShieldRegen,
         staminaCostMultiplier,
         xpGainMultiplier,
         magicScaling: Math.max(0.1, runtime.magicScaling),
@@ -766,6 +779,8 @@ function syncLegacyCharacterFields(gameData, derivedStats) {
 
     const maxLife = Math.max(1, _num(derived.maxLife, _num(derived.life, base.baseLife)));
     const currentLife = _clamp(_num(base.currentLife, maxLife), 0, maxLife);
+    const maxAuraShield = Math.max(0, _num(derived.maxAuraShield, _num(derived.auraShield, 0)));
+    base.currentAuraShield = _clamp(_num(base.currentAuraShield, maxAuraShield), 0, maxAuraShield);
 
     gameData.level = base.level;
     gameData.xp = base.xp;

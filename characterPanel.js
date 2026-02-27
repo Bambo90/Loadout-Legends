@@ -49,6 +49,25 @@
             .join("");
     }
 
+    function _buildDefenseRows(derived) {
+        const armor = derived && derived.finalArmor && typeof derived.finalArmor === "object"
+            ? derived.finalArmor
+            : {};
+        const rows = [
+            { label: "ARMOUR", value: _fmtNumber(_num(armor.armour, 0), 2) },
+            { label: "EVASION", value: _fmtNumber(_num(armor.evasion, 0), 2) },
+            { label: "AURA SHIELD", value: _fmtNumber(_num(armor.auraShield, 0), 2) },
+            { label: "AS REGEN", value: _fmtNumber(_num(derived && derived.auraShieldRegen, 0), 2) + " /s" }
+        ];
+
+        return rows.map((entry) => (
+            '<div class="cp-row">' +
+            '<span class="cp-key">' + entry.label + "</span>" +
+            '<span class="cp-val">' + entry.value + "</span>" +
+            "</div>"
+        )).join("");
+    }
+
     function _renderPanelContent(panelEl, payload, options) {
         const mode = options.mode === "full" ? "full" : "compact";
         const title = options.title || "Charakter";
@@ -78,7 +97,7 @@
         const weightLimit = _fmtNumber(_num(derived.weightLimit, 0), 2);
 
         const damageRows = _toObjectRows(derived.finalDamage, (bucket) => _fmtDamageBucket(bucket));
-        const defenseRows = _toObjectRows(derived.finalArmor, (value) => _fmtNumber(_num(value, 0), 2));
+        const defenseRows = _buildDefenseRows(derived);
         const attributeRows = _toObjectRows(base.baseAttributes, (value) => _fmtNumber(_num(value, 0), 0));
         const weightRows =
             '<div class="cp-row"><span class="cp-key">GEWICHT</span><span class="cp-val">' + weightCurrent + " / " + weightLimit + "</span></div>" +

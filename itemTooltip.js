@@ -29,6 +29,7 @@
         "armour": "Armour",
         "evasion": "Evasion",
         "auraShield": "Aura Shield",
+        "auraShieldRegen": "Aura Shield Regen",
         "attacksPerSecond": "Attacks Per Second",
         "attackCooldownMs": "Attack Cooldown",
         "attackIntervalMs": "Attack Interval (ms)",
@@ -514,6 +515,22 @@
         return type === "armor" || type === "shield";
     }
 
+    function _resolvePrimaryStatPathSet(runtimeItem, baseItem) {
+        const paths = new Set();
+        if (_isWeaponItem(runtimeItem) || _isWeaponItem(baseItem)) {
+            paths.add("physicalDamageMin");
+            paths.add("physicalDamageMax");
+            paths.add("critChance");
+            paths.add("attacksPerSecond");
+        }
+        if (_isArmorItem(runtimeItem) || _isArmorItem(baseItem)) {
+            paths.add("armour");
+            paths.add("evasion");
+            paths.add("auraShield");
+        }
+        return paths;
+    }
+
     function _buildFinalTooltipStats(runtimeItem, baseItem, modifiers) {
         const stats = {
             physicalDamageMin: 0,
@@ -574,11 +591,20 @@
             ));
         }
         if (_isArmorItem(runtimeItem) || _isArmorItem(baseItem)) {
-            return _renderSection("Armor Stats", (
-                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Armour</span><span class="item-tooltip-value">${_escapeHtml(String(Math.round(finalStats.armour)))}</span></div>` +
-                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Evasion</span><span class="item-tooltip-value">${_escapeHtml(String(Math.round(finalStats.evasion)))}</span></div>` +
-                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Aura Shield</span><span class="item-tooltip-value">${_escapeHtml(String(Math.round(finalStats.auraShield)))}</span></div>`
-            ));
+            const orderedArmorKeys = ["armour", "evasion", "auraShield"];
+            const seen = new Set();
+            const rows = [];
+            orderedArmorKeys.forEach((key) => {
+                if (seen.has(key)) return;
+                seen.add(key);
+                const value = Math.round(_num(finalStats && finalStats[key], 0));
+                if (value <= 0) return;
+                rows.push(
+                    `<div class="item-tooltip-row"><span class="item-tooltip-stat">${_escapeHtml(_formatStatLabel(key))}</span><span class="item-tooltip-value">${_escapeHtml(String(value))}</span></div>`
+                );
+            });
+            if (rows.length === 0) return "";
+            return _renderSection("Armor Stats", rows.join(""));
         }
         return "";
     }
@@ -600,9 +626,10 @@
         }
         if (!_isFiniteNumber(weight)) weight = 0;
 
-        const baseStats = Array.isArray(baseItem.baseStats)
+        const hiddenPrimaryStatPaths = _resolvePrimaryStatPathSet(runtimeItem, baseItem);
+        const baseStats = (Array.isArray(baseItem.baseStats)
             ? baseItem.baseStats.map(_normalizeModifier).filter(Boolean)
-            : [];
+            : []).filter((modifier) => !hiddenPrimaryStatPaths.has(modifier.statPath));
         const implicitRows = _buildAffixRows(runtimeItem.implicits);
         const prefixRows = _buildAffixRows(runtimeItem.prefixes);
         const suffixRows = _buildAffixRows(runtimeItem.suffixes);
@@ -626,7 +653,11 @@
 
         const legacyModifiers = effectiveModifiers.filter((modifier) => {
             const key = _modifierKey(modifier);
-            return !baseKeys.has(key) && !implicitKeys.has(key) && !prefixKeys.has(key) && !suffixKeys.has(key);
+            return !hiddenPrimaryStatPaths.has(modifier.statPath)
+                && !baseKeys.has(key)
+                && !implicitKeys.has(key)
+                && !prefixKeys.has(key)
+                && !suffixKeys.has(key);
         });
 
         const rarityClass = `item-tooltip-rarity-${_escapeHtml(runtimeItem.rarity || baseItem.rarity || "common")}`;
