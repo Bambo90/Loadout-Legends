@@ -3710,6 +3710,7 @@ function renderShop() {
 function renderDragPreviewForGrid(container, location, cols, totalSlots) {
     const draggedItem = DragSystem.getDraggedItem();
     if (!draggedItem) return;
+    const maxRows = Math.ceil(totalSlots / cols);
 
     // Determine whether the mouse is over THIS container. Prefer explicit hoverTarget
     // when it points into this location; otherwise use last known mouse position
@@ -3717,10 +3718,11 @@ function renderDragPreviewForGrid(container, location, cols, totalSlots) {
     let hoverIndex = null;
     const rect = container.getBoundingClientRect();
     const lastPos = window._dragLastPos || null;
+    const pointerInsideThisGrid = !!(lastPos && lastPos.x >= rect.left && lastPos.x <= rect.right && lastPos.y >= rect.top && lastPos.y <= rect.bottom);
 
     if (draggedItem.hoverTarget && draggedItem.hoverTarget.location === location) {
         hoverIndex = draggedItem.hoverTarget.index;
-    } else if (lastPos && lastPos.x >= rect.left && lastPos.x <= rect.right && lastPos.y >= rect.top && lastPos.y <= rect.bottom) {
+    } else if (pointerInsideThisGrid) {
         const geo = getCellGeometry(container, cols);
         const cellW = geo.cellW;
         const cellH = geo.cellH;
@@ -3729,16 +3731,31 @@ function renderDragPreviewForGrid(container, location, cols, totalSlots) {
         const col = Math.floor(relX / cellW);
         const row = Math.floor(relY / cellH);
         const clampedCol = Math.max(0, Math.min(cols - 1, col));
-        const maxRows = Math.ceil(totalSlots / cols);
         const clampedRow = Math.max(0, Math.min(maxRows - 1, row));
         hoverIndex = clampedRow * cols + clampedCol;
-        console.log('preview snap fallback ->', location, 'col', clampedCol, 'row', clampedRow, 'index', hoverIndex);
     } else {
         // Mouse not over this container and no matching hoverTarget — don't render previews here
         return;
     }
 
-    const maxRows = Math.ceil(totalSlots / cols);
+    // Keep preview ghost directly under the moved body by deriving it from follow-item position.
+    if (pointerInsideThisGrid) {
+        const followEl = document.querySelector('.follow-item');
+        if (followEl) {
+            const followRect = followEl.getBoundingClientRect();
+            const geo = getCellGeometry(container, cols);
+            const originX = Math.floor((followRect.left - rect.left) / geo.cellW);
+            const originY = Math.floor((followRect.top - rect.top) / geo.cellH);
+            const offsetX = Number.isFinite(Number(draggedItem.offsetX)) ? Math.floor(Number(draggedItem.offsetX)) : 0;
+            const offsetY = Number.isFinite(Number(draggedItem.offsetY)) ? Math.floor(Number(draggedItem.offsetY)) : 0;
+            const anchorHoverX = originX + offsetX;
+            const anchorHoverY = originY + offsetY;
+            const clampedCol = Math.max(0, Math.min(cols - 1, anchorHoverX));
+            const clampedRow = Math.max(0, Math.min(maxRows - 1, anchorHoverY));
+            hoverIndex = clampedRow * cols + clampedCol;
+        }
+    }
+
     const bodyShape = draggedItem.previewShape || draggedItem.item?.body || [[1]];
     let placementValid = false;
     let previewOriginIndex = 0;
