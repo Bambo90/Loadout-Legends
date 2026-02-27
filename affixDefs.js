@@ -19,7 +19,7 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         id: "implicit_weapon_honed_edge",
         category: "weapon",
         group: "implicit",
-        statPath: "damageFlat",
+        statPath: "physicalDamageMin",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 2, requiredIlvl: 1 }),
@@ -31,7 +31,7 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         id: "implicit_weapon_weighted_edge",
         category: "weapon",
         group: "implicit",
-        statPath: "damageFlat",
+        statPath: "physicalDamageMax",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 3, requiredIlvl: 1 }),
@@ -40,10 +40,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "prefix_honed_slash",
+        id: "prefix_weapon_honed_strike",
         category: "weapon",
         group: "prefix",
-        statPath: "damageFlat",
+        statPath: "physicalDamageMin",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 3, requiredIlvl: 1 }),
@@ -52,10 +52,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "prefix_crushing_blunt",
+        id: "prefix_weapon_crushing_strike",
         category: "weapon",
         group: "prefix",
-        statPath: "damageFlat",
+        statPath: "physicalDamageMax",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 3, requiredIlvl: 1 }),
@@ -64,10 +64,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "prefix_weapon_barbed_pierce",
+        id: "prefix_weapon_barbed_strike",
         category: "weapon",
         group: "prefix",
-        statPath: "damageFlat",
+        statPath: "physicalDamageMin",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 2, requiredIlvl: 1 }),
@@ -76,10 +76,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "prefix_weapon_tempered_slash",
+        id: "prefix_weapon_tempered_strike",
         category: "weapon",
         group: "prefix",
-        statPath: "damageFlat",
+        statPath: "physicalDamageMax",
         type: "percent",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 0.03, max: 0.05, requiredIlvl: 1 }),
@@ -88,10 +88,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "prefix_weapon_heavy_blunt",
+        id: "prefix_weapon_heavy_strike",
         category: "weapon",
         group: "prefix",
-        statPath: "damageFlat",
+        statPath: "physicalDamageMax",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 2, requiredIlvl: 1 }),
@@ -103,7 +103,7 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         id: "suffix_of_swiftness",
         category: "weapon",
         group: "suffix",
-        statPath: "attackCooldownMs",
+        statPath: "attacksPerSecond",
         type: "percent",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 0.03, max: 0.05, requiredIlvl: 1 }),
@@ -148,10 +148,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "implicit_guarded_slash",
+        id: "implicit_armor_guarded_plate",
         category: "armor",
         group: "implicit",
-        statPath: "armor.slash",
+        statPath: "armour",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 3, requiredIlvl: 1 }),
@@ -160,10 +160,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "implicit_armor_guarded_pierce",
+        id: "implicit_armor_guarded_weave",
         category: "armor",
         group: "implicit",
-        statPath: "armor.pierce",
+        statPath: "evasion",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 3, requiredIlvl: 1 }),
@@ -172,10 +172,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "implicit_armor_guarded_blunt",
+        id: "implicit_armor_guarded_ward",
         category: "armor",
         group: "implicit",
-        statPath: "armor.blunt",
+        statPath: "auraShield",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 1, max: 3, requiredIlvl: 1 }),
@@ -187,7 +187,7 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         id: "prefix_reinforced_armor",
         category: "armor",
         group: "prefix",
-        statPath: "armor.blunt",
+        statPath: "auraShield",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 2, max: 4, requiredIlvl: 1 }),
@@ -196,10 +196,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "prefix_armor_reinforced_slash",
+        id: "prefix_armor_reinforced_plate",
         category: "armor",
         group: "prefix",
-        statPath: "armor.slash",
+        statPath: "armour",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 2, max: 4, requiredIlvl: 1 }),
@@ -208,10 +208,10 @@ const _AFFIX_DEFS_SEED = Object.freeze([
         ])
     },
     {
-        id: "prefix_armor_reinforced_pierce",
+        id: "prefix_armor_reinforced_weave",
         category: "armor",
         group: "prefix",
-        statPath: "armor.pierce",
+        statPath: "evasion",
         type: "flat",
         tiers: Object.freeze([
             Object.freeze({ tier: 1, min: 2, max: 4, requiredIlvl: 1 }),
@@ -527,11 +527,11 @@ const AFFIX_CATEGORY_POOLS = Object.freeze({
             Object.freeze({ affixId: "implicit_weapon_weighted_edge", weight: 4 })
         ]),
         prefix: Object.freeze([
-            Object.freeze({ affixId: "prefix_honed_slash", weight: 4 }),
-            Object.freeze({ affixId: "prefix_crushing_blunt", weight: 3 }),
-            Object.freeze({ affixId: "prefix_weapon_barbed_pierce", weight: 3 }),
-            Object.freeze({ affixId: "prefix_weapon_tempered_slash", weight: 2 }),
-            Object.freeze({ affixId: "prefix_weapon_heavy_blunt", weight: 3 })
+            Object.freeze({ affixId: "prefix_weapon_honed_strike", weight: 4 }),
+            Object.freeze({ affixId: "prefix_weapon_crushing_strike", weight: 3 }),
+            Object.freeze({ affixId: "prefix_weapon_barbed_strike", weight: 3 }),
+            Object.freeze({ affixId: "prefix_weapon_tempered_strike", weight: 2 }),
+            Object.freeze({ affixId: "prefix_weapon_heavy_strike", weight: 3 })
         ]),
         suffix: Object.freeze([
             Object.freeze({ affixId: "suffix_of_swiftness", weight: 4 }),
@@ -542,14 +542,14 @@ const AFFIX_CATEGORY_POOLS = Object.freeze({
     }),
     armor: Object.freeze({
         implicit: Object.freeze([
-            Object.freeze({ affixId: "implicit_guarded_slash", weight: 3 }),
-            Object.freeze({ affixId: "implicit_armor_guarded_pierce", weight: 3 }),
-            Object.freeze({ affixId: "implicit_armor_guarded_blunt", weight: 3 })
+            Object.freeze({ affixId: "implicit_armor_guarded_plate", weight: 3 }),
+            Object.freeze({ affixId: "implicit_armor_guarded_weave", weight: 3 }),
+            Object.freeze({ affixId: "implicit_armor_guarded_ward", weight: 3 })
         ]),
         prefix: Object.freeze([
             Object.freeze({ affixId: "prefix_reinforced_armor", weight: 3 }),
-            Object.freeze({ affixId: "prefix_armor_reinforced_slash", weight: 3 }),
-            Object.freeze({ affixId: "prefix_armor_reinforced_pierce", weight: 3 }),
+            Object.freeze({ affixId: "prefix_armor_reinforced_plate", weight: 3 }),
+            Object.freeze({ affixId: "prefix_armor_reinforced_weave", weight: 3 }),
             Object.freeze({ affixId: "prefix_armor_vital_plating", weight: 3 }),
             Object.freeze({ affixId: "prefix_armor_enduring_core", weight: 2 })
         ]),

@@ -8,18 +8,16 @@ function calculateCharacterDamageValue(characterStats) {
         return getCharacterDamageValueFromDerived(characterStats);
     }
 
-    if (!characterStats || !characterStats.finalDamage || typeof characterStats.finalDamage !== "object") {
-        return 0;
+    if (characterStats && Number.isFinite(characterStats.physicalDamageMin) && Number.isFinite(characterStats.physicalDamageMax)) {
+        const min = Math.max(0, characterStats.physicalDamageMin);
+        const max = Math.max(min, characterStats.physicalDamageMax);
+        return Math.max(0, (min + max) / 2);
     }
-
-    let totalAverage = 0;
-    Object.keys(characterStats.finalDamage).forEach((damageType) => {
-        const bucket = characterStats.finalDamage[damageType] || {};
-        const min = typeof bucket.min === "number" ? bucket.min : 0;
-        const max = typeof bucket.max === "number" ? bucket.max : 0;
-        totalAverage += (min + max) / 2;
-    });
-    return Math.max(0, totalAverage);
+    if (!characterStats || !characterStats.finalDamage || typeof characterStats.finalDamage !== "object") return 0;
+    const physical = characterStats.finalDamage.physical || {};
+    const min = typeof physical.min === "number" ? physical.min : 0;
+    const max = typeof physical.max === "number" ? physical.max : min;
+    return Math.max(0, (Math.max(0, min) + Math.max(Math.max(0, min), max)) / 2);
 }
 
 /**
@@ -27,7 +25,7 @@ function calculateCharacterDamageValue(characterStats) {
  * Preferred call path is to pass `characterStats` and consume derived stats.
  */
 function calculatePlayerDamageWithEquipment(playerLevel, equippedItems, characterStats) {
-    if (characterStats && characterStats.finalDamage) {
+    if (characterStats && (characterStats.finalDamage || Number.isFinite(characterStats.physicalDamageMin))) {
         return calculateCharacterDamageValue(characterStats);
     }
 
@@ -37,8 +35,13 @@ function calculatePlayerDamageWithEquipment(playerLevel, equippedItems, characte
 
     if (equippedItems && Array.isArray(equippedItems)) {
         equippedItems.forEach((item) => {
-            if (item && item.damage) {
-                damageBonus += item.damage * 0.1;
+            if (!item) return;
+            const min = Number(item.physicalDamageMin);
+            const max = Number(item.physicalDamageMax);
+            if (Number.isFinite(min) || Number.isFinite(max)) {
+                const safeMin = Number.isFinite(min) ? min : 0;
+                const safeMax = Number.isFinite(max) ? max : safeMin;
+                damageBonus += ((safeMin + safeMax) * 0.5) * 0.02;
             }
         });
     }
@@ -52,7 +55,10 @@ function calculatePlayerDamageWithEquipment(playerLevel, equippedItems, characte
  */
 function calculateEquipmentBonusValue(equippedItems, bonusType, characterStats) {
     if (characterStats && typeof characterStats === "object") {
-        if (bonusType === "speed") return Number.isFinite(characterStats.attackSpeed) ? characterStats.attackSpeed : 1.0;
+        if (bonusType === "speed") {
+            if (Number.isFinite(characterStats.attacksPerSecond)) return characterStats.attacksPerSecond;
+            return Number.isFinite(characterStats.attackSpeed) ? characterStats.attackSpeed : 1.0;
+        }
         if (bonusType === "xp") return Math.max(0.1, characterStats.xpGainMultiplier || 1.0);
         if (bonusType === "damage") return Math.max(0, calculateCharacterDamageValue(characterStats));
         return 1.0;
@@ -68,10 +74,20 @@ function calculateEquipmentBonusValue(equippedItems, bonusType, characterStats) 
     equippedItems.forEach((item) => {
         if (!item) return;
 
-        if (bonusType === "damage" && item.damage) {
-            bonus += item.damage * 0.1;
-        } else if (bonusType === "speed" && item.speedBonus) {
-            bonus *= item.speedBonus;
+        if (bonusType === "damage") {
+            const min = Number(item.physicalDamageMin);
+            const max = Number(item.physicalDamageMax);
+            if (Number.isFinite(min) || Number.isFinite(max)) {
+                const safeMin = Number.isFinite(min) ? min : 0;
+                const safeMax = Number.isFinite(max) ? max : safeMin;
+                bonus += ((safeMin + safeMax) * 0.5) * 0.02;
+            }
+        } else if (bonusType === "speed") {
+            if (Number.isFinite(item.attacksPerSecond) && item.attacksPerSecond > 0) {
+                bonus = Math.max(bonus, item.attacksPerSecond);
+            } else if (item.speedBonus) {
+                bonus *= item.speedBonus;
+            }
         } else if (bonusType === "xp" && item.xpBonus) {
             bonus *= item.xpBonus;
         }

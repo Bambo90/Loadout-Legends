@@ -24,23 +24,17 @@
     });
 
     const ITEM_TOOLTIP_STAT_LABELS = Object.freeze({
-        "damage.slash.min": "Slash Damage Min",
-        "damage.slash.max": "Slash Damage Max",
-        "damage.pierce.min": "Pierce Damage Min",
-        "damage.pierce.max": "Pierce Damage Max",
-        "damage.blunt.min": "Blunt Damage Min",
-        "damage.blunt.max": "Blunt Damage Max",
-        "damageFlat": "Damage",
-        "damageMin": "Damage Min",
-        "damageMax": "Damage Max",
-        "armor.slash": "Slash Armor",
-        "armor.pierce": "Pierce Armor",
-        "armor.blunt": "Blunt Armor",
+        "physicalDamageMin": "Physical Damage Min",
+        "physicalDamageMax": "Physical Damage Max",
+        "armour": "Armour",
+        "evasion": "Evasion",
+        "auraShield": "Aura Shield",
+        "attacksPerSecond": "Attacks Per Second",
         "attackCooldownMs": "Attack Cooldown",
         "attackIntervalMs": "Attack Interval (ms)",
-        "attackSpeed": "Attack Speed",
+        "attackSpeed": "Attacks Per Second",
         "xpGainMultiplier": "XP Gain",
-        "critChance": "Crit Chance",
+        "critChance": "Critical Strike Chance",
         "life": "Life",
         "mana": "Mana",
         "stamina": "Stamina",
@@ -156,9 +150,8 @@
     function _isIntegerLikeStatPath(statPath) {
         if (typeof statPath !== "string" || !statPath) return false;
         if (statPath === "life" || statPath === "mana" || statPath === "stamina" || statPath === "weightLimit" || statPath === "staminaCost") return true;
-        if (statPath === "damageFlat" || statPath === "damageMin" || statPath === "damageMax") return true;
-        if (statPath.startsWith("armor.")) return true;
-        if (statPath.startsWith("damage.")) return true;
+        if (statPath === "physicalDamageMin" || statPath === "physicalDamageMax") return true;
+        if (statPath === "armour" || statPath === "evasion" || statPath === "auraShield") return true;
         return false;
     }
 
@@ -500,6 +493,96 @@
         );
     }
 
+    function _isWeaponItem(item) {
+        if (!item || typeof item !== "object") return false;
+        const tags = Array.isArray(item.tags) ? item.tags.map((tag) => String(tag || "").toLowerCase()) : [];
+        if (tags.includes("weapon") || tags.includes("tool")) return true;
+        const type = String(item.baseType || item.type || "").toLowerCase();
+        return (
+            type === "weapon" || type === "tool" ||
+            type === "dagger" || type === "sword" || type === "axe" || type === "mace" ||
+            type === "spear" || type === "bow" || type === "crossbow" || type === "wand" ||
+            type === "staff" || type === "stave"
+        );
+    }
+
+    function _isArmorItem(item) {
+        if (!item || typeof item !== "object") return false;
+        const tags = Array.isArray(item.tags) ? item.tags.map((tag) => String(tag || "").toLowerCase()) : [];
+        if (tags.includes("armor") || tags.includes("shield")) return true;
+        const type = String(item.baseType || item.type || "").toLowerCase();
+        return type === "armor" || type === "shield";
+    }
+
+    function _buildFinalTooltipStats(runtimeItem, baseItem, modifiers) {
+        const stats = {
+            physicalDamageMin: 0,
+            physicalDamageMax: 0,
+            critChance: 0,
+            attacksPerSecond: 0,
+            armour: 0,
+            evasion: 0,
+            auraShield: 0
+        };
+        const source = runtimeItem && typeof runtimeItem === "object" ? runtimeItem : (baseItem || {});
+        Object.keys(stats).forEach((key) => {
+            if (_isFiniteNumber(source[key])) stats[key] = source[key];
+            else if (_isFiniteNumber(baseItem && baseItem[key])) stats[key] = baseItem[key];
+        });
+        const flat = [];
+        const percent = [];
+        const pathsWithModifiers = new Set();
+        (Array.isArray(modifiers) ? modifiers : []).forEach((modifier) => {
+            const normalized = _normalizeModifier(modifier);
+            if (!normalized) return;
+            if (!Object.prototype.hasOwnProperty.call(stats, normalized.statPath)) return;
+            pathsWithModifiers.add(normalized.statPath);
+            if (normalized.type === "flat") flat.push(normalized);
+            if (normalized.type === "percent") percent.push(normalized);
+        });
+        pathsWithModifiers.forEach((statPath) => {
+            stats[statPath] = 0;
+        });
+
+        const apply = (modifier) => {
+            const current = _num(stats[modifier.statPath], 0);
+            if (modifier.type === "flat") {
+                stats[modifier.statPath] = current + modifier.value;
+                return;
+            }
+            stats[modifier.statPath] = current * (1 + modifier.value);
+        };
+        flat.forEach(apply);
+        percent.forEach(apply);
+
+        stats.physicalDamageMin = Math.max(0, _num(stats.physicalDamageMin, 0));
+        stats.physicalDamageMax = Math.max(stats.physicalDamageMin, _num(stats.physicalDamageMax, stats.physicalDamageMin));
+        stats.attacksPerSecond = Math.max(0, _num(stats.attacksPerSecond, 0));
+        stats.critChance = Math.max(0, _num(stats.critChance, 0));
+        stats.armour = Math.max(0, _num(stats.armour, 0));
+        stats.evasion = Math.max(0, _num(stats.evasion, 0));
+        stats.auraShield = Math.max(0, _num(stats.auraShield, 0));
+        return stats;
+    }
+
+    function _renderPrimaryStatsBlock(runtimeItem, baseItem, finalStats) {
+        if (_isWeaponItem(runtimeItem) || _isWeaponItem(baseItem)) {
+            return _renderSection("Weapon Stats", (
+                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Physical Damage</span><span class="item-tooltip-value">${_escapeHtml(`${Math.round(finalStats.physicalDamageMin)}-${Math.round(finalStats.physicalDamageMax)}`)}</span></div>` +
+                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Critical Strike Chance</span><span class="item-tooltip-value">${_escapeHtml(_formatNumber(finalStats.critChance * 100))}%</span></div>` +
+                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Attacks Per Second</span><span class="item-tooltip-value">${_escapeHtml(_formatNumber(finalStats.attacksPerSecond))}</span></div>`
+            ));
+        }
+        if (_isArmorItem(runtimeItem) || _isArmorItem(baseItem)) {
+            return _renderSection("Armor Stats", (
+                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Armour</span><span class="item-tooltip-value">${_escapeHtml(String(Math.round(finalStats.armour)))}</span></div>` +
+                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Evasion</span><span class="item-tooltip-value">${_escapeHtml(String(Math.round(finalStats.evasion)))}</span></div>` +
+                `<div class="item-tooltip-row"><span class="item-tooltip-stat">Aura Shield</span><span class="item-tooltip-value">${_escapeHtml(String(Math.round(finalStats.auraShield)))}</span></div>`
+            ));
+        }
+        return "";
+    }
+
     function _buildTooltipHtml(context) {
         const runtimeItem = _resolveRuntimeItem(context);
         if (!runtimeItem) return "";
@@ -528,6 +611,7 @@
         const effectiveModifiers = (typeof extractItemModifiers === "function")
             ? extractItemModifiers(runtimeItem).map(_normalizeModifier).filter(Boolean)
             : [];
+        const finalStats = _buildFinalTooltipStats(runtimeItem, baseItem, effectiveModifiers);
 
         const baseKeys = new Set(baseStats.map(_modifierKey));
         const implicitKeys = new Set(implicitRows.map((entry) => entry.key));
@@ -558,12 +642,14 @@
             `</header>`
         );
 
+        const primaryStatsSection = _renderPrimaryStatsBlock(runtimeItem, baseItem, finalStats);
         const sections = [
+            primaryStatsSection,
             _renderSection(_label("baseStats"), _renderModifierRows(baseStats)),
             _renderSection(`${_label("implicit")} (${slotSummary.implicitFilled}/${slotSummary.implicitSlots})`, _renderAffixRows(implicitRows)),
             _renderSection(`${_label("prefixes")} (${slotSummary.prefixFilled}/${slotSummary.prefixSlots})`, _renderAffixRows(prefixRows)),
             _renderSection(`${_label("suffixes")} (${slotSummary.suffixFilled}/${slotSummary.suffixSlots})`, _renderAffixRows(suffixRows))
-        ];
+        ].filter(Boolean);
 
         if (legacyModifiers.length > 0) {
             sections.push(_renderSection(_label("legacy"), _renderModifierRows(legacyModifiers)));
@@ -785,3 +871,4 @@
         };
     }
 })();
+

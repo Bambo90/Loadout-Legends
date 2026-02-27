@@ -1325,28 +1325,22 @@ function _getFreshDerivedCharacterStats(gridKey) {
 }
 
 function _resolveDerivedDamageRange(stats) {
-    if (!stats || !stats.finalDamage || typeof stats.finalDamage !== 'object') return null;
-    let totalMin = 0;
-    let totalMax = 0;
-    let hasDamageBucket = false;
-
-    Object.keys(stats.finalDamage).forEach((damageType) => {
-        const bucket = stats.finalDamage[damageType] || {};
-        const min = Number(bucket.min);
-        const max = Number(bucket.max);
-        if (!Number.isFinite(min) && !Number.isFinite(max)) return;
-        const safeMin = Math.max(0, Number.isFinite(min) ? min : 0);
-        const safeMax = Math.max(safeMin, Number.isFinite(max) ? max : safeMin);
-        totalMin += safeMin;
-        totalMax += safeMax;
-        hasDamageBucket = true;
-    });
-
-    if (!hasDamageBucket) return null;
-    return {
-        min: Math.max(0, totalMin),
-        max: Math.max(Math.max(0, totalMin), totalMax)
-    };
+    if (!stats || typeof stats !== 'object') return null;
+    const minDirect = Number(stats.physicalDamageMin);
+    const maxDirect = Number(stats.physicalDamageMax);
+    if (Number.isFinite(minDirect) || Number.isFinite(maxDirect)) {
+        const min = Math.max(0, Number.isFinite(minDirect) ? minDirect : 0);
+        const max = Math.max(min, Number.isFinite(maxDirect) ? maxDirect : min);
+        return { min, max };
+    }
+    if (!stats.finalDamage || typeof stats.finalDamage !== 'object') return null;
+    const physical = stats.finalDamage.physical || {};
+    const min = Number(physical.min);
+    const max = Number(physical.max);
+    if (!Number.isFinite(min) && !Number.isFinite(max)) return null;
+    const safeMin = Math.max(0, Number.isFinite(min) ? min : 0);
+    const safeMax = Math.max(safeMin, Number.isFinite(max) ? max : safeMin);
+    return { min: safeMin, max: safeMax };
 }
 
 function _rollDamageInRange(range) {
@@ -1748,53 +1742,68 @@ function _applyPercentDelta(base, delta) {
 
 function _resolveWeaponActionCooldownMs(item) {
     if (!item || typeof item !== 'object') return ZONE_COMBAT_UNARMED_INTERVAL_MS;
+    const apsModifiers = _readItemModifierTotals(item, 'attacksPerSecond');
+    const hasApsFromModifiers = apsModifiers.flat !== 0 || apsModifiers.percent !== 0;
+    const explicitAps = Number(item.attacksPerSecond);
+    const byType = ZONE_DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE[_resolveItemType(item)];
     const explicitCooldown = Number(item.attackCooldownMs);
-    let cooldownMs = Number.isFinite(explicitCooldown) && explicitCooldown > 0
+    const explicitInterval = Number(item.attackIntervalMs);
+    let baseCooldown = Number.isFinite(explicitCooldown) && explicitCooldown > 0
         ? explicitCooldown
-        : NaN;
-    if (!Number.isFinite(cooldownMs) || cooldownMs <= 0) {
-        const byType = ZONE_DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE[_resolveItemType(item)];
-        cooldownMs = Number.isFinite(byType) ? byType : ZONE_COMBAT_UNARMED_INTERVAL_MS;
+        : (Number.isFinite(explicitInterval) && explicitInterval > 0
+            ? explicitInterval
+            : (Number.isFinite(byType) ? byType : ZONE_COMBAT_UNARMED_INTERVAL_MS));
+    let aps = hasApsFromModifiers
+        ? 0
+        : (Number.isFinite(explicitAps) && explicitAps > 0 ? explicitAps : (1000 / baseCooldown));
+    aps += apsModifiers.flat;
+    if (apsModifiers.percent !== 0) {
+        aps *= (1 + apsModifiers.percent);
     }
-    const cooldownModifiers = _readItemModifierTotals(item, 'attackCooldownMs');
-    if (cooldownModifiers.flat !== 0) {
-        cooldownMs += cooldownModifiers.flat;
-    }
-    if (cooldownModifiers.percent !== 0) {
-        cooldownMs *= (1 - cooldownModifiers.percent);
-    }
-    if (!Number.isFinite(cooldownMs) || cooldownMs <= 0) cooldownMs = ZONE_COMBAT_UNARMED_INTERVAL_MS;
-    return _clampCooldownMs(cooldownMs);
+    if (!Number.isFinite(aps) || aps <= 0) aps = 1000 / baseCooldown;
+    return _clampCooldownMs(1000 / Math.max(0.05, aps));
 }
 
 function _resolveWeaponActionDamageBaseRange(item) {
     if (!item || typeof item !== 'object') return { min: 0, max: 0 };
-    const damageMin = Number(item.damageMin);
-    const damageMax = Number(item.damageMax);
+    const damageMin = Number(item.physicalDamageMin);
+    const damageMax = Number(item.physicalDamageMax);
     if (Number.isFinite(damageMin) && Number.isFinite(damageMax)) {
         const min = Math.max(0, Math.min(damageMin, damageMax));
         const max = Math.max(min, Math.max(damageMin, damageMax));
         return { min, max };
     }
-    const damageFlat = Number(item.damageFlat);
-    if (Number.isFinite(damageFlat)) {
-        const value = Math.max(0, damageFlat);
+    const fallbackMin = Number(item.damageMin);
+    const fallbackMax = Number(item.damageMax);
+    if (Number.isFinite(fallbackMin) && Number.isFinite(fallbackMax)) {
+        const min = Math.max(0, Math.min(fallbackMin, fallbackMax));
+        const max = Math.max(min, Math.max(fallbackMin, fallbackMax));
+        return { min, max };
+    }
+    const fallbackFlat = Number(item.damageFlat);
+    if (Number.isFinite(fallbackFlat)) {
+        const value = Math.max(0, fallbackFlat);
         return { min: value, max: value };
     }
     return { min: 0, max: 0 };
 }
 
 function _resolveWeaponActionDamageRange(item) {
-    const baseRange = _resolveWeaponActionDamageBaseRange(item);
+    const minMods = _readItemModifierTotals(item, 'physicalDamageMin');
+    const maxMods = _readItemModifierTotals(item, 'physicalDamageMax');
+    const hasModernDamageMods = (
+        minMods.flat !== 0 || minMods.percent !== 0 ||
+        maxMods.flat !== 0 || maxMods.percent !== 0
+    );
+    const baseRange = hasModernDamageMods
+        ? { min: 0, max: 0 }
+        : _resolveWeaponActionDamageBaseRange(item);
     let min = baseRange.min;
     let max = baseRange.max;
-    const flatMods = _readItemModifierTotals(item, 'damageFlat');
-    const minMods = _readItemModifierTotals(item, 'damageMin');
-    const maxMods = _readItemModifierTotals(item, 'damageMax');
-    min += flatMods.flat + minMods.flat;
-    max += flatMods.flat + maxMods.flat;
-    min = _applyPercentDelta(min, flatMods.percent + minMods.percent);
-    max = _applyPercentDelta(max, flatMods.percent + maxMods.percent);
+    min += minMods.flat;
+    max += maxMods.flat;
+    min = _applyPercentDelta(min, minMods.percent);
+    max = _applyPercentDelta(max, maxMods.percent);
     min = Math.max(0, min);
     max = Math.max(min, max);
     return { min, max };
@@ -1802,8 +1811,8 @@ function _resolveWeaponActionDamageRange(item) {
 
 function _resolveWeaponActionDamageValue(effect) {
     if (!effect || typeof effect !== 'object') return 0;
-    const damageMin = Number(effect.damageMin);
-    const damageMax = Number(effect.damageMax);
+    const damageMin = Number(effect.physicalDamageMin);
+    const damageMax = Number(effect.physicalDamageMax);
     if (!Number.isFinite(damageMin) || !Number.isFinite(damageMax)) return 0;
     const min = Math.max(0, Math.min(damageMin, damageMax));
     const max = Math.max(min, Math.max(damageMin, damageMax));
@@ -1948,8 +1957,8 @@ function _buildActionDescriptorsForEquippedItems(stats, activeGridKey) {
             resourceCost: _resolveWeaponResourceCost(item),
             effect: {
                 type: 'weapon_attack',
-                damageMin: damageRange.min,
-                damageMax: damageRange.max
+                physicalDamageMin: damageRange.min,
+                physicalDamageMax: damageRange.max
             },
             order: (entryIdx * 10)
         });
@@ -3757,7 +3766,15 @@ function renderShop() {
         if (!canBuy) card.style.opacity = '0.6';
         
         const statText = [];
-        if (item.damage) statText.push(`+${item.damage} DMG`);
+        if (Number.isFinite(item.physicalDamageMin) || Number.isFinite(item.physicalDamageMax)) {
+            const min = Math.max(0, Number.isFinite(item.physicalDamageMin) ? item.physicalDamageMin : 0);
+            const max = Math.max(min, Number.isFinite(item.physicalDamageMax) ? item.physicalDamageMax : min);
+            statText.push(`${Math.round(min)}-${Math.round(max)} Physical`);
+        }
+        if (Number.isFinite(item.attacksPerSecond)) statText.push(`${item.attacksPerSecond.toFixed(2)} APS`);
+        if (Number.isFinite(item.armour) && item.armour > 0) statText.push(`+${Math.round(item.armour)} Armour`);
+        if (Number.isFinite(item.evasion) && item.evasion > 0) statText.push(`+${Math.round(item.evasion)} Evasion`);
+        if (Number.isFinite(item.auraShield) && item.auraShield > 0) statText.push(`+${Math.round(item.auraShield)} Aura Shield`);
         if (item.speedBonus) statText.push(`+${Math.floor((item.speedBonus - 1) * 100)}% Speed`);
         if (item.xpBonus) statText.push(`+${Math.floor((item.xpBonus - 1) * 100)}% XP`);
         
@@ -4026,7 +4043,7 @@ function calculateEquipmentBonus(gridType, bonusType) {
     if (gridType === 'farmGrid') {
         const characterStats = getDerivedCharacterStats(gridType);
         if (characterStats) {
-            if (bonusType === 'speed') return characterStats.attackSpeed;
+            if (bonusType === 'speed') return Number.isFinite(characterStats.attacksPerSecond) ? characterStats.attacksPerSecond : characterStats.attackSpeed;
             if (bonusType === 'xp') return characterStats.xpGainMultiplier;
             if (bonusType === 'damage') return calculateCharacterDamageValue(characterStats);
         }

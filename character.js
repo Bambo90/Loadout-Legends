@@ -1,11 +1,11 @@
 // ==========================================
 // CHARACTER SYSTEM
-// Central character model, stat pipeline and migration helpers
+// Unified ARPG stat model
 // ==========================================
 
-const CHARACTER_DAMAGE_TYPES = Object.freeze(["slash", "pierce", "blunt"]);
+const CHARACTER_DAMAGE_TYPES = Object.freeze(["physical"]);
 const CHARACTER_MODIFIER_TYPES = Object.freeze(["flat", "percent"]);
-const CHARACTER_UNARMED_ATTACK_INTERVAL_MS = 5000;
+const CHARACTER_UNARMED_ATTACKS_PER_SECOND = 1000 / 5000;
 const CHARACTER_DEFAULT_WEAPON_INTERVAL_MS_BY_TYPE = Object.freeze({
     dagger: 900,
     sword: 1400,
@@ -29,13 +29,11 @@ const CHARACTER_ATTRIBUTE_EFFECTS = Object.freeze({
     str: Object.freeze([
         Object.freeze({ statPath: "weightLimit", type: "flat", valuePerPoint: 2 }),
         Object.freeze({ statPath: "life", type: "flat", valuePerPoint: 2 }),
-        Object.freeze({ statPath: "damage.slash.min", type: "percent", valuePerPoint: 0.005 }),
-        Object.freeze({ statPath: "damage.slash.max", type: "percent", valuePerPoint: 0.005 }),
-        Object.freeze({ statPath: "damage.blunt.min", type: "percent", valuePerPoint: 0.005 }),
-        Object.freeze({ statPath: "damage.blunt.max", type: "percent", valuePerPoint: 0.005 })
+        Object.freeze({ statPath: "physicalDamageMin", type: "percent", valuePerPoint: 0.005 }),
+        Object.freeze({ statPath: "physicalDamageMax", type: "percent", valuePerPoint: 0.005 })
     ]),
     dex: Object.freeze([
-        Object.freeze({ statPath: "attackSpeed", type: "percent", valuePerPoint: 0.004 }),
+        Object.freeze({ statPath: "attacksPerSecond", type: "percent", valuePerPoint: 0.004 }),
         Object.freeze({ statPath: "critChance", type: "flat", valuePerPoint: 0.001 }),
         Object.freeze({ statPath: "staminaRegen", type: "percent", valuePerPoint: 0.006 })
     ]),
@@ -69,16 +67,6 @@ function _num(value, fallback) {
     return _isFiniteNumber(value) ? value : fallback;
 }
 
-function _cloneDeep(value) {
-    if (!value || typeof value !== "object") return value;
-    try {
-        return JSON.parse(JSON.stringify(value));
-    } catch (err) {
-        if (Array.isArray(value)) return value.slice();
-        return { ...value };
-    }
-}
-
 function _round2(value) {
     return Math.round(value * 100) / 100;
 }
@@ -88,19 +76,17 @@ function _clamp(value, min, max) {
 }
 
 function _createEmptyDamageMap() {
-    const map = {};
-    CHARACTER_DAMAGE_TYPES.forEach((damageType) => {
-        map[damageType] = { min: 0, max: 0 };
-    });
-    return map;
+    return {
+        physical: { min: 0, max: 0 }
+    };
 }
 
-function _createEmptyArmorMap() {
-    const map = {};
-    CHARACTER_DAMAGE_TYPES.forEach((damageType) => {
-        map[damageType] = 0;
-    });
-    return map;
+function _createEmptyDefenseMap() {
+    return {
+        armour: 0,
+        evasion: 0,
+        auraShield: 0
+    };
 }
 
 function _countBodyCells(item) {
@@ -109,7 +95,7 @@ function _countBodyCells(item) {
     item.body.forEach((row) => {
         if (!Array.isArray(row)) return;
         row.forEach((cell) => {
-            if (cell) count++;
+            if (cell) count += 1;
         });
     });
     return Math.max(1, count);
@@ -125,28 +111,65 @@ function calculateXpToNextLevel(level, config) {
     return Math.floor(cfg.baseXP * Math.pow(cfg.growthFactor, safeLevel - 1));
 }
 
+function _normalizeDamageBucket(sourceBucket) {
+    const src = sourceBucket && typeof sourceBucket === "object" ? sourceBucket : {};
+    const min = Math.max(0, _num(src.min, 0));
+    const max = Math.max(min, _num(src.max, min));
+    return { min, max };
+}
+
 function normalizeDamageMap(sourceMap) {
     const normalized = _createEmptyDamageMap();
     const src = sourceMap && typeof sourceMap === "object" ? sourceMap : {};
-    CHARACTER_DAMAGE_TYPES.forEach((damageType) => {
-        const srcEntry = src[damageType] && typeof src[damageType] === "object" ? src[damageType] : {};
-        normalized[damageType] = {
-            min: Math.max(0, _num(srcEntry.min, normalized[damageType].min)),
-            max: Math.max(0, _num(srcEntry.max, normalized[damageType].max))
-        };
-        if (normalized[damageType].max < normalized[damageType].min) {
-            normalized[damageType].max = normalized[damageType].min;
-        }
+
+    if (src.physical && typeof src.physical === "object") {
+        normalized.physical = _normalizeDamageBucket(src.physical);
+        return normalized;
+    }
+
+    if (_isFiniteNumber(src.min) || _isFiniteNumber(src.max)) {
+        normalized.physical = _normalizeDamageBucket(src);
+        return normalized;
+    }
+
+    let aggregateMin = 0;
+    let aggregateMax = 0;
+    Object.keys(src).forEach((key) => {
+        const bucket = src[key];
+        if (!bucket || typeof bucket !== "object") return;
+        const min = _num(bucket.min, null);
+        const max = _num(bucket.max, null);
+        if (!_isFiniteNumber(min) && !_isFiniteNumber(max)) return;
+        const safeMin = Math.max(0, _isFiniteNumber(min) ? min : 0);
+        const safeMax = Math.max(safeMin, _isFiniteNumber(max) ? max : safeMin);
+        aggregateMin += safeMin;
+        aggregateMax += safeMax;
     });
+    normalized.physical = {
+        min: Math.max(0, aggregateMin),
+        max: Math.max(Math.max(0, aggregateMin), aggregateMax)
+    };
     return normalized;
 }
 
 function normalizeArmorMap(sourceMap) {
-    const normalized = _createEmptyArmorMap();
+    const normalized = _createEmptyDefenseMap();
     const src = sourceMap && typeof sourceMap === "object" ? sourceMap : {};
-    CHARACTER_DAMAGE_TYPES.forEach((damageType) => {
-        normalized[damageType] = Math.max(0, _num(src[damageType], 0));
+
+    if (_isFiniteNumber(src.armour) || _isFiniteNumber(src.evasion) || _isFiniteNumber(src.auraShield)) {
+        normalized.armour = Math.max(0, _num(src.armour, 0));
+        normalized.evasion = Math.max(0, _num(src.evasion, 0));
+        normalized.auraShield = Math.max(0, _num(src.auraShield, 0));
+        return normalized;
+    }
+
+    let legacySum = 0;
+    Object.keys(src).forEach((key) => {
+        const value = _num(src[key], null);
+        if (!_isFiniteNumber(value)) return;
+        legacySum += Math.max(0, value);
     });
+    normalized.armour = Math.max(0, legacySum);
     return normalized;
 }
 
@@ -154,7 +177,7 @@ function createDefaultCharacterBase() {
     const baseAttributes = { str: 10, dex: 10, int: 10 };
     const baseLife = 100;
     const baseMana = 60;
-    const baseStamina = 100; // Stamina lvl vorher 100 test
+    const baseStamina = 100;
     return {
         level: 1,
         xp: 0,
@@ -163,9 +186,12 @@ function createDefaultCharacterBase() {
         baseMana,
         baseStamina,
         baseDamage: {
-            slash: { min: 3, max: 5 },
-            pierce: { min: 1, max: 2 },
-            blunt: { min: 1, max: 3 }
+            physical: { min: 4, max: 7 }
+        },
+        baseDefense: {
+            armour: 0,
+            evasion: 0,
+            auraShield: 0
         },
         weightLimit: _calculateWeightLimitFromStrength(baseAttributes.str),
         currentWeight: 0,
@@ -182,7 +208,6 @@ function createDefaultCharacterState() {
         dirty: true
     };
 }
-
 function normalizeCharacterBase(rawBase) {
     const defaults = createDefaultCharacterBase();
     const base = rawBase && typeof rawBase === "object" ? rawBase : {};
@@ -193,12 +218,9 @@ function normalizeCharacterBase(rawBase) {
         int: Math.max(0, _num(baseAttributesSrc.int, defaults.baseAttributes.int))
     };
 
-    const weightLimit = Math.max(
-        1,
-        _num(base.weightLimit, _calculateWeightLimitFromStrength(baseAttributes.str))
-    );
+    const weightLimit = Math.max(1, _num(base.weightLimit, _calculateWeightLimitFromStrength(baseAttributes.str)));
 
-    const normalized = {
+    return {
         level: Math.max(1, Math.floor(_num(base.level, defaults.level))),
         xp: Math.max(0, _num(base.xp, defaults.xp)),
         baseAttributes,
@@ -206,14 +228,13 @@ function normalizeCharacterBase(rawBase) {
         baseMana: Math.max(0, _num(base.baseMana, defaults.baseMana)),
         baseStamina: Math.max(1, _num(base.baseStamina, defaults.baseStamina)),
         baseDamage: normalizeDamageMap(base.baseDamage || defaults.baseDamage),
+        baseDefense: normalizeArmorMap(base.baseDefense || defaults.baseDefense),
         weightLimit,
         currentWeight: Math.max(0, _num(base.currentWeight, defaults.currentWeight)),
         currentLife: Math.max(0, _num(base.currentLife, base.baseLife)),
         currentMana: Math.max(0, _num(base.currentMana, base.baseMana)),
         currentStamina: Math.max(0, _num(base.currentStamina, base.baseStamina))
     };
-
-    return normalized;
 }
 
 function _buildCharacterBaseFromLegacyState(sourceData) {
@@ -221,14 +242,12 @@ function _buildCharacterBaseFromLegacyState(sourceData) {
     const source = sourceData && typeof sourceData === "object" ? sourceData : {};
 
     const legacyBaseDamage = (() => {
-        if (source.baseDamage && typeof source.baseDamage === "object") return source.baseDamage;
+        if (source.baseDamage && typeof source.baseDamage === "object") return normalizeDamageMap(source.baseDamage);
         const legacyLevel = Math.max(1, Math.floor(_num(source.level, defaults.level)));
         const baseMin = 2 + (legacyLevel * 0.5);
-        return {
-            slash: { min: baseMin, max: baseMin + 2 },
-            pierce: { min: 0, max: 0 },
-            blunt: { min: 0, max: 0 }
-        };
+        return normalizeDamageMap({
+            physical: { min: baseMin, max: baseMin + 2 }
+        });
     })();
 
     const candidate = {
@@ -239,6 +258,7 @@ function _buildCharacterBaseFromLegacyState(sourceData) {
         baseMana: _num(source.baseMana, defaults.baseMana),
         baseStamina: _num(source.baseStamina, defaults.baseStamina),
         baseDamage: legacyBaseDamage,
+        baseDefense: source.baseDefense,
         weightLimit: _num(source.weightLimit, undefined),
         currentWeight: _num(source.currentWeight, defaults.currentWeight),
         currentLife: _num(source.hp, _num(source.maxHp, defaults.baseLife)),
@@ -294,7 +314,7 @@ function _readNumericPath(root, statPath, fallback) {
     const parts = _toPathParts(statPath);
     if (!parts.length) return fallback;
     let ptr = root;
-    for (let i = 0; i < parts.length; i++) {
+    for (let i = 0; i < parts.length; i += 1) {
         const key = parts[i];
         if (!ptr || typeof ptr !== "object" || !Object.prototype.hasOwnProperty.call(ptr, key)) {
             return fallback;
@@ -308,7 +328,7 @@ function _writeNumericPath(root, statPath, value) {
     const parts = _toPathParts(statPath);
     if (!parts.length) return;
     let ptr = root;
-    for (let i = 0; i < parts.length - 1; i++) {
+    for (let i = 0; i < parts.length - 1; i += 1) {
         const key = parts[i];
         if (!ptr[key] || typeof ptr[key] !== "object") {
             ptr[key] = {};
@@ -331,42 +351,38 @@ function _normalizeModifier(rawModifier) {
 }
 
 function _buildLegacyItemModifierFactories() {
-    const damagePercentAllTypes = (percentValue) => {
-        const mods = [];
-        CHARACTER_DAMAGE_TYPES.forEach((damageType) => {
-            mods.push({ statPath: `damage.${damageType}.min`, type: "percent", value: percentValue });
-            mods.push({ statPath: `damage.${damageType}.max`, type: "percent", value: percentValue });
-        });
-        return mods;
-    };
-
-    const armorFlatAllTypes = (flatValue) => {
-        return CHARACTER_DAMAGE_TYPES.map((damageType) => ({
-            statPath: `armor.${damageType}`,
-            type: "flat",
-            value: flatValue
-        }));
-    };
-
     return Object.freeze({
+        physicalDamageMin: (value) => [{ statPath: "physicalDamageMin", type: "flat", value }],
+        physicalDamageMax: (value) => [{ statPath: "physicalDamageMax", type: "flat", value }],
+        attacksPerSecond: (value) => [{ statPath: "attacksPerSecond", type: "flat", value }],
+        armour: (value) => [{ statPath: "armour", type: "flat", value }],
+        evasion: (value) => [{ statPath: "evasion", type: "flat", value }],
+        auraShield: (value) => [{ statPath: "auraShield", type: "flat", value }],
         damage: (value) => [
-            { statPath: "damage.slash.min", type: "flat", value },
-            { statPath: "damage.slash.max", type: "flat", value }
+            { statPath: "physicalDamageMin", type: "flat", value },
+            { statPath: "physicalDamageMax", type: "flat", value }
         ],
-        speedBonus: (value) => [{ statPath: "attackSpeed", type: "percent", value: value - 1 }],
+        damageMin: (value) => [{ statPath: "physicalDamageMin", type: "flat", value }],
+        damageMax: (value) => [{ statPath: "physicalDamageMax", type: "flat", value }],
+        damageFlat: (value) => [
+            { statPath: "physicalDamageMin", type: "flat", value },
+            { statPath: "physicalDamageMax", type: "flat", value }
+        ],
+        speedBonus: (value) => [{ statPath: "attacksPerSecond", type: "percent", value: value - 1 }],
         xpBonus: (value) => [{ statPath: "xpGainMultiplier", type: "percent", value: value - 1 }],
-        defense: (value) => armorFlatAllTypes(value),
-        allResist: (value) => armorFlatAllTypes(value),
+        defense: (value) => [{ statPath: "armour", type: "flat", value }],
+        allResist: (value) => [{ statPath: "auraShield", type: "flat", value }],
         critChance: (value) => [{ statPath: "critChance", type: "flat", value }],
         life: (value) => [{ statPath: "life", type: "flat", value }],
         mana: (value) => [{ statPath: "mana", type: "flat", value }],
         stamina: (value) => [{ statPath: "stamina", type: "flat", value }],
-        damageBonus: (value) => damagePercentAllTypes(value - 1),
+        damageBonus: (value) => [
+            { statPath: "physicalDamageMin", type: "percent", value: value - 1 },
+            { statPath: "physicalDamageMax", type: "percent", value: value - 1 }
+        ],
         physicalBonus: (value) => [
-            { statPath: "damage.slash.min", type: "percent", value: value - 1 },
-            { statPath: "damage.slash.max", type: "percent", value: value - 1 },
-            { statPath: "damage.blunt.min", type: "percent", value: value - 1 },
-            { statPath: "damage.blunt.max", type: "percent", value: value - 1 }
+            { statPath: "physicalDamageMin", type: "percent", value: value - 1 },
+            { statPath: "physicalDamageMax", type: "percent", value: value - 1 }
         ]
     });
 }
@@ -397,11 +413,9 @@ function extractItemModifiers(item) {
 
     return output;
 }
-
 function _buildAttributeModifiers(baseAttributes) {
     const modifiers = [];
     const attrs = baseAttributes && typeof baseAttributes === "object" ? baseAttributes : {};
-
     Object.keys(CHARACTER_ATTRIBUTE_EFFECTS).forEach((attributeKey) => {
         const points = Math.max(0, _num(attrs[attributeKey], 0));
         const effects = CHARACTER_ATTRIBUTE_EFFECTS[attributeKey] || [];
@@ -414,7 +428,6 @@ function _buildAttributeModifiers(baseAttributes) {
             if (normalized) modifiers.push(normalized);
         });
     });
-
     return modifiers;
 }
 
@@ -422,21 +435,13 @@ function _buildLevelModifiers(level) {
     const safeLevel = Math.max(1, Math.floor(_num(level, 1)));
     const gainedLevels = Math.max(0, safeLevel - 1);
     if (gainedLevels <= 0) return [];
-
-    const modifiers = [
+    return [
         { statPath: "life", type: "flat", value: gainedLevels * 10 },
         { statPath: "mana", type: "flat", value: gainedLevels * 2 },
-        { statPath: "stamina", type: "flat", value: gainedLevels * 2 }
-    ];
-
-    CHARACTER_DAMAGE_TYPES.forEach((damageType) => {
-        modifiers.push({ statPath: `damage.${damageType}.min`, type: "flat", value: gainedLevels * 0.35 });
-        modifiers.push({ statPath: `damage.${damageType}.max`, type: "flat", value: gainedLevels * 0.55 });
-    });
-
-    return modifiers
-        .map(_normalizeModifier)
-        .filter(Boolean);
+        { statPath: "stamina", type: "flat", value: gainedLevels * 2 },
+        { statPath: "physicalDamageMin", type: "flat", value: gainedLevels * 0.35 },
+        { statPath: "physicalDamageMax", type: "flat", value: gainedLevels * 0.55 }
+    ].map(_normalizeModifier).filter(Boolean);
 }
 
 function getItemWeight(item) {
@@ -448,89 +453,74 @@ function getItemWeight(item) {
 
 function _resolveItemAttackType(item) {
     if (!item || typeof item !== "object") return "misc";
-    const baseType = typeof item.baseType === "string" && item.baseType
-        ? item.baseType
-        : null;
-    if (baseType) return baseType;
-    return typeof item.type === "string" && item.type ? item.type : "misc";
+    const baseType = (typeof item.baseType === "string" && item.baseType) ? item.baseType : null;
+    return baseType || ((typeof item.type === "string" && item.type) ? item.type : "misc");
 }
 
 function _isAttackWeaponType(type) {
     return Object.prototype.hasOwnProperty.call(CHARACTER_DEFAULT_WEAPON_INTERVAL_MS_BY_TYPE, type);
 }
 
-function _resolveWeaponBaseAttackIntervalMs(item) {
+function _resolveWeaponBaseAttacksPerSecond(item) {
     if (!item || typeof item !== "object") return null;
+    const explicitAps = Number(item.attacksPerSecond);
+    if (Number.isFinite(explicitAps) && explicitAps > 0) return explicitAps;
     const explicitInterval = Number(item.attackIntervalMs);
-    if (Number.isFinite(explicitInterval) && explicitInterval > 0) return explicitInterval;
+    if (Number.isFinite(explicitInterval) && explicitInterval > 0) return 1000 / explicitInterval;
+    const explicitCooldown = Number(item.attackCooldownMs);
+    if (Number.isFinite(explicitCooldown) && explicitCooldown > 0) return 1000 / explicitCooldown;
     const legacyAttackSpeed = Number(item.attackSpeed);
-    if (Number.isFinite(legacyAttackSpeed) && legacyAttackSpeed > 0) {
-        return 1000 / legacyAttackSpeed;
-    }
+    if (Number.isFinite(legacyAttackSpeed) && legacyAttackSpeed > 0) return legacyAttackSpeed;
     const attackType = _resolveItemAttackType(item);
     if (_isAttackWeaponType(attackType)) {
-        return CHARACTER_DEFAULT_WEAPON_INTERVAL_MS_BY_TYPE[attackType];
+        return 1000 / CHARACTER_DEFAULT_WEAPON_INTERVAL_MS_BY_TYPE[attackType];
     }
     return null;
 }
 
-function _resolveActiveAttackBaseIntervalMs(activeEntries) {
+function _resolveActiveAttackBaseAps(activeEntries) {
     const entries = Array.isArray(activeEntries) ? activeEntries : [];
-    for (let i = 0; i < entries.length; i++) {
+    for (let i = 0; i < entries.length; i += 1) {
         const item = entries[i] && entries[i].item ? entries[i].item : null;
         if (!item) continue;
         const attackType = _resolveItemAttackType(item);
         if (!_isAttackWeaponType(attackType)) continue;
-        const resolved = _resolveWeaponBaseAttackIntervalMs(item);
+        const resolved = _resolveWeaponBaseAttacksPerSecond(item);
         if (_isFiniteNumber(resolved) && resolved > 0) return resolved;
     }
-    return CHARACTER_UNARMED_ATTACK_INTERVAL_MS;
+    return CHARACTER_UNARMED_ATTACKS_PER_SECOND;
 }
 
 function _mapAttackTimingModifier(modifier) {
     const normalized = _normalizeModifier(modifier);
     if (!normalized) return null;
     if (normalized.statPath === "attackSpeed" && normalized.type === "percent") {
-        return {
-            statPath: "attackIntervalMs",
-            type: "percent",
-            value: -normalized.value
-        };
+        return { statPath: "attacksPerSecond", type: "percent", value: normalized.value };
+    }
+    if (normalized.statPath === "attackCooldownMs" && normalized.type === "percent") {
+        return { statPath: "attacksPerSecond", type: "percent", value: normalized.value };
+    }
+    if (normalized.statPath === "attackIntervalMs" && normalized.type === "percent") {
+        return { statPath: "attacksPerSecond", type: "percent", value: -normalized.value };
     }
     return normalized;
-}
-
-function _applyModifiersInOrder(runtimeStats, modifiers) {
-    if (!Array.isArray(modifiers) || modifiers.length === 0) return;
-
-    const flatModifiers = [];
-    const percentModifiers = [];
-    modifiers.forEach((modifier) => {
-        const normalized = _normalizeModifier(modifier);
-        if (!normalized) return;
-        if (normalized.type === "flat") flatModifiers.push(normalized);
-        if (normalized.type === "percent") percentModifiers.push(normalized);
-    });
-
-    _applyModifierPhases(runtimeStats, flatModifiers, percentModifiers);
 }
 
 function _applyModifierPhases(runtimeStats, flatModifiers, percentModifiers) {
     const applyOne = (modifier) => {
         const current = _readNumericPath(runtimeStats, modifier.statPath, 0);
-        let nextValue;
+        let nextValue = current;
         if (modifier.type === "flat") {
             nextValue = current + modifier.value;
         } else {
             let percentValue = modifier.value;
-            if (modifier.statPath === "attackIntervalMs") {
-                percentValue = _clamp(percentValue, -0.95, 0.95);
+            if (modifier.statPath === "attacksPerSecond") {
+                percentValue = _clamp(percentValue, -0.95, 5);
             }
             nextValue = current * (1 + percentValue);
         }
         _writeNumericPath(runtimeStats, modifier.statPath, nextValue);
     };
-
     flatModifiers.forEach(applyOne);
     percentModifiers.forEach(applyOne);
 }
@@ -538,17 +528,13 @@ function _applyModifierPhases(runtimeStats, flatModifiers, percentModifiers) {
 function _splitModifiersByType(modifiers) {
     const flatModifiers = [];
     const percentModifiers = [];
-    if (!Array.isArray(modifiers)) {
-        return { flatModifiers, percentModifiers };
-    }
-
+    if (!Array.isArray(modifiers)) return { flatModifiers, percentModifiers };
     modifiers.forEach((modifier) => {
         const normalized = _mapAttackTimingModifier(modifier);
         if (!normalized) return;
         if (normalized.type === "flat") flatModifiers.push(normalized);
         if (normalized.type === "percent") percentModifiers.push(normalized);
     });
-
     return { flatModifiers, percentModifiers };
 }
 
@@ -567,14 +553,12 @@ function _resolveItemById(itemId) {
 function collectEquippedItemEntries(grid, resolver) {
     if (!grid || typeof grid !== "object") return [];
     const resolveItem = typeof resolver === "function" ? resolver : _resolveItemById;
-
     return Object.keys(grid)
         .map((key) => ({ key, index: parseInt(key, 10), cell: grid[key] }))
         .filter((entry) => Number.isFinite(entry.index))
         .filter((entry) => entry.cell && entry.cell.root && entry.cell.itemId)
         .sort((a, b) => a.index - b.index)
         .map((entry) => {
-            // Resolver may use full cell context (instanceId, rotation, etc.).
             const item = resolveItem(entry.cell.itemId, entry.cell, entry.index);
             if (!item) return null;
             return {
@@ -614,15 +598,20 @@ function _classifyWeightActivation(equippedEntries, weightLimit) {
 }
 
 function _createRuntimeStatsFromBase(base) {
+    const baseDamage = normalizeDamageMap(base.baseDamage);
+    const baseDefense = normalizeArmorMap(base.baseDefense);
     return {
-        damage: normalizeDamageMap(base.baseDamage),
-        armor: _createEmptyArmorMap(),
+        physicalDamageMin: baseDamage.physical.min,
+        physicalDamageMax: baseDamage.physical.max,
+        armour: baseDefense.armour,
+        evasion: baseDefense.evasion,
+        auraShield: baseDefense.auraShield,
         life: base.baseLife,
         mana: base.baseMana,
         stamina: base.baseStamina,
-        attackIntervalMs: 0,
+        attacksPerSecond: 0,
         critChance: 0.05,
-        staminaRegen: 1, // normal 1
+        staminaRegen: 1,
         staminaCostMultiplier: 1,
         xpGainMultiplier: 1,
         magicScaling: 1,
@@ -630,19 +619,17 @@ function _createRuntimeStatsFromBase(base) {
         currentWeight: base.currentWeight
     };
 }
-
 function getCharacterDamageValueFromDerived(derivedStats) {
-    if (!derivedStats || !derivedStats.finalDamage) return 0;
-    let totalAverage = 0;
-    const damage = derivedStats.finalDamage;
-    const damageTypes = Object.keys(damage);
-    damageTypes.forEach((damageType) => {
-        const bucket = damage[damageType] || {};
-        const min = _num(bucket.min, 0);
-        const max = _num(bucket.max, 0);
-        totalAverage += (min + max) / 2;
-    });
-    return Math.max(0, totalAverage);
+    if (derivedStats && _isFiniteNumber(derivedStats.physicalDamageMin) && _isFiniteNumber(derivedStats.physicalDamageMax)) {
+        const min = Math.max(0, derivedStats.physicalDamageMin);
+        const max = Math.max(min, derivedStats.physicalDamageMax);
+        return Math.max(0, (min + max) / 2);
+    }
+    if (!derivedStats || !derivedStats.finalDamage || !derivedStats.finalDamage.physical) return 0;
+    const bucket = derivedStats.finalDamage.physical;
+    const min = Math.max(0, _num(bucket.min, 0));
+    const max = Math.max(min, _num(bucket.max, min));
+    return Math.max(0, (min + max) / 2);
 }
 
 function computeCharacterStats(params) {
@@ -650,44 +637,33 @@ function computeCharacterStats(params) {
     const base = normalizeCharacterBase(input.base);
     const equippedItemEntries = Array.isArray(input.equippedItemEntries) ? input.equippedItemEntries : [];
 
-    // 1) Load base stats
     const runtime = _createRuntimeStatsFromBase(base);
 
-    // 2) Collect attribute + level modifiers for global phase application.
     const attributeModifiers = _buildAttributeModifiers(base.baseAttributes);
     const levelModifiers = _buildLevelModifiers(base.level);
     const progressionModifiers = [...attributeModifiers, ...levelModifiers];
 
-    // Hard-cap activation is resolved from base + progression modifiers only.
-    // Items cannot self-enable by modifying weight limit during the same solve.
     const activationPreview = _createRuntimeStatsFromBase(base);
     const activationSplit = _splitModifiersByType(progressionModifiers);
     _applyModifierPhases(activationPreview, activationSplit.flatModifiers, activationSplit.percentModifiers);
-    activationPreview.weightLimit = Math.max(
-        1,
-        _num(activationPreview.weightLimit, _calculateWeightLimitFromStrength(base.baseAttributes.str))
-    );
+    activationPreview.weightLimit = Math.max(1, _num(activationPreview.weightLimit, _calculateWeightLimitFromStrength(base.baseAttributes.str)));
 
-    // 3) Resolve active item set and gather item modifiers.
     const weightClass = _classifyWeightActivation(equippedItemEntries, activationPreview.weightLimit);
     const activeItemModifiers = [];
     weightClass.active.forEach((entry) => {
         extractItemModifiers(entry.item).forEach((modifier) => activeItemModifiers.push(modifier));
     });
-    runtime.attackIntervalMs = _resolveActiveAttackBaseIntervalMs(weightClass.active);
+    const hasApsItemModifier = activeItemModifiers.some((modifier) => (
+        modifier && modifier.statPath === "attacksPerSecond"
+    ));
+    runtime.attacksPerSecond = hasApsItemModifier ? 0 : _resolveActiveAttackBaseAps(weightClass.active);
 
-    // 4) Global modifier phase:
-    //    - collect ALL sources
-    //    - apply ALL flats
-    //    - then apply ALL percents
     const allModifiers = [...progressionModifiers, ...activeItemModifiers];
     const globalSplit = _splitModifiersByType(allModifiers);
     _applyModifierPhases(runtime, globalSplit.flatModifiers, globalSplit.percentModifiers);
 
-    // Keep STR-driven floor authoritative after the full modifier pass.
     runtime.weightLimit = Math.max(1, _num(runtime.weightLimit, _calculateWeightLimitFromStrength(base.baseAttributes.str)));
 
-    // 5) Weight effects (stamina mechanics only).
     runtime.currentWeight = weightClass.totalWeight;
     const limit = Math.max(1, runtime.weightLimit);
     const ratio = runtime.currentWeight / limit;
@@ -699,19 +675,25 @@ function computeCharacterStats(params) {
         runtime.staminaRegen *= Math.max(0.4, 1 - ((ratio - 0.75) * 1.2));
     }
 
-    // 6) Finalize derived snapshot.
-    const finalDamage = normalizeDamageMap(runtime.damage);
-    const finalArmor = normalizeArmorMap(runtime.armor);
+    const finalPhysicalMin = Math.max(0, _num(runtime.physicalDamageMin, 0));
+    const finalPhysicalMax = Math.max(finalPhysicalMin, _num(runtime.physicalDamageMax, finalPhysicalMin));
+    const finalArmor = normalizeArmorMap({
+        armour: runtime.armour,
+        evasion: runtime.evasion,
+        auraShield: runtime.auraShield
+    });
+    const finalDamage = normalizeDamageMap({
+        physical: { min: finalPhysicalMin, max: finalPhysicalMax }
+    });
+
     const finalLife = Math.max(1, runtime.life);
     const finalMana = Math.max(0, runtime.mana);
     const finalStamina = Math.max(1, runtime.stamina);
     const currentLife = _clamp(_num(base.currentLife, finalLife), 0, finalLife);
     const currentMana = _clamp(_num(base.currentMana, finalMana), 0, finalMana);
     const currentStamina = _clamp(_num(base.currentStamina, finalStamina), 0, finalStamina);
-    const attackIntervalMs = (_isFiniteNumber(runtime.attackIntervalMs) && runtime.attackIntervalMs > 0)
-        ? runtime.attackIntervalMs
-        : CHARACTER_UNARMED_ATTACK_INTERVAL_MS;
-    const attackSpeed = 1000 / attackIntervalMs;
+    const attacksPerSecond = Math.max(0.1, _num(runtime.attacksPerSecond, CHARACTER_UNARMED_ATTACKS_PER_SECOND));
+    const attackIntervalMs = 1000 / attacksPerSecond;
     const critChance = _clamp(runtime.critChance, 0, 1);
     const staminaRegen = Math.max(0, runtime.staminaRegen);
     const staminaCostMultiplier = Math.max(0.1, runtime.staminaCostMultiplier);
@@ -720,8 +702,14 @@ function computeCharacterStats(params) {
     return {
         finalDamage,
         finalArmor,
+        physicalDamageMin: finalPhysicalMin,
+        physicalDamageMax: finalPhysicalMax,
+        armour: finalArmor.armour,
+        evasion: finalArmor.evasion,
+        auraShield: finalArmor.auraShield,
+        attacksPerSecond,
         attackIntervalMs,
-        attackSpeed,
+        attackSpeed: attacksPerSecond,
         critChance,
         staminaRegen,
         staminaCostMultiplier,
@@ -743,7 +731,7 @@ function computeCharacterStats(params) {
         activeItemInstanceIds: weightClass.active.map((entry) => entry.instanceId).filter(Boolean),
         inactiveItemInstanceIds: weightClass.inactive.map((entry) => entry.instanceId).filter(Boolean),
         xpToNextLevel: calculateXpToNextLevel(base.level),
-        damageAverage: _round2(getCharacterDamageValueFromDerived({ finalDamage }))
+        damageAverage: _round2((finalPhysicalMin + finalPhysicalMax) / 2)
     };
 }
 
@@ -771,17 +759,14 @@ function markCharacterStatsDirty(gameData) {
 function syncLegacyCharacterFields(gameData, derivedStats) {
     if (!gameData || typeof gameData !== "object") return;
     ensureCharacterModelOnGameData(gameData);
-
     const base = gameData.character.base;
     const derived = derivedStats && typeof derivedStats === "object"
         ? derivedStats
         : (gameData.character.derived || { xpToNextLevel: calculateXpToNextLevel(base.level), life: base.baseLife });
 
-    // Clamp current resources against derived maxima without mutating base.
     const maxLife = Math.max(1, _num(derived.maxLife, _num(derived.life, base.baseLife)));
     const currentLife = _clamp(_num(base.currentLife, maxLife), 0, maxLife);
 
-    // Legacy runtime bridge while systems still read top-level values.
     gameData.level = base.level;
     gameData.xp = base.xp;
     gameData.xpNextLevel = _num(derived.xpToNextLevel, calculateXpToNextLevel(base.level));
@@ -805,7 +790,6 @@ function recomputeCharacterDerivedStats(gameData, options) {
     gameData.character.dirty = false;
     syncLegacyCharacterFields(gameData, derived);
 
-    // UI hook: announce that fresh derived stats were recomputed.
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function" && typeof CustomEvent === "function") {
         window.dispatchEvent(new CustomEvent("character:stats-updated", {
             detail: {
@@ -858,7 +842,6 @@ function grantCharacterXP(gameData, xpAmount, options) {
 
     return { levelsGained, leveledUp: levelsGained > 0 };
 }
-
 if (typeof window !== "undefined") {
     window.CHARACTER_DAMAGE_TYPES = CHARACTER_DAMAGE_TYPES;
     window.CHARACTER_LEVELING_CONFIG = CHARACTER_LEVELING_CONFIG;

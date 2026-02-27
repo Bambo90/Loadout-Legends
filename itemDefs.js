@@ -9,11 +9,13 @@ const ITEM_STATIC_FIELDS = Object.freeze([
     "price", "dropChance", "dropSources",
     // Legacy combat / bonus stats
     "damage", "damageFlat", "damageMin", "damageMax", "defense", "attackSpeed", "attackIntervalMs", "attackCooldownMs", "speedBonus", "xpBonus", "evasion",
+    // Unified ARPG combat stats
+    "physicalDamageMin", "physicalDamageMax", "critChance", "attacksPerSecond", "armour", "auraShield",
     "life", "mana", "allResist", "lifeLeech", "damageBonus", "magicBonus",
     "magicReduction", "physicalBonus", "physicalReduction", "spectralDefense",
     "accuracy", "piercing", "armorIgnore", "fireBonus", "coldBonus", "chainBonus",
     "blockChance", "blockValue", "counterAttack", "magicAbsorption", "durability",
-    "critChance", "critMulti",
+    "critMulti",
     "actions", "resourceCost", "staminaCost", "manaCost",
     // PoE-style base schema
     "baseType", "weight", "baseStats", "tags", "implicitPool", "prefixSlots", "suffixSlots", "prefixPool", "suffixPool",
@@ -141,6 +143,127 @@ function _collectItemArrays() {
     return arrays;
 }
 
+function _isWeaponLikeItem(item) {
+    if (!item || typeof item !== "object") return false;
+    const tags = Array.isArray(item.tags) ? item.tags.map((tag) => String(tag || "").toLowerCase()) : [];
+    if (tags.includes("weapon") || tags.includes("tool")) return true;
+    const category = resolveAffixCategoryForItem(item);
+    if (category === "weapon") return true;
+    const type = _resolveItemTypeForCooldown(item);
+    return Object.prototype.hasOwnProperty.call(_DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE, type);
+}
+
+function _isArmorLikeItem(item) {
+    if (!item || typeof item !== "object") return false;
+    const tags = Array.isArray(item.tags) ? item.tags.map((tag) => String(tag || "").toLowerCase()) : [];
+    if (tags.includes("armor") || tags.includes("shield")) return true;
+    const type = String(item.baseType || item.type || "").toLowerCase();
+    if (type === "armor" || type === "shield") return true;
+    return resolveAffixCategoryForItem(item) === "armor";
+}
+
+function _resolveLegacyWeaponDamageRange(item) {
+    const directMin = Number(item && item.physicalDamageMin);
+    const directMax = Number(item && item.physicalDamageMax);
+    if (_isFiniteNumber(directMin) && _isFiniteNumber(directMax)) {
+        const min = Math.max(0, Math.min(directMin, directMax));
+        const max = Math.max(min, Math.max(directMin, directMax));
+        return { min, max };
+    }
+
+    const legacyMin = Number(item && item.damageMin);
+    const legacyMax = Number(item && item.damageMax);
+    if (_isFiniteNumber(legacyMin) && _isFiniteNumber(legacyMax)) {
+        const min = Math.max(0, Math.min(legacyMin, legacyMax));
+        const max = Math.max(min, Math.max(legacyMin, legacyMax));
+        return { min, max };
+    }
+
+    const flat = Number(item && item.damageFlat);
+    if (_isFiniteNumber(flat)) {
+        const value = Math.max(0, flat);
+        return { min: value, max: value };
+    }
+
+    const legacyDamage = Number(item && item.damage);
+    if (_isFiniteNumber(legacyDamage)) {
+        const value = Math.max(0, legacyDamage);
+        return { min: value, max: value };
+    }
+
+    return { min: 0, max: 0 };
+}
+
+function _resolveLegacyWeaponAttacksPerSecond(item) {
+    const aps = Number(item && item.attacksPerSecond);
+    if (_isFiniteNumber(aps) && aps > 0) return aps;
+
+    const attackIntervalMs = Number(item && item.attackIntervalMs);
+    if (_isFiniteNumber(attackIntervalMs) && attackIntervalMs > 0) {
+        return 1000 / attackIntervalMs;
+    }
+
+    const attackCooldownMs = Number(item && item.attackCooldownMs);
+    if (_isFiniteNumber(attackCooldownMs) && attackCooldownMs > 0) {
+        return 1000 / attackCooldownMs;
+    }
+
+    const attackSpeed = Number(item && item.attackSpeed);
+    if (_isFiniteNumber(attackSpeed) && attackSpeed > 0) return attackSpeed;
+
+    const byType = _DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE[_resolveItemTypeForCooldown(item)];
+    if (_isFiniteNumber(byType) && byType > 0) {
+        return 1000 / byType;
+    }
+
+    return null;
+}
+
+function _normalizeLegacyRatingValue(rawValue, defenseValue, scalar) {
+    if (!_isFiniteNumber(rawValue)) return null;
+    if (Math.abs(rawValue) <= 1) {
+        const defense = Math.max(0, _isFiniteNumber(defenseValue) ? defenseValue : 0);
+        return Math.max(0, Math.round(Math.max(0, rawValue) * Math.max(1, defense) * scalar));
+    }
+    return Math.max(0, Math.round(rawValue));
+}
+
+function _resolveLegacyArmourValue(item) {
+    const direct = Number(item && item.armour);
+    if (_isFiniteNumber(direct)) return Math.max(0, Math.round(direct));
+    const defense = Number(item && item.defense);
+    if (_isFiniteNumber(defense)) return Math.max(0, Math.round(defense));
+    return 0;
+}
+
+function _resolveLegacyEvasionValue(item, armourValue) {
+    const direct = Number(item && item.evasion);
+    if (_isFiniteNumber(direct)) {
+        const normalized = _normalizeLegacyRatingValue(direct, armourValue, 6);
+        if (_isFiniteNumber(normalized)) return normalized;
+    }
+    return 0;
+}
+
+function _resolveLegacyAuraShieldValue(item, armourValue) {
+    const direct = Number(item && item.auraShield);
+    if (_isFiniteNumber(direct)) return Math.max(0, Math.round(direct));
+
+    const spectral = Number(item && item.spectralDefense);
+    if (_isFiniteNumber(spectral)) {
+        return _normalizeLegacyRatingValue(spectral, armourValue, 8) || 0;
+    }
+    const magicReduction = Number(item && item.magicReduction);
+    if (_isFiniteNumber(magicReduction)) {
+        return _normalizeLegacyRatingValue(magicReduction, armourValue, 8) || 0;
+    }
+    const absorption = Number(item && item.magicAbsorption);
+    if (_isFiniteNumber(absorption)) {
+        return _normalizeLegacyRatingValue(absorption, armourValue, 8) || 0;
+    }
+    return 0;
+}
+
 function _buildLegacyBaseStats(item) {
     if (!item || typeof item !== "object") return [];
     const output = [];
@@ -148,45 +271,41 @@ function _buildLegacyBaseStats(item) {
         const normalized = _normalizeModifier(modifier);
         if (normalized) output.push(normalized);
     };
-    const addArmorAllTypes = (value) => {
-        add({ statPath: "armor.slash", type: "flat", value });
-        add({ statPath: "armor.pierce", type: "flat", value });
-        add({ statPath: "armor.blunt", type: "flat", value });
-    };
-    const addDamagePercentAllTypes = (value) => {
-        add({ statPath: "damage.slash.min", type: "percent", value });
-        add({ statPath: "damage.slash.max", type: "percent", value });
-        add({ statPath: "damage.pierce.min", type: "percent", value });
-        add({ statPath: "damage.pierce.max", type: "percent", value });
-        add({ statPath: "damage.blunt.min", type: "percent", value });
-        add({ statPath: "damage.blunt.max", type: "percent", value });
-    };
 
-    const damageMin = Number(item.damageMin);
-    const damageMax = Number(item.damageMax);
-    if (_isFiniteNumber(damageMin) && _isFiniteNumber(damageMax)) {
-        const min = Math.min(damageMin, damageMax);
-        const max = Math.max(damageMin, damageMax);
-        add({ statPath: "damage.slash.min", type: "flat", value: min });
-        add({ statPath: "damage.slash.max", type: "flat", value: max });
-    } else if (_isFiniteNumber(item.damageFlat)) {
-        add({ statPath: "damage.slash.min", type: "flat", value: item.damageFlat });
-        add({ statPath: "damage.slash.max", type: "flat", value: item.damageFlat });
-    } else if (_isFiniteNumber(item.damage)) {
-        add({ statPath: "damage.slash.min", type: "flat", value: item.damage });
-        add({ statPath: "damage.slash.max", type: "flat", value: item.damage });
+    if (_isWeaponLikeItem(item)) {
+        const range = _resolveLegacyWeaponDamageRange(item);
+        if (_isFiniteNumber(range.min) && range.min > 0) {
+            add({ statPath: "physicalDamageMin", type: "flat", value: range.min });
+        }
+        if (_isFiniteNumber(range.max) && range.max > 0) {
+            add({ statPath: "physicalDamageMax", type: "flat", value: range.max });
+        }
+        const aps = _resolveLegacyWeaponAttacksPerSecond(item);
+        if (_isFiniteNumber(aps) && aps > 0) {
+            add({ statPath: "attacksPerSecond", type: "flat", value: aps });
+        }
     }
+
+    if (_isArmorLikeItem(item)) {
+        const armour = _resolveLegacyArmourValue(item);
+        const evasion = _resolveLegacyEvasionValue(item, armour);
+        const auraShield = _resolveLegacyAuraShieldValue(item, armour);
+        if (armour > 0) add({ statPath: "armour", type: "flat", value: armour });
+        if (evasion > 0) add({ statPath: "evasion", type: "flat", value: evasion });
+        if (auraShield > 0) add({ statPath: "auraShield", type: "flat", value: auraShield });
+    }
+
     if (_isFiniteNumber(item.speedBonus)) {
-        add({ statPath: "attackSpeed", type: "percent", value: item.speedBonus - 1 });
+        add({ statPath: "attacksPerSecond", type: "percent", value: item.speedBonus - 1 });
     }
     if (_isFiniteNumber(item.xpBonus)) {
         add({ statPath: "xpGainMultiplier", type: "percent", value: item.xpBonus - 1 });
     }
     if (_isFiniteNumber(item.defense)) {
-        addArmorAllTypes(item.defense);
+        add({ statPath: "armour", type: "flat", value: item.defense });
     }
     if (_isFiniteNumber(item.allResist)) {
-        addArmorAllTypes(item.allResist);
+        add({ statPath: "auraShield", type: "flat", value: item.allResist });
     }
     if (_isFiniteNumber(item.critChance)) {
         add({ statPath: "critChance", type: "flat", value: item.critChance });
@@ -201,14 +320,14 @@ function _buildLegacyBaseStats(item) {
         add({ statPath: "stamina", type: "flat", value: item.stamina });
     }
     if (_isFiniteNumber(item.damageBonus)) {
-        addDamagePercentAllTypes(item.damageBonus - 1);
+        const value = item.damageBonus - 1;
+        add({ statPath: "physicalDamageMin", type: "percent", value });
+        add({ statPath: "physicalDamageMax", type: "percent", value });
     }
     if (_isFiniteNumber(item.physicalBonus)) {
         const value = item.physicalBonus - 1;
-        add({ statPath: "damage.slash.min", type: "percent", value });
-        add({ statPath: "damage.slash.max", type: "percent", value });
-        add({ statPath: "damage.blunt.min", type: "percent", value });
-        add({ statPath: "damage.blunt.max", type: "percent", value });
+        add({ statPath: "physicalDamageMin", type: "percent", value });
+        add({ statPath: "physicalDamageMax", type: "percent", value });
     }
 
     // Keep compatibility with defs that already declare a generic modifier array.
@@ -306,6 +425,63 @@ function _resolveAttackCooldownMs(item) {
     return null;
 }
 
+function _extractBaseStatFlatTotal(baseStats, statPath) {
+    if (!Array.isArray(baseStats) || !statPath) return 0;
+    return baseStats.reduce((sum, modifier) => {
+        if (!modifier || modifier.statPath !== statPath || modifier.type !== "flat") return sum;
+        const value = Number(modifier.value);
+        return Number.isFinite(value) ? (sum + value) : sum;
+    }, 0);
+}
+
+function _syncModernItemScalarFields(item) {
+    if (!item || typeof item !== "object") return;
+    const baseStats = Array.isArray(item.baseStats) ? item.baseStats : [];
+
+    const weaponMin = _extractBaseStatFlatTotal(baseStats, "physicalDamageMin");
+    const weaponMax = _extractBaseStatFlatTotal(baseStats, "physicalDamageMax");
+    const weaponAps = _extractBaseStatFlatTotal(baseStats, "attacksPerSecond");
+    const armour = _extractBaseStatFlatTotal(baseStats, "armour");
+    const evasion = _extractBaseStatFlatTotal(baseStats, "evasion");
+    const auraShield = _extractBaseStatFlatTotal(baseStats, "auraShield");
+    const critChance = _extractBaseStatFlatTotal(baseStats, "critChance");
+
+    if (!_isFiniteNumber(item.physicalDamageMin) || item.physicalDamageMin < 0) {
+        item.physicalDamageMin = Math.max(0, weaponMin);
+    }
+    if (!_isFiniteNumber(item.physicalDamageMax) || item.physicalDamageMax < 0) {
+        item.physicalDamageMax = Math.max(item.physicalDamageMin, weaponMax);
+    }
+    if (!_isFiniteNumber(item.attacksPerSecond) || item.attacksPerSecond <= 0) {
+        if (weaponAps > 0) {
+            item.attacksPerSecond = weaponAps;
+        } else if (_isFiniteNumber(item.attackCooldownMs) && item.attackCooldownMs > 0) {
+            item.attacksPerSecond = 1000 / item.attackCooldownMs;
+        } else if (_isFiniteNumber(item.attackIntervalMs) && item.attackIntervalMs > 0) {
+            item.attacksPerSecond = 1000 / item.attackIntervalMs;
+        }
+    }
+    if (_isFiniteNumber(item.attacksPerSecond) && item.attacksPerSecond > 0) {
+        item.attackIntervalMs = 1000 / item.attacksPerSecond;
+    }
+    if (!_isFiniteNumber(item.armour) || item.armour < 0) {
+        item.armour = Math.max(0, armour);
+    }
+    const shouldNormalizeLegacyEvasion = _isArmorLikeItem(item)
+        && _isFiniteNumber(item.evasion)
+        && Math.abs(item.evasion) <= 1
+        && evasion > 0;
+    if (shouldNormalizeLegacyEvasion || !_isFiniteNumber(item.evasion) || item.evasion < 0) {
+        item.evasion = Math.max(0, evasion);
+    }
+    if (!_isFiniteNumber(item.auraShield) || item.auraShield < 0) {
+        item.auraShield = Math.max(0, auraShield);
+    }
+    if (!_isFiniteNumber(item.critChance) || item.critChance < 0) {
+        item.critChance = Math.max(0, critChance);
+    }
+}
+
 function _normalizeItemDefinition(rawItem) {
     if (!rawItem || typeof rawItem !== "object") return null;
     const item = { ...rawItem };
@@ -319,6 +495,7 @@ function _normalizeItemDefinition(rawItem) {
     }
     item.weight = _isFiniteNumber(item.weight) ? Math.max(0, item.weight) : _countBodyCellsFromItem(item);
     item.baseStats = _normalizeBaseStats(item.baseStats, item);
+    _syncModernItemScalarFields(item);
     item.prefixSlots = _normalizeSlotValue(item.prefixSlots, item.rarity, "prefixSlots");
     item.suffixSlots = _normalizeSlotValue(item.suffixSlots, item.rarity, "suffixSlots");
     const explicitImplicitPool = _normalizeAffixPool(item.implicitPool);
@@ -586,11 +763,55 @@ function _affixRollToModifier(rollEntry) {
     });
 }
 
+const _ILVL_SCALABLE_BASE_STAT_PATHS = new Set([
+    "physicalDamageMin",
+    "physicalDamageMax",
+    "armour",
+    "evasion",
+    "auraShield"
+]);
+const _ILVL_BASE_SCALE_PER_LEVEL = Object.freeze({
+    weapon: 0.012,
+    armor: 0.014,
+    jewelry: 0
+});
+
+function _resolveIlvlBaseScaleFactor(baseItem, itemLevel) {
+    const ilvl = Math.max(1, Math.floor(_isFiniteNumber(itemLevel) ? itemLevel : 1));
+    if (ilvl <= 1) return 1;
+    const category = resolveAffixCategoryForItem(baseItem) || "jewelry";
+    const perLevel = _isFiniteNumber(_ILVL_BASE_SCALE_PER_LEVEL[category])
+        ? _ILVL_BASE_SCALE_PER_LEVEL[category]
+        : 0;
+    if (perLevel <= 0) return 1;
+    return 1 + ((ilvl - 1) * perLevel);
+}
+
+function _scaleBaseModifierByItemLevel(modifier, scaleFactor) {
+    const normalized = _normalizeModifier(modifier);
+    if (!normalized) return null;
+    if (normalized.type !== "flat") return normalized;
+    if (!_ILVL_SCALABLE_BASE_STAT_PATHS.has(normalized.statPath)) return normalized;
+    const scaledValue = normalized.value * scaleFactor;
+    const rounded = Math.abs(scaledValue) <= 1
+        ? Number(scaledValue.toFixed(4))
+        : Number(scaledValue.toFixed(2));
+    return {
+        statPath: normalized.statPath,
+        type: normalized.type,
+        value: rounded
+    };
+}
+
 function _buildModifiersFromInstance(baseItem, instanceData) {
     const modifiers = [];
+    const itemLevel = _isFiniteNumber(instanceData && instanceData.itemLevel)
+        ? Math.max(1, Math.floor(instanceData.itemLevel))
+        : 1;
+    const baseScaleFactor = _resolveIlvlBaseScaleFactor(baseItem, itemLevel);
     if (baseItem && Array.isArray(baseItem.baseStats)) {
         baseItem.baseStats.forEach((modifier) => {
-            const normalized = _normalizeModifier(modifier);
+            const normalized = _scaleBaseModifierByItemLevel(modifier, baseScaleFactor);
             if (normalized) modifiers.push(normalized);
         });
     }

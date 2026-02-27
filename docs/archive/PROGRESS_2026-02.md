@@ -90,7 +90,7 @@ Original prompt: Du warst grade dabei irgendwas für das zukünftige Wrapping mi
     4) item percent modifiers
     5) weight effects
     6) finalize derived stats
-  - Added extendable damage-type mapping (`slash`, `pierce`, `blunt`) for both damage and armor maps.
+- Added extendable legacy damage-type mapping for both damage and armor maps.
   - Added generic modifier format `{ statPath, type, value }` and legacy-item-to-modifier conversion layer.
   - Added hard-cap item deactivation by weight and soft stamina-cost penalty from carried weight.
   - Added exponential XP function `calculateXpToNextLevel(baseXP * growthFactor^level)`.
