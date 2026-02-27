@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS_AUDIO = Object.freeze({
 const DEFAULT_SETTINGS_KEYBINDS = Object.freeze({
     rotateItem: "KeyR",
     toggleTooltips: "Alt",
+    toggleAffixDetails: "KeyA",
     cancelAction: "Escape"
 });
 const SAVEENGINE_BATTLEFIELD_MAX_PAGES = 9;

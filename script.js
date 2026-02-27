@@ -59,11 +59,13 @@ const UI_SOUND_PATHS = Object.freeze({
 const DEFAULT_KEYBINDS = Object.freeze({
     rotateItem: 'KeyR',
     toggleTooltips: 'Alt',
+    toggleAffixDetails: 'KeyA',
     cancelAction: 'Escape'
 });
 const KEYBIND_DEFINITIONS = Object.freeze([
     { id: 'rotateItem', label: 'Item rotieren (Drag)' },
     { id: 'toggleTooltips', label: 'Tooltips umschalten' },
+    { id: 'toggleAffixDetails', label: 'Affix Details umschalten' },
     { id: 'cancelAction', label: 'Abbrechen / Schließen' }
 ]);
 const DEFAULT_AUDIO_SETTINGS = Object.freeze({
@@ -128,6 +130,20 @@ const AUDIO_FADE_MS = 5000;
 const DEV_MODE_GOLD_HOTKEY_CODE = 'KeyG';
 const DEV_MODE_GOLD_GRANT_AMOUNT = 10000;
 const DEV_MODE_LEVEL_HOTKEY_CODE = 'KeyL';
+const SHOP_RARITY_SORT_ORDER = Object.freeze({
+    common: 0,
+    magic: 1,
+    rare: 2,
+    unique: 3,
+    legendary: 4
+});
+
+function hasPrivilegedDevAccess() {
+    if (typeof window === 'undefined') return false;
+    const api = window.electronAPI;
+    return !!(api && api.runtime === 'electron' && api.devToolsEnabled === true);
+}
+window.hasPrivilegedDevAccess = hasPrivilegedDevAccess;
 
 let currentWorkshop = null;
 let lastMonsterAttack = Date.now();
@@ -208,6 +224,9 @@ function ensureSettingsDefaults() {
     if (typeof gameData.settings.devMode !== 'boolean') {
         gameData.settings.devMode = false;
     }
+    if (!hasPrivilegedDevAccess()) {
+        gameData.settings.devMode = false;
+    }
     if (typeof gameData.settings.affixDetailsEnabled !== 'boolean') {
         gameData.settings.affixDetailsEnabled = false;
     }
@@ -238,12 +257,22 @@ function getAudioVolume(channel) {
 
 function isDevModeEnabled() {
     const settings = ensureSettingsDefaults();
-    return !!(settings && settings.devMode === true);
+    return !!(settings && settings.devMode === true && hasPrivilegedDevAccess());
 }
+
+function isDeveloperShopEnabled() {
+    return hasPrivilegedDevAccess() && isDevModeEnabled();
+}
+window.isDeveloperShopEnabled = isDeveloperShopEnabled;
 
 function _syncDevModeOptionToggle() {
     const checkbox = document.getElementById('option-dev-mode');
-    if (checkbox) checkbox.checked = isDevModeEnabled();
+    if (!checkbox) return;
+    const allowDevMode = hasPrivilegedDevAccess();
+    checkbox.disabled = !allowDevMode;
+    checkbox.checked = allowDevMode && isDevModeEnabled();
+    const row = checkbox.closest('.options-toggle-row');
+    if (row) row.style.display = allowDevMode ? '' : 'none';
 }
 
 function isAffixDetailsEnabled() {
@@ -260,8 +289,9 @@ function _syncAffixDetailsOptionToggle() {
 function setDevModeSetting(enabled, options) {
     const opts = options && typeof options === 'object' ? options : {};
     ensureSettingsDefaults();
-    gameData.settings.devMode = !!enabled;
+    gameData.settings.devMode = hasPrivilegedDevAccess() && !!enabled;
     _syncDevModeOptionToggle();
+    renderShop();
     if (opts.save !== false && typeof saveGame === 'function') saveGame();
 }
 window.setDevModeSetting = setDevModeSetting;
@@ -1594,6 +1624,9 @@ function switchTab(tabId) {
     }
     if (tabId === 'options') {
         renderOptionsTab();
+    }
+    if (tabId === 'shop') {
+        renderShop();
     }
     _syncAmbientLoopState();
 }
@@ -3376,7 +3409,12 @@ function closeWorkshop() {
 
 function buyItem(itemId) {
     const item = getItemDefinition(itemId);
-    if (!item || gameData.gold < item.price) return;
+    if (!item) return;
+    const devShopEnabled = isDeveloperShopEnabled();
+    const itemPrice = devShopEnabled ? 0 : Math.max(0, Math.floor(Number(item.price) || 0));
+    const requiredLevel = Math.max(1, Math.floor(Number(item.req) || 1));
+    if (!devShopEnabled && gameData.level < requiredLevel) return;
+    if (!devShopEnabled && gameData.gold < itemPrice) return;
     if (typeof ensureBankPageData === 'function') {
         ensureBankPageData(gameData);
     }
@@ -3397,11 +3435,14 @@ function buyItem(itemId) {
         });
         if (!tx.ok) continue;
 
-        addGold(-item.price, 'shop_buy');
+        if (itemPrice > 0) {
+            addGold(-itemPrice, 'shop_buy');
+        }
         if (tx.instanceId && typeof registerItemInstance === 'function') {
             registerItemInstance(gameData, tx.instanceId, item.id, Math.max(1, gameData.level), { source: 'shop' });
         }
         if (typeof renderWorkshopGrids === 'function') { try { queueRenderWorkshopGrids(); } catch (err) { renderWorkshopGrids(); } }
+        renderShop();
         updateUI();
         playUISound('itemBought');
         if (typeof saveGame === 'function') saveGame();
@@ -3653,18 +3694,66 @@ function addItemToBank(itemId, itemLevel) {
     return false; // Bank full
 }
 
+function _getShopItemsForRender() {
+    if (!isDeveloperShopEnabled()) {
+        return getShopItems();
+    }
+    if (typeof getAllItemDefs !== 'function') {
+        return getShopItems();
+    }
+    const allDefs = getAllItemDefs();
+    if (!allDefs || typeof allDefs !== 'object') {
+        return getShopItems();
+    }
+    return Object.values(allDefs);
+}
+
+function _sortShopItems(items) {
+    if (!Array.isArray(items)) return [];
+    return items.slice().sort((a, b) => {
+        const reqA = Math.max(1, Math.floor(Number(a && a.req) || 1));
+        const reqB = Math.max(1, Math.floor(Number(b && b.req) || 1));
+        if (reqA !== reqB) return reqA - reqB;
+
+        const rarityA = (a && typeof a.rarity === 'string') ? a.rarity : 'common';
+        const rarityB = (b && typeof b.rarity === 'string') ? b.rarity : 'common';
+        const rarityRankA = Object.prototype.hasOwnProperty.call(SHOP_RARITY_SORT_ORDER, rarityA) ? SHOP_RARITY_SORT_ORDER[rarityA] : 999;
+        const rarityRankB = Object.prototype.hasOwnProperty.call(SHOP_RARITY_SORT_ORDER, rarityB) ? SHOP_RARITY_SORT_ORDER[rarityB] : 999;
+        if (rarityRankA !== rarityRankB) return rarityRankA - rarityRankB;
+
+        const nameA = (a && a.name) ? String(a.name) : '';
+        const nameB = (b && b.name) ? String(b.name) : '';
+        return nameA.localeCompare(nameB, 'de');
+    });
+}
+
 function renderShop() {
     const container = document.getElementById('shop-container');
     if (!container) return;
     
     container.innerHTML = '';
-    const shopItems = getShopItems();
+    const devShopEnabled = isDeveloperShopEnabled();
+    const shopItems = _sortShopItems(_getShopItemsForRender());
+
+    if (devShopEnabled) {
+        const hint = document.createElement('div');
+        hint.className = 'shop-item-card';
+        hint.style.gridColumn = '1 / -1';
+        hint.style.borderColor = '#f97316';
+        hint.style.boxShadow = '0 0 18px rgba(249,115,22,0.35)';
+        hint.innerHTML = '<strong>Dev-Shop aktiv:</strong> Alle Items sichtbar, Kaufpreis 0 Gold.';
+        container.appendChild(hint);
+    }
     
     shopItems.forEach(item => {
         const card = document.createElement('div');
         card.classList.add('shop-item-card', item.rarity);
         
-        const canBuy = gameData.gold >= item.price && (!item.req || gameData.level >= item.req);
+        const itemPrice = devShopEnabled ? 0 : Math.max(0, Math.floor(Number(item.price) || 0));
+        const requiredLevel = Math.max(1, Math.floor(Number(item.req) || 1));
+        const hasLevel = devShopEnabled ? true : gameData.level >= requiredLevel;
+        const hasGold = devShopEnabled ? true : gameData.gold >= itemPrice;
+        const canBuy = hasLevel && hasGold;
         if (!canBuy) card.style.opacity = '0.6';
         
         const statText = [];
@@ -3679,10 +3768,10 @@ function renderShop() {
             <h4 style="margin: 10px 0;">${item.name}</h4>
             <p style="font-size: 0.8rem; color: #aaa; margin: 5px 0;">${item.desc || ''}</p>
             ${statText.length > 0 ? `<p style="font-size: 0.75rem; color: var(--accent-gold); margin: 5px 0;">${statText.join(' | ')}</p>` : ''}
-            <p style="font-size: 0.8rem; color: #888; margin: 5px 0;">Lvl ${item.req || 1}</p>
-            <p style="font-weight: bold; color: var(--accent-gold); margin: 10px 0;">${item.price} Gold</p>
+            <p style="font-size: 0.8rem; color: #888; margin: 5px 0;">Lvl ${requiredLevel}</p>
+            <p style="font-weight: bold; color: var(--accent-gold); margin: 10px 0;">${itemPrice} Gold${devShopEnabled ? ' (Dev)' : ''}</p>
             <button class="buy-btn" onclick="buyItem('${item.id}')" ${canBuy ? '' : 'disabled'}>
-                ${canBuy ? 'Kaufen' : 'Zu teuer / Level'}
+                ${canBuy ? 'Kaufen' : (hasLevel ? 'Zu teuer' : 'Level zu niedrig')}
             </button>
         `;
         

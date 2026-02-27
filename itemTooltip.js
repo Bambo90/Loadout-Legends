@@ -433,9 +433,8 @@
                 ? `${_label("range")} ${_formatModifierValue({ statPath: entry.modifier.statPath, type: entry.modifier.type, value: entry.min })}–${_formatModifierValue({ statPath: entry.modifier.statPath, type: entry.modifier.type, value: entry.max })}`
                 : `${_label("range")} -`;
             const tierText = `${_label("tier")}${entry.tier}`;
-            const rollText = `${_label("roll")} ${_formatModifierValue({ statPath: entry.modifier.statPath, type: entry.modifier.type, value: entry.roll })}`;
             const detailsHtml = showDetails
-                ? `<div class="item-tooltip-row"><span class="item-tooltip-stat"><span class="item-tooltip-source">${_escapeHtml(`${tierText} (${rangeText}) ${rollText}`)}</span></span><span class="item-tooltip-value"></span></div>`
+                ? `<div class="item-tooltip-row"><span class="item-tooltip-stat"><span class="item-tooltip-source">${_escapeHtml(`${tierText} (${rangeText})`)}</span></span><span class="item-tooltip-value"></span></div>`
                 : "";
             return (
                 `<div class="item-tooltip-row">` +
@@ -685,7 +684,9 @@
             target.tagName === "SELECT" ||
             target.isContentEditable
         ));
-        const isDetailsToggleKey = event.code === "KeyD" || (typeof event.key === "string" && event.key.toLowerCase() === "d");
+        const isDetailsToggleKey = (typeof window.matchesActionKeybinding === "function")
+            ? window.matchesActionKeybinding("toggleAffixDetails", event)
+            : (event.code === "KeyA" || (typeof event.key === "string" && event.key.toLowerCase() === "a"));
         if (isDetailsToggleKey && !isTextInput) {
             const nextValue = !_isAffixDetailsEnabled();
             if (typeof setAffixDetailsSetting === "function") {

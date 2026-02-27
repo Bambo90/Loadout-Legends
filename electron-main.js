@@ -5,6 +5,7 @@ const path = require('path');
 let mainWindow;
 
 function createWindow() {
+  const devToolsEnabled = !app.isPackaged || process.env.LOADOUT_DEV_TOOLS === '1';
   const iconPath = path.join(__dirname, 'assets/icon.png');
   const windowOptions = {
     width: 1400,
@@ -13,7 +14,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [`--ll-dev-tools=${devToolsEnabled ? '1' : '0'}`]
     }
   };
 

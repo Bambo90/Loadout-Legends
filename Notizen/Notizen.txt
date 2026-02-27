@@ -1,4 +1,6 @@
 
+Notes for AI
+
 Regel 1:
 Simulation ist immer rein logisch.
 
@@ -29,6 +31,21 @@ if saveVersion == 2:
     convert v2 -> v3
 
 
+⚠️ Kritische Design-Regeln
+
+Item speichert niemals fertige Modifier.
+
+Modifier wird aus Affix-Definition generiert.
+
+Tiers sind datengetrieben.
+
+Keine Switch-Statements im Code.
+
+DamageTypes kommen aus Mapping, nicht fix.
+
+
+Human Notes
+
 ##### CSS Variablen Syntax ####
 
 Gold: Selector / Selektor
@@ -48,17 +65,7 @@ z.B. clamp(...), linear-gradient(...), rgba(...)
 (manche Themes färben Funktionen gelb und Farbangaben/Strings ebenfalls gelblich)
 
 
-⚠️ Kritische Design-Regeln
 
-Item speichert niemals fertige Modifier.
-
-Modifier wird aus Affix-Definition generiert.
-
-Tiers sind datengetrieben.
-
-Keine Switch-Statements im Code.
-
-DamageTypes kommen aus Mapping, nicht fix.
 
 
 
@@ -99,3 +106,18 @@ window.DEBUG_RENDER_SKIPS = false;
 window.DEBUG_AURA_RENDER = false;
 window.DEBUG_WORKSHOP_RENDER = false;
 window.DEBUG_SPRITE_ANCHOR = true;   // nur das aktiv
+
+
+Gold Cheat G = +10.000g
+Konfig: [script.js](c:\Users\bbs2e\Desktop\Loadout Legends\script.js:127)
+Handler: [script.js](c:\Users\bbs2e\Desktop\Loadout Legends\script.js:737)
+Listener-Registrierung: [script.js](c:\Users\bbs2e\Desktop\Loadout Legends\script.js:760)
+Leicht rückbaubar ist es auch: der gesamte Cheat sitzt in diesem isolierten Block (2 Konstanten + 1 Handler + 1 addEventListener).
+
+Level Cheat L = +1 Level
+Neue Konstante: [script.js](c:\Users\bbs2e\Desktop\Loadout Legends\script.js:130)
+const DEV_MODE_LEVEL_HOTKEY_CODE = 'KeyL';
+Dev-Hotkey-Handler erweitert: [script.js](c:\Users\bbs2e\Desktop\Loadout Legends\script.js:736)
+G bleibt +10.000 Gold
+L berechnet fehlende XP bis zum nächsten Level und vergibt genau diese XP (grantXP(...)) => pro Tastendruck exakt ein Level
+Danach updateUI() + saveGame()
