@@ -16,35 +16,47 @@ function _rngIntInclusive(min, max, rng) {
     return lo + Math.floor(_rngFloat(rng) * ((hi - lo) + 1));
 }
 
-const _GENERATOR_WEAPON_AFFIX_TYPES = Object.freeze({
-    dagger: true,
-    sword: true,
-    axe: true,
-    mace: true,
-    spear: true,
-    bow: true,
-    crossbow: true,
-    wand: true,
-    staff: true,
-    stave: true,
-    weapon: true
-});
+const _TIER_WEIGHT_PROGRESS_MIN_ILVL = 1;
+const _TIER_WEIGHT_PROGRESS_MAX_ILVL = 60;
+const _TIER_WEIGHT_SHAPE_EXPONENT = 1.25;
+
+let _cachedCategoryResolver = null;
 
 function _resolveAffixCategory(baseItem) {
-    if (!baseItem || typeof baseItem !== "object") return null;
-    const tags = Array.isArray(baseItem.tags) ? baseItem.tags : [];
-    if (tags.includes("weapon")) return "weapon";
-    if (tags.includes("armor")) return "armor";
-    if (tags.includes("jewelry")) return "jewelry";
-    if (tags.includes("accessory")) return "jewelry";
+    if (typeof _cachedCategoryResolver === "function") {
+        return _cachedCategoryResolver(baseItem);
+    }
 
-    const baseType = (typeof baseItem.baseType === "string" && baseItem.baseType)
-        ? baseItem.baseType
-        : (typeof baseItem.type === "string" ? baseItem.type : "");
-    if (_GENERATOR_WEAPON_AFFIX_TYPES[baseType]) return "weapon";
-    if (baseType === "armor") return "armor";
-    if (baseType === "jewelry" || baseType === "accessory") return "jewelry";
+    if (typeof resolveAffixCategoryForItem === "function") {
+        _cachedCategoryResolver = resolveAffixCategoryForItem;
+        return _cachedCategoryResolver(baseItem);
+    }
+
+    if (typeof window !== "undefined" && typeof window.resolveAffixCategoryForItem === "function") {
+        _cachedCategoryResolver = window.resolveAffixCategoryForItem;
+        return _cachedCategoryResolver(baseItem);
+    }
+
+    if (typeof require === "function") {
+        try {
+            const itemDefs = require("./itemDefs.js");
+            if (itemDefs && typeof itemDefs.resolveAffixCategoryForItem === "function") {
+                _cachedCategoryResolver = itemDefs.resolveAffixCategoryForItem;
+                return _cachedCategoryResolver(baseItem);
+            }
+        } catch (err) {
+            // Ignore in browser/non-commonjs runtime.
+        }
+    }
+
     return null;
+}
+
+function _isCraftFirstRarity(baseItem) {
+    const rarity = (baseItem && typeof baseItem.rarity === "string")
+        ? baseItem.rarity.trim().toLowerCase()
+        : "";
+    return rarity !== "unique" && rarity !== "legendary";
 }
 
 function _pickWeighted(pool, rng) {
@@ -72,19 +84,49 @@ function _pickWeighted(pool, rng) {
     return normalized[normalized.length - 1].affixId;
 }
 
+function _resolveTierQualityProgress(itemLevel) {
+    const ilvl = Math.max(1, Math.floor(Number.isFinite(itemLevel) ? itemLevel : 1));
+    const minIlvl = _TIER_WEIGHT_PROGRESS_MIN_ILVL;
+    const maxIlvl = _TIER_WEIGHT_PROGRESS_MAX_ILVL;
+    if (maxIlvl <= minIlvl) return 1;
+    const normalized = (ilvl - minIlvl) / (maxIlvl - minIlvl);
+    return Math.max(0, Math.min(1, normalized));
+}
+
+function _resolveTierRollWeight(entry, index, orderedEligibleTiers, itemLevel) {
+    if (!entry || !Array.isArray(orderedEligibleTiers) || orderedEligibleTiers.length === 0) return 1;
+    const count = orderedEligibleTiers.length;
+    const rankWorstToBest = Math.max(1, Math.min(count, index + 1));
+    const progress = _resolveTierQualityProgress(itemLevel);
+    const worstBiasWeight = Math.pow((count - rankWorstToBest) + 1, _TIER_WEIGHT_SHAPE_EXPONENT);
+    const bestBiasWeight = Math.pow(rankWorstToBest, _TIER_WEIGHT_SHAPE_EXPONENT);
+    const blended = worstBiasWeight + ((bestBiasWeight - worstBiasWeight) * progress);
+    return Math.max(1, blended);
+}
+
 function _pickTierAndRoll(affixDef, itemLevel, rng) {
     if (!affixDef) return null;
     const eligibleTiers = (typeof getEligibleAffixTiers === "function")
         ? getEligibleAffixTiers(affixDef, itemLevel)
         : [];
-    if (!Array.isArray(eligibleTiers) || eligibleTiers.length === 0) return null;
+    const tierPool = Array.isArray(eligibleTiers) ? eligibleTiers : [];
+    if (tierPool.length === 0) return null;
 
-    const normalizedTiers = eligibleTiers
-        .map((tier) => {
+    const orderedEligibleTiers = tierPool
+        .slice()
+        .sort((a, b) => {
+            const ai = Number.isFinite(a && a.requiredIlvl) ? a.requiredIlvl : 0;
+            const bi = Number.isFinite(b && b.requiredIlvl) ? b.requiredIlvl : 0;
+            if (ai !== bi) return ai - bi;
+            const at = Number.isFinite(a && a.tier) ? a.tier : 0;
+            const bt = Number.isFinite(b && b.tier) ? b.tier : 0;
+            return bt - at;
+        });
+
+    const normalizedTiers = orderedEligibleTiers
+        .map((tier, index) => {
             if (!tier || typeof tier !== "object") return null;
-            const weight = Number.isFinite(tier.weight) && tier.weight > 0
-                ? tier.weight
-                : Math.max(1, Math.round(Math.pow(Math.max(1, Number(tier.tier) || 1), 1.8)));
+            const weight = _resolveTierRollWeight(tier, index, orderedEligibleTiers, itemLevel);
             return { tier, weight };
         })
         .filter(Boolean);
@@ -121,21 +163,9 @@ function _buildGroupPool(baseItem, category, group) {
     return [];
 }
 
-function _rollAffixGroup(baseItem, category, group, maxSlots, itemLevel, rng) {
-    if (!category) return [];
-    const slots = Math.max(0, Math.floor(Number.isFinite(maxSlots) ? maxSlots : 0));
-    if (slots <= 0) return [];
-
-    const pool = _buildGroupPool(baseItem, category, group);
-    if (!Array.isArray(pool) || pool.length === 0) return [];
-
-    const count = _rngIntInclusive(1, slots, rng);
-    if (count <= 0) return [];
-
-    const picked = [];
-    const usedIds = new Set();
+function _pickAffixRollFromPool(pool, usedIds, category, group, itemLevel, rng) {
     let guard = 0;
-    while (picked.length < count && guard < 100) {
+    while (guard < 100) {
         guard += 1;
         const affixId = _pickWeighted(pool, rng);
         if (!affixId || usedIds.has(affixId)) continue;
@@ -144,6 +174,37 @@ function _rollAffixGroup(baseItem, category, group, maxSlots, itemLevel, rng) {
         const roll = _pickTierAndRoll(affixDef, itemLevel, rng);
         if (!roll) continue;
         usedIds.add(affixId);
+        return roll;
+    }
+    return null;
+}
+
+function _rollAffixGroup(baseItem, category, group, maxSlots, itemLevel, rng) {
+    if (!category) return [];
+    const slots = Math.max(0, Math.floor(Number.isFinite(maxSlots) ? maxSlots : 0));
+    if (slots <= 0) return [];
+
+    const pool = _buildGroupPool(baseItem, category, group);
+    if (!Array.isArray(pool) || pool.length === 0) return [];
+
+    const craftFirst = _isCraftFirstRarity(baseItem);
+    const picked = [];
+    const usedIds = new Set();
+
+    if (craftFirst) {
+        for (let slotIndex = 0; slotIndex < slots; slotIndex += 1) {
+            if (_rngFloat(rng) > 0.5) continue;
+            const roll = _pickAffixRollFromPool(pool, usedIds, category, group, itemLevel, rng);
+            if (roll) picked.push(roll);
+        }
+        return picked;
+    }
+
+    const count = _rngIntInclusive(1, slots, rng);
+    if (count <= 0) return [];
+    while (picked.length < count) {
+        const roll = _pickAffixRollFromPool(pool, usedIds, category, group, itemLevel, rng);
+        if (!roll) break;
         picked.push(roll);
     }
     return picked;
@@ -158,18 +219,28 @@ function generateItem(baseItemId, itemLevel, options) {
     const rng = typeof opts.rng === "function" ? opts.rng : null;
     const ilvl = Math.max(1, Math.floor(Number.isFinite(itemLevel) ? itemLevel : 1));
     const category = _resolveAffixCategory(baseItem);
+    const craftFirst = _isCraftFirstRarity(baseItem);
 
     let implicits = [];
     const implicitPool = _buildGroupPool(baseItem, category, "implicit");
     if (category && Array.isArray(implicitPool) && implicitPool.length > 0) {
-        const implicitChance = Number.isFinite(opts.implicitChance) ? opts.implicitChance : 0.65;
-        if (_rngFloat(rng) <= implicitChance) {
+        if (craftFirst) {
             const implicitAffixId = _pickWeighted(implicitPool, rng);
             const implicitDef = typeof getAffixDefById === "function" ? getAffixDefById(implicitAffixId) : null;
             const implicitRoll = (implicitDef && implicitDef.group === "implicit" && implicitDef.category === category)
                 ? _pickTierAndRoll(implicitDef, ilvl, rng)
                 : null;
             if (implicitRoll) implicits = [implicitRoll];
+        } else {
+            const implicitChance = Number.isFinite(opts.implicitChance) ? opts.implicitChance : 0.65;
+            if (_rngFloat(rng) <= implicitChance) {
+                const implicitAffixId = _pickWeighted(implicitPool, rng);
+                const implicitDef = typeof getAffixDefById === "function" ? getAffixDefById(implicitAffixId) : null;
+                const implicitRoll = (implicitDef && implicitDef.group === "implicit" && implicitDef.category === category)
+                    ? _pickTierAndRoll(implicitDef, ilvl, rng)
+                    : null;
+                if (implicitRoll) implicits = [implicitRoll];
+            }
         }
     }
 

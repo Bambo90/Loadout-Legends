@@ -438,8 +438,7 @@ const _AFFIX_DEFS_SEED = Object.freeze([
 ]);
 
 const _AFFIX_TIER_TARGET_COUNT = 12;
-const _AFFIX_TIER_WEIGHT_EXPONENT = 1.8;
-const _AFFIX_TIER_REQUIRED_ILVL_BY_TIER = Object.freeze([85, 80, 75, 70, 65, 60, 55, 50, 45, 35, 25, 10]);
+const _AFFIX_TIER_REQUIRED_ILVL_BY_TIER = Object.freeze([60, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1]);
 const _AFFIX_TIER_GAMMA_PERCENT = 1.35;
 const _AFFIX_TIER_GAMMA_FLAT = 1.6;
 
@@ -504,8 +503,7 @@ function _buildExpandedTiersFromSeed(seedTiers) {
             tier: tierNumber,
             min: _roundTierBound(interpolatedMin),
             max: _roundTierBound(interpolatedMax),
-            requiredIlvl: Math.max(1, Math.floor(requiredIlvl)),
-            weight: Math.max(1, Math.round(Math.pow(tierNumber, _AFFIX_TIER_WEIGHT_EXPONENT)))
+            requiredIlvl: Math.max(1, Math.floor(requiredIlvl))
         }));
     }
     return Object.freeze(output);

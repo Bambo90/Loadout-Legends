@@ -45,18 +45,31 @@ const _DEFAULT_WEAPON_COOLDOWN_MS_BY_TYPE = Object.freeze({
     stave: 4600,
     weapon: 3600
 });
-const _WEAPON_AFFIX_TYPES = Object.freeze({
-    dagger: true,
-    sword: true,
-    axe: true,
-    mace: true,
-    spear: true,
-    bow: true,
-    crossbow: true,
-    wand: true,
-    staff: true,
-    stave: true,
-    weapon: true
+const _AFFIX_CATEGORY_BY_TAG = Object.freeze({
+    weapon: "weapon",
+    armor: "armor",
+    jewelry: "jewelry",
+    accessory: "jewelry",
+    tool: "weapon",
+    shield: "armor"
+});
+const _AFFIX_CATEGORY_BY_TYPE = Object.freeze({
+    dagger: "weapon",
+    sword: "weapon",
+    axe: "weapon",
+    mace: "weapon",
+    spear: "weapon",
+    bow: "weapon",
+    crossbow: "weapon",
+    wand: "weapon",
+    staff: "weapon",
+    stave: "weapon",
+    weapon: "weapon",
+    tool: "weapon",
+    armor: "armor",
+    shield: "armor",
+    jewelry: "jewelry",
+    accessory: "jewelry"
 });
 
 function _isFiniteNumber(value) {
@@ -259,22 +272,25 @@ function _resolveItemTypeForCooldown(item) {
     return "misc";
 }
 
-function _resolveAffixCategoryForItem(item) {
+function resolveAffixCategoryForItem(item) {
     if (!item || typeof item !== "object") return null;
+    if (item.affixCapable === false || item.disableAffixes === true) return null;
     const tags = Array.isArray(item.tags) ? item.tags : [];
-    if (tags.includes("weapon")) return "weapon";
-    if (tags.includes("armor")) return "armor";
-    if (tags.includes("jewelry")) return "jewelry";
-    if (tags.includes("accessory")) return "jewelry";
+    for (let i = 0; i < tags.length; i += 1) {
+        const tag = String(tags[i] || "").trim().toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(_AFFIX_CATEGORY_BY_TAG, tag)) {
+            return _AFFIX_CATEGORY_BY_TAG[tag];
+        }
+    }
     const baseType = _resolveItemTypeForCooldown(item);
-    if (_WEAPON_AFFIX_TYPES[baseType]) return "weapon";
-    if (baseType === "armor") return "armor";
-    if (baseType === "accessory" || baseType === "jewelry") return "jewelry";
+    if (Object.prototype.hasOwnProperty.call(_AFFIX_CATEGORY_BY_TYPE, baseType)) {
+        return _AFFIX_CATEGORY_BY_TYPE[baseType];
+    }
     return null;
 }
 
 function _resolveCategoryAffixPool(item, group) {
-    const category = _resolveAffixCategoryForItem(item);
+    const category = resolveAffixCategoryForItem(item);
     if (!category || !group || typeof getAffixPoolByCategoryGroup !== "function") return [];
     return _normalizeAffixPool(getAffixPoolByCategoryGroup(category, group));
 }
@@ -736,6 +752,7 @@ function sanitizeLoadedSaveData(data) {
 
 if (typeof window !== "undefined") {
     window.ITEM_STATIC_FIELDS = ITEM_STATIC_FIELDS;
+    window.resolveAffixCategoryForItem = resolveAffixCategoryForItem;
     window.getAllItemDefs = getAllItemDefs;
     window.getItemDefById = getItemDefById;
     window.refreshItemDefIndex = refreshItemDefIndex;
@@ -758,6 +775,7 @@ if (typeof window !== "undefined") {
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
         ITEM_STATIC_FIELDS,
+        resolveAffixCategoryForItem,
         getAllItemDefs,
         getItemDefById,
         refreshItemDefIndex,

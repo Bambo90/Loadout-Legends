@@ -394,6 +394,51 @@
             .filter(Boolean);
     }
 
+    function _toSlotCount(value) {
+        if (!_isFiniteNumber(value)) return 0;
+        return Math.max(0, Math.floor(value));
+    }
+
+    function _hasAffixPool(item, key) {
+        return !!(item && Array.isArray(item[key]) && item[key].length > 0);
+    }
+
+    function _isAffixCapableItem(runtimeItem, baseItem) {
+        if ((runtimeItem && (runtimeItem.affixCapable === false || runtimeItem.disableAffixes === true))
+            || (baseItem && (baseItem.affixCapable === false || baseItem.disableAffixes === true))) {
+            return false;
+        }
+        return (
+            _hasAffixPool(runtimeItem, "implicitPool") ||
+            _hasAffixPool(runtimeItem, "prefixPool") ||
+            _hasAffixPool(runtimeItem, "suffixPool") ||
+            _hasAffixPool(baseItem, "implicitPool") ||
+            _hasAffixPool(baseItem, "prefixPool") ||
+            _hasAffixPool(baseItem, "suffixPool")
+        );
+    }
+
+    function _resolveAffixSlotSummary(runtimeItem, baseItem, implicitRows, prefixRows, suffixRows) {
+        const affixCapable = _isAffixCapableItem(runtimeItem, baseItem);
+        const prefixSlots = affixCapable
+            ? _toSlotCount(_isFiniteNumber(runtimeItem && runtimeItem.prefixSlots) ? runtimeItem.prefixSlots : (baseItem && baseItem.prefixSlots))
+            : 0;
+        const suffixSlots = affixCapable
+            ? _toSlotCount(_isFiniteNumber(runtimeItem && runtimeItem.suffixSlots) ? runtimeItem.suffixSlots : (baseItem && baseItem.suffixSlots))
+            : 0;
+        const implicitSlots = affixCapable ? 1 : 0;
+        const implicitFilled = implicitRows.length > 0 ? 1 : 0;
+        return {
+            affixCapable,
+            implicitFilled,
+            implicitSlots,
+            prefixFilled: prefixRows.length,
+            prefixSlots,
+            suffixFilled: suffixRows.length,
+            suffixSlots
+        };
+    }
+
     function _renderModifierRows(modifiers, sourceByKey) {
         if (!Array.isArray(modifiers) || modifiers.length === 0) {
             return `<div class="item-tooltip-empty">${_escapeHtml(_label("empty"))}</div>`;
@@ -478,6 +523,7 @@
         const implicitRows = _buildAffixRows(runtimeItem.implicits);
         const prefixRows = _buildAffixRows(runtimeItem.prefixes);
         const suffixRows = _buildAffixRows(runtimeItem.suffixes);
+        const slotSummary = _resolveAffixSlotSummary(runtimeItem, baseItem, implicitRows, prefixRows, suffixRows);
 
         const effectiveModifiers = (typeof extractItemModifiers === "function")
             ? extractItemModifiers(runtimeItem).map(_normalizeModifier).filter(Boolean)
@@ -514,9 +560,9 @@
 
         const sections = [
             _renderSection(_label("baseStats"), _renderModifierRows(baseStats)),
-            _renderSection(_label("implicit"), _renderAffixRows(implicitRows)),
-            _renderSection(_label("prefixes"), _renderAffixRows(prefixRows)),
-            _renderSection(_label("suffixes"), _renderAffixRows(suffixRows))
+            _renderSection(`${_label("implicit")} (${slotSummary.implicitFilled}/${slotSummary.implicitSlots})`, _renderAffixRows(implicitRows)),
+            _renderSection(`${_label("prefixes")} (${slotSummary.prefixFilled}/${slotSummary.prefixSlots})`, _renderAffixRows(prefixRows)),
+            _renderSection(`${_label("suffixes")} (${slotSummary.suffixFilled}/${slotSummary.suffixSlots})`, _renderAffixRows(suffixRows))
         ];
 
         if (legacyModifiers.length > 0) {
