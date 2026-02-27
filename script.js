@@ -3738,24 +3738,6 @@ function renderDragPreviewForGrid(container, location, cols, totalSlots) {
         return;
     }
 
-    // Keep preview ghost directly under the moved body by deriving it from follow-item position.
-    if (pointerInsideThisGrid) {
-        const followEl = document.querySelector('.follow-item');
-        if (followEl) {
-            const followRect = followEl.getBoundingClientRect();
-            const geo = getCellGeometry(container, cols);
-            const originX = Math.floor((followRect.left - rect.left) / geo.cellW);
-            const originY = Math.floor((followRect.top - rect.top) / geo.cellH);
-            const offsetX = Number.isFinite(Number(draggedItem.offsetX)) ? Math.floor(Number(draggedItem.offsetX)) : 0;
-            const offsetY = Number.isFinite(Number(draggedItem.offsetY)) ? Math.floor(Number(draggedItem.offsetY)) : 0;
-            const anchorHoverX = originX + offsetX;
-            const anchorHoverY = originY + offsetY;
-            const clampedCol = Math.max(0, Math.min(cols - 1, anchorHoverX));
-            const clampedRow = Math.max(0, Math.min(maxRows - 1, anchorHoverY));
-            hoverIndex = clampedRow * cols + clampedCol;
-        }
-    }
-
     const bodyShape = draggedItem.previewShape || draggedItem.item?.body || [[1]];
     let placementValid = false;
     let previewOriginIndex = 0;

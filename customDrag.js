@@ -345,6 +345,29 @@ function _findFirstBodyOffset(shape) {
     return { r: 0, c: 0 };
 }
 
+function _computeCenterOffsetsFromShape(shape) {
+    const rows = Array.isArray(shape) && shape.length > 0 ? shape.length : 1;
+    const cols = Array.isArray(shape) && shape[0] ? shape[0].length : 1;
+    return {
+        offsetX: Math.max(0, Math.floor(cols / 2)),
+        offsetY: Math.max(0, Math.floor(rows / 2))
+    };
+}
+
+function _syncDraggedItemCenterAnchor(shape, geo) {
+    if (!draggedItem) return;
+    const center = _computeCenterOffsetsFromShape(shape);
+    const slotSize = Number.isFinite(geo && geo.slotSize) ? geo.slotSize : 64;
+    const cellW = Number.isFinite(geo && geo.cellW) ? geo.cellW : slotSize;
+    const cellH = Number.isFinite(geo && geo.cellH) ? geo.cellH : slotSize;
+    draggedItem.offsetX = center.offsetX;
+    draggedItem.offsetY = center.offsetY;
+    draggedItem.pointerToAnchorOffsetPx = {
+        x: Number((center.offsetX * cellW) + (slotSize / 2)),
+        y: Number((center.offsetY * cellH) + (slotSize / 2))
+    };
+}
+
 function _restoreDraggedItemToSourceIfNeeded() {
     if (!draggedItem) return false;
 
@@ -713,6 +736,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
             ? getItemAuraMatrix(item, initialRotationIndex)
             : null);
     const firstBodyOffset = _findFirstBodyOffset(baseShape);
+    const initialCenter = _computeCenterOffsetsFromShape(baseShape);
     const sourceOriginIndex = Number(fromIndex) - (firstBodyOffset.r * fromCols) - firstBodyOffset.c;
     draggedItem = {
         item: item,
@@ -720,8 +744,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         fromIndex: fromIndex,
         // store the originating grid column count so restores/drops use same geometry
         fromCols: fromCols,
-        offsetX: offsetX || 0,
-        offsetY: offsetY || 0,
+        offsetX: initialCenter.offsetX,
+        offsetY: initialCenter.offsetY,
         previewShape: baseShape.map(r => [...r]),
         rotatedAura: initialAura,
         rotationIndex: initialRotationIndex,
@@ -774,6 +798,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         const gap = geo.gap;
         const cellW2 = geo.cellW;
         const cellH2 = geo.cellH;
+        _syncDraggedItemCenterAnchor(shape, geo);
         // Compute total follow-element dimensions: rows/cols * slotSize with gaps between
         const followElWidth = cols * slotSize + (cols > 1 ? (cols - 1) * gap : 0);
         const followElHeight = rows * slotSize + (rows > 1 ? (rows - 1) * gap : 0);
@@ -1005,6 +1030,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         };
     }
 
+    _syncDraggedItemCenterAnchor(shape, geo);
     document.body.appendChild(_customFollowEl);
 
     
@@ -1040,6 +1066,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
         const gap2 = geo2.gap;
         const cellWLocal = geo2.cellW;
         const cellHLocal = geo2.cellH;
+        _syncDraggedItemCenterAnchor(shape, geo2);
         _customFollowEl.style.width = (cols * cellWLocal - gap2) + 'px';
         _customFollowEl.style.height = (rows * cellHLocal - gap2) + 'px';
         
@@ -1261,6 +1288,7 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
                 y: Number(defaultAnchorLocalPx.y)
             };
         }
+        _syncDraggedItemCenterAnchor(shape, geo2);
     };
 
     // capture initial offsets locally to avoid race when draggedItem becomes null during cleanup
