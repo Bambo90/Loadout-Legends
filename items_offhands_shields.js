@@ -74,7 +74,7 @@ const ITEMS_OFFHANDS_SHIELDS = [
         rarity: "unique",
         icon: "💎",
         price: 4000,
-        inShop: false,
+        inShop: true,
         dropSources: ["crystal_golem"],
         dropChance: 0.04,
         req: 13,

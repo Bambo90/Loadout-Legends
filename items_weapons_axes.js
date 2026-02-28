@@ -11,7 +11,7 @@ const ITEMS_WEAPONS_AXES = [
         rarity: "rare",
         icon: "🪓",
         price: 800,
-        inShop: false,
+        inShop: true,
         req: 10,
         damage: 15,
         damageMin: 15,

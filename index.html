@@ -115,6 +115,19 @@
 
                 <div id="tab-shop" class="tab-content">
                     <h3>Marktplatz</h3>
+                    <div class="shop-controls">
+                        <input
+                            type="text"
+                            id="shop-search"
+                            placeholder="Suche nach Name oder Typ..."
+                            oninput="setShopSearch(this.value)"
+                            aria-label="Shop Suche"
+                        />
+                        <select id="shop-tag-filter" onchange="setShopTagFilter(this.value)" aria-label="Shop Tag Filter">
+                            <option value="all">Alle</option>
+                        </select>
+                        <span id="shop-result-count" class="shop-result-count">0 / 0 Items</span>
+                    </div>
                     <div id="shop-container" class="shop-grid"></div>
                 </div>
                 <div id="tab-character" class="tab-content">

@@ -145,6 +145,41 @@ const SHOP_RARITY_SORT_ORDER = Object.freeze({
     unique: 3,
     legendary: 4
 });
+const DEV_LOCAL_HOST_PATTERNS = Object.freeze([
+    /^localhost$/i,
+    /^127(?:\.\d{1,3}){3}$/,
+    /^\[::1\]$/i,
+    /^::1$/i,
+    /^10(?:\.\d{1,3}){3}$/,
+    /^192\.168(?:\.\d{1,3}){2}$/,
+    /^172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2}$/
+]);
+const SHOP_FILTER_ALL = 'all';
+const SHOP_TAG_LABELS = Object.freeze({
+    all: 'Alle',
+    weapon: 'Waffen',
+    tool: 'Tools',
+    armor: 'Ruestung',
+    shield: 'Schilde',
+    accessory: 'Accessoires',
+    jewelry: 'Schmuck',
+    amulet: 'Amulette',
+    ring: 'Ringe',
+    helmet: 'Helme',
+    body: 'Brust',
+    gloves: 'Handschuhe',
+    boots: 'Stiefel',
+    sword: 'Schwerter',
+    axe: 'Aexte',
+    mace: 'Maces',
+    spear: 'Speere',
+    bow: 'Boegen',
+    crossbow: 'Armbrueste',
+    wand: 'Staebe',
+    staff: 'Staebe',
+    stave: 'Staebe',
+    consumable: 'Verbrauch'
+});
 const ACTIVE_GRID_KEYS = Object.freeze(['farmGrid', 'pveGrid', 'pvpGrid', 'sortGrid']);
 const ACTIVE_GRID_LABELS = Object.freeze({
     farmGrid: 'Farm',
@@ -156,7 +191,17 @@ const ACTIVE_GRID_LABELS = Object.freeze({
 function hasPrivilegedDevAccess() {
     if (typeof window === 'undefined') return false;
     const api = window.electronAPI;
-    return !!(api && api.runtime === 'electron' && api.devToolsEnabled === true);
+    const hasElectronAccess = !!(api && api.runtime === 'electron' && api.devToolsEnabled === true);
+    if (hasElectronAccess) return true;
+    try {
+        const protocol = String(window.location && window.location.protocol ? window.location.protocol : '').toLowerCase();
+        if (protocol !== 'http:' && protocol !== 'https:') return false;
+        const hostname = String(window.location && window.location.hostname ? window.location.hostname : '').trim();
+        if (!hostname) return false;
+        return DEV_LOCAL_HOST_PATTERNS.some((pattern) => pattern.test(hostname));
+    } catch (err) {
+        return false;
+    }
 }
 window.hasPrivilegedDevAccess = hasPrivilegedDevAccess;
 
@@ -167,6 +212,10 @@ let _lastHoveredMenuButton = null;
 let _lastMenuHoverSoundAt = 0;
 let _pendingRebindAction = null;
 let _lastDerivedGridKey = null;
+const shopFilterState = {
+    search: '',
+    tag: SHOP_FILTER_ALL
+};
 const _uiSoundBases = Object.create(null);
 const audioRuntime = {
     musicEl: null,
@@ -4036,13 +4085,144 @@ function _sortShopItems(items) {
     });
 }
 
+function _normalizeShopTag(value) {
+    if (typeof value !== 'string') return SHOP_FILTER_ALL;
+    const normalized = value.trim().toLowerCase();
+    return normalized || SHOP_FILTER_ALL;
+}
+
+function _normalizeShopSearch(value) {
+    if (typeof value !== 'string') return '';
+    return value.trim();
+}
+
+function _getShopTagLabel(tag) {
+    const normalized = _normalizeShopTag(tag);
+    if (Object.prototype.hasOwnProperty.call(SHOP_TAG_LABELS, normalized)) {
+        return SHOP_TAG_LABELS[normalized];
+    }
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function _resolveShopItemTags(item) {
+    const tags = new Set();
+    if (!item || typeof item !== 'object') return [];
+
+    if (Array.isArray(item.tags)) {
+        item.tags.forEach((tag) => {
+            if (typeof tag !== 'string') return;
+            const normalized = tag.trim().toLowerCase();
+            if (normalized) tags.add(normalized);
+        });
+    }
+
+    if (typeof item.type === 'string' && item.type.trim()) {
+        tags.add(item.type.trim().toLowerCase());
+    }
+    if (typeof item.baseType === 'string' && item.baseType.trim()) {
+        tags.add(item.baseType.trim().toLowerCase());
+    }
+
+    if (typeof resolveAffixCategoryForItem === 'function') {
+        const category = resolveAffixCategoryForItem(item);
+        if (typeof category === 'string' && category.trim()) {
+            tags.add(category.trim().toLowerCase());
+        }
+    }
+
+    return Array.from(tags);
+}
+
+function _collectShopFilterTags(items) {
+    const tags = new Set([SHOP_FILTER_ALL]);
+    if (!Array.isArray(items)) return Array.from(tags);
+    items.forEach((item) => {
+        _resolveShopItemTags(item).forEach((tag) => tags.add(tag));
+    });
+    return Array.from(tags).sort((a, b) => {
+        if (a === SHOP_FILTER_ALL) return -1;
+        if (b === SHOP_FILTER_ALL) return 1;
+        return _getShopTagLabel(a).localeCompare(_getShopTagLabel(b), 'de');
+    });
+}
+
+function _syncShopFilterControls(availableTags, visibleCount, totalCount) {
+    const tags = Array.isArray(availableTags) && availableTags.length > 0
+        ? availableTags
+        : [SHOP_FILTER_ALL];
+
+    const tagSelect = document.getElementById('shop-tag-filter');
+    if (tagSelect) {
+        const activeTag = tags.includes(_normalizeShopTag(shopFilterState.tag))
+            ? _normalizeShopTag(shopFilterState.tag)
+            : SHOP_FILTER_ALL;
+        shopFilterState.tag = activeTag;
+
+        tagSelect.innerHTML = '';
+        tags.forEach((tag) => {
+            const option = document.createElement('option');
+            option.value = tag;
+            option.textContent = _getShopTagLabel(tag);
+            tagSelect.appendChild(option);
+        });
+        tagSelect.value = activeTag;
+    }
+
+    const searchInput = document.getElementById('shop-search');
+    if (searchInput && searchInput.value !== shopFilterState.search) {
+        searchInput.value = shopFilterState.search;
+    }
+
+    const countEl = document.getElementById('shop-result-count');
+    if (countEl) {
+        const safeVisible = Number.isFinite(visibleCount) ? Math.max(0, Math.floor(visibleCount)) : 0;
+        const safeTotal = Number.isFinite(totalCount) ? Math.max(0, Math.floor(totalCount)) : 0;
+        countEl.textContent = `${safeVisible} / ${safeTotal} Items`;
+    }
+}
+
+function setShopSearch(query) {
+    shopFilterState.search = _normalizeShopSearch(query);
+    renderShop();
+}
+window.setShopSearch = setShopSearch;
+
+function setShopTagFilter(tag) {
+    shopFilterState.tag = _normalizeShopTag(tag);
+    renderShop();
+}
+window.setShopTagFilter = setShopTagFilter;
+
 function renderShop() {
     const container = document.getElementById('shop-container');
     if (!container) return;
     
     container.innerHTML = '';
     const devShopEnabled = isDeveloperShopEnabled();
-    const shopItems = _sortShopItems(_getShopItemsForRender());
+    const allShopItems = _sortShopItems(_getShopItemsForRender());
+    const availableTags = _collectShopFilterTags(allShopItems);
+    const activeTag = availableTags.includes(_normalizeShopTag(shopFilterState.tag))
+        ? _normalizeShopTag(shopFilterState.tag)
+        : SHOP_FILTER_ALL;
+    shopFilterState.tag = activeTag;
+    const activeSearch = _normalizeShopSearch(shopFilterState.search);
+    const activeSearchNeedle = activeSearch.toLowerCase();
+
+    const shopItems = allShopItems.filter((item) => {
+        const tags = _resolveShopItemTags(item);
+        if (activeTag !== SHOP_FILTER_ALL && !tags.includes(activeTag)) return false;
+        if (!activeSearchNeedle) return true;
+        const haystack = [
+            item && item.name ? item.name : '',
+            item && item.desc ? item.desc : '',
+            item && item.type ? item.type : '',
+            item && item.baseType ? item.baseType : '',
+            tags.join(' ')
+        ].join(' ').toLowerCase();
+        return haystack.includes(activeSearchNeedle);
+    });
+
+    _syncShopFilterControls(availableTags, shopItems.length, allShopItems.length);
 
     if (devShopEnabled) {
         const hint = document.createElement('div');
@@ -4052,6 +4232,15 @@ function renderShop() {
         hint.style.boxShadow = '0 0 18px rgba(249,115,22,0.35)';
         hint.innerHTML = '<strong>Dev-Shop aktiv:</strong> Alle Items sichtbar, Kaufpreis 0 Gold.';
         container.appendChild(hint);
+    }
+
+    if (shopItems.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'shop-item-card';
+        empty.style.gridColumn = '1 / -1';
+        empty.innerHTML = '<strong>Keine Items gefunden.</strong><br><span style="color:#aaa;">Passe Suche oder Filter an.</span>';
+        container.appendChild(empty);
+        return;
     }
     
     shopItems.forEach(item => {

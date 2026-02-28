@@ -24,6 +24,10 @@ let _perfFrameTimes = [];
 let _perfLastFrameTime = 0;
 let _perfEnabled = false; // Set to true to enable perf logging
 
+// Hover update tuning for drag preview responsiveness.
+const DRAG_HOVER_THROTTLE_MS = 32;
+const DRAG_HOVER_MIN_MOVE_PX = 2;
+
 function _readSpriteOffset(value) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : 0;
@@ -1367,8 +1371,8 @@ function startCustomDrag(item, fromLocation, fromIndex, offsetX, offsetY, previe
     updatePos(initX, initY);
 
     // pointer move/up handlers
-    const _hoverThrottleMs = 48;
-    const _hoverMinMove = 4;
+    const _hoverThrottleMs = DRAG_HOVER_THROTTLE_MS;
+    const _hoverMinMove = DRAG_HOVER_MIN_MOVE_PX;
     let _lastHoverCheck = 0;
     let _lastHoverX = 0;
     let _lastHoverY = 0;

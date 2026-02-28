@@ -75,7 +75,7 @@ const ITEMS_ACCESSORIES_AMULETS = [
         rarity: "unique",
         icon: "⭐",
         price: 3200,
-        inShop: false,
+        inShop: true,
         dropSources: ["celestial_being"],
         dropChance: 0.05,
         req: 12,
