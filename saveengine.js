@@ -21,6 +21,19 @@ const DEFAULT_ACTIVE_GRID_KEY = "farmGrid";
 const VALID_ACTIVE_GRID_KEYS = Object.freeze(["farmGrid", "pveGrid", "pvpGrid", "sortGrid"]);
 const SAVEENGINE_BATTLEFIELD_MAX_PAGES = 9;
 const SAVEENGINE_BATTLEFIELD_DEFAULT_UNLOCKED_PAGES = 2;
+const DEFAULT_CURRENCY_KEYS = Object.freeze([
+    "gold",
+    "cm_offense_t1",
+    "cm_offense_t2",
+    "cm_offense_t3",
+    "cm_defense_t1",
+    "cm_defense_t2",
+    "cm_defense_t3",
+    "res_metal",
+    "res_wood",
+    "res_leather",
+    "res_crystal"
+]);
 
 function _clampVolumePercent(value, fallbackValue) {
     const fallback = Number.isFinite(fallbackValue) ? fallbackValue : 100;
@@ -93,6 +106,32 @@ function ensureBattlefieldDefaultsInData(target) {
 
     const active = Number.isFinite(battlefield.activePage) ? Math.floor(battlefield.activePage) : 1;
     battlefield.activePage = Math.max(1, Math.min(battlefield.unlockedPages, active));
+    return target;
+}
+
+function _normalizeCurrencyAmount(value, fallbackValue) {
+    const fallback = Number.isFinite(fallbackValue) ? fallbackValue : 0;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return Math.max(0, Math.floor(fallback));
+    return Math.max(0, Math.floor(numeric));
+}
+
+function ensureCurrenciesDefaultsInData(target) {
+    if (!target || typeof target !== "object") return target;
+    if (!target.currencies || typeof target.currencies !== "object" || Array.isArray(target.currencies)) {
+        target.currencies = {};
+    }
+
+    const legacyGold = Number.isFinite(target.gold) ? target.gold : null;
+    if (legacyGold !== null && !Number.isFinite(target.currencies.gold)) {
+        target.currencies.gold = legacyGold;
+    }
+
+    DEFAULT_CURRENCY_KEYS.forEach((key) => {
+        target.currencies[key] = _normalizeCurrencyAmount(target.currencies[key], 0);
+    });
+
+    target.gold = target.currencies.gold;
     return target;
 }
 
@@ -200,13 +239,7 @@ function migrateSave(data, version) {
             case 0: {
                 // v0 -> v1:
                 // Move legacy top-level gold into currencies.gold.
-                if (!migrated.currencies || typeof migrated.currencies !== "object" || Array.isArray(migrated.currencies)) {
-                    migrated.currencies = {};
-                }
-                if (typeof migrated.gold === "number" && typeof migrated.currencies.gold !== "number") {
-                    migrated.currencies.gold = migrated.gold;
-                    delete migrated.gold;
-                }
+                ensureCurrenciesDefaultsInData(migrated);
 
                 // Legacy cell migration:
                 // old saves may embed item objects or baseId instead of itemId.
@@ -309,6 +342,7 @@ function migrateSave(data, version) {
         }
     }
 
+    ensureCurrenciesDefaultsInData(migrated);
     return { data: migrated, version: currentVersion };
 }
 
@@ -363,6 +397,7 @@ function normalizeGridInstances(grid, cols) {
 
 function saveGame() {
     const storage = getStorageAdapter();
+    ensureCurrenciesDefaultsInData(gameData);
     if (typeof ensureBankPageData === "function") {
         ensureBankPageData(gameData);
     }
@@ -428,13 +463,7 @@ function loadGame() {
                 console.log(`Savegame migriert: v${loadedVersion} -> v${migration.version}`);
             }
 
-            // Runtime bridge while game systems still read gameData.gold directly.
-            if (migratedData.currencies &&
-                typeof migratedData.currencies === "object" &&
-                typeof migratedData.currencies.gold === "number" &&
-                typeof migratedData.gold !== "number") {
-                migratedData.gold = migratedData.currencies.gold;
-            }
+            ensureCurrenciesDefaultsInData(migratedData);
 
             // Wir mergen die geladenen Daten vorsichtig in gameData
             // Das stellt sicher, dass neue Variablen (die es im alten Save nicht gab) existieren
@@ -448,6 +477,7 @@ function loadGame() {
             if (!gameData.sortGrid) gameData.sortGrid = {};
             if (!gameData.monsterDefeats) gameData.monsterDefeats = {};
             if (!gameData.currentMonsterIndex) gameData.currentMonsterIndex = 0;
+            ensureCurrenciesDefaultsInData(gameData);
             ensureBattlefieldDefaultsInData(gameData);
             ensureSettingsDefaultsInData(gameData);
             if (typeof ensureBankPageData === "function") {
@@ -496,6 +526,7 @@ function loadGame() {
         gameData.pvpGrid = {};
         gameData.sortGrid = {};
         gameData.monsterDefeats = {};
+        ensureCurrenciesDefaultsInData(gameData);
         ensureBattlefieldDefaultsInData(gameData);
         if (typeof ensureBankPageData === "function") {
             ensureBankPageData(gameData);

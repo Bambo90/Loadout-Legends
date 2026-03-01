@@ -5,6 +5,19 @@
 
 let gameData = {
     gold: 500,
+    currencies: {
+        gold: 500,
+        cm_offense_t1: 0,
+        cm_offense_t2: 0,
+        cm_offense_t3: 0,
+        cm_defense_t1: 0,
+        cm_defense_t2: 0,
+        cm_defense_t3: 0,
+        res_metal: 0,
+        res_wood: 0,
+        res_leather: 0,
+        res_crystal: 0
+    },
     // Legacy mirrors are kept for compatibility; source of truth is character.base.
     level: 1,
     xp: 0,
@@ -187,6 +200,89 @@ const ACTIVE_GRID_LABELS = Object.freeze({
     pvpGrid: 'PVP',
     sortGrid: 'Sort'
 });
+const CURRENCY_KEYS = Object.freeze([
+    'gold',
+    'cm_offense_t1',
+    'cm_offense_t2',
+    'cm_offense_t3',
+    'cm_defense_t1',
+    'cm_defense_t2',
+    'cm_defense_t3',
+    'res_metal',
+    'res_wood',
+    'res_leather',
+    'res_crystal'
+]);
+const REFORGING_WALLET_GROUPS = Object.freeze([
+    {
+        title: 'Gold',
+        entries: [{ key: 'gold', label: 'Gold' }]
+    },
+    {
+        title: 'Combat Mats',
+        entries: [
+            { key: 'cm_offense_t1', label: 'Offense T1' },
+            { key: 'cm_offense_t2', label: 'Offense T2' },
+            { key: 'cm_offense_t3', label: 'Offense T3' },
+            { key: 'cm_defense_t1', label: 'Defense T1' },
+            { key: 'cm_defense_t2', label: 'Defense T2' },
+            { key: 'cm_defense_t3', label: 'Defense T3' }
+        ]
+    },
+    {
+        title: 'City Resources',
+        entries: [
+            { key: 'res_metal', label: 'Metal' },
+            { key: 'res_wood', label: 'Wood' },
+            { key: 'res_leather', label: 'Leather' },
+            { key: 'res_crystal', label: 'Crystal' }
+        ]
+    }
+]);
+const REFORGING_ITEM_SOURCES = Object.freeze([
+    { key: 'farmGrid', label: 'Farm', priority: 1 },
+    { key: 'pveGrid', label: 'PVE', priority: 2 },
+    { key: 'pvpGrid', label: 'PVP', priority: 3 },
+    { key: 'bank', label: 'Storage', priority: 4 }
+]);
+const REFORGING_TARGET_MODE_VALUES = Object.freeze({
+    chaos: 'chaos',
+    focus: 'focus'
+});
+const REFORGING_TARGET_MODE_COST_MULT = Object.freeze({
+    chaos: 1.0,
+    focus: 1.6
+});
+const REFORGING_RARITY_MULT = Object.freeze({
+    common: 1.0,
+    normal: 1.0,
+    rare: 1.5
+});
+const REFORGING_COMBAT_MAT_KEYS = Object.freeze([
+    'cm_offense_t1',
+    'cm_offense_t2',
+    'cm_offense_t3',
+    'cm_defense_t1',
+    'cm_defense_t2',
+    'cm_defense_t3'
+]);
+const REFORGING_CITY_RESOURCE_KEYS = Object.freeze([
+    'res_metal',
+    'res_wood',
+    'res_leather',
+    'res_crystal'
+]);
+const REFORGING_SHARD_TIER_BANDS = Object.freeze({
+    t1: Object.freeze({ minTier: 1, maxTier: 2 }),
+    t2: Object.freeze({ minTier: 1, maxTier: 3 }),
+    t3: Object.freeze({ minTier: 2, maxTier: 4 })
+});
+const REFORGING_FOCUS_LEAK_CHANCE = 0.15;
+const REFORGING_CHAOS_TAG_BIAS_MULT = 1.15;
+const REFORGING_ACTION_GROUPS = Object.freeze({
+    prefix: 'prefix',
+    suffix: 'suffix'
+});
 
 function hasPrivilegedDevAccess() {
     if (typeof window === 'undefined') return false;
@@ -232,6 +328,15 @@ const audioRuntime = {
     settingsReady: false,
     unlockListenerBound: false
 };
+const reforgingState = {
+    selectedInstanceId: null,
+    pickerOpen: false,
+    targetMode: REFORGING_TARGET_MODE_VALUES.chaos,
+    combatMatKey: REFORGING_COMBAT_MAT_KEYS[0],
+    pending: null,
+    isWorking: false,
+    actionMessage: ''
+};
 
 function _resolveAssetUrl(path) {
     if (typeof path !== 'string' || !path.trim()) return '';
@@ -270,6 +375,7 @@ const zoneBattlefieldState = {
 
 if (typeof window !== 'undefined') {
     window.currentWorkshop = currentWorkshop;
+    window.reforgingState = reforgingState;
 }
 
 function _clampPercent(value, fallbackValue = 100) {
@@ -323,6 +429,188 @@ function getAudioVolume(channel) {
     return getAudioVolumePercent(channel) / 100;
 }
 
+function _normalizeCurrencyValue(value, fallbackValue = 0) {
+    const fallback = Number.isFinite(fallbackValue) ? fallbackValue : 0;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return Math.max(0, Math.floor(fallback));
+    return Math.max(0, Math.floor(numeric));
+}
+
+function ensureCurrencyState(target = gameData) {
+    if (!target || typeof target !== 'object') return {};
+    if (!target.currencies || typeof target.currencies !== 'object' || Array.isArray(target.currencies)) {
+        target.currencies = {};
+    }
+
+    const legacyGold = Number.isFinite(target.gold) ? target.gold : null;
+    if (legacyGold !== null && !Number.isFinite(target.currencies.gold)) {
+        target.currencies.gold = legacyGold;
+    }
+
+    CURRENCY_KEYS.forEach((key) => {
+        target.currencies[key] = _normalizeCurrencyValue(target.currencies[key], 0);
+    });
+
+    target.gold = target.currencies.gold;
+    return target.currencies;
+}
+
+function getCurrency(key) {
+    const normalizedKey = (typeof key === 'string') ? key.trim() : '';
+    if (!normalizedKey) return 0;
+    const currencies = ensureCurrencyState(gameData);
+    if (!Object.prototype.hasOwnProperty.call(currencies, normalizedKey)) {
+        currencies[normalizedKey] = 0;
+    }
+    currencies[normalizedKey] = _normalizeCurrencyValue(currencies[normalizedKey], 0);
+    if (normalizedKey === 'gold') {
+        gameData.gold = currencies.gold;
+    }
+    return currencies[normalizedKey];
+}
+
+function _applyCurrencyDelta(key, amount, options) {
+    const opts = options && typeof options === 'object' ? options : {};
+    const normalizedKey = (typeof key === 'string') ? key.trim() : '';
+    if (!normalizedKey) return 0;
+
+    const numericDelta = Number(amount);
+    if (!Number.isFinite(numericDelta)) return 0;
+    const delta = Math.trunc(numericDelta);
+    if (delta === 0) return 0;
+
+    const currencies = ensureCurrencyState(gameData);
+    if (!Object.prototype.hasOwnProperty.call(currencies, normalizedKey)) {
+        currencies[normalizedKey] = 0;
+    }
+
+    const current = getCurrency(normalizedKey);
+    const next = Math.max(0, current + delta);
+    const applied = next - current;
+    if (applied === 0) return 0;
+
+    currencies[normalizedKey] = next;
+    if (normalizedKey === 'gold') {
+        gameData.gold = next;
+        if (applied > 0 && opts.trackTotalGold !== false) {
+            const total = Number.isFinite(gameData.totalGold) ? gameData.totalGold : 0;
+            gameData.totalGold = total + applied;
+        }
+    }
+
+    if (opts.refreshUI === true && typeof updateUI === 'function') {
+        updateUI();
+    }
+    if (opts.refreshWallet === true && typeof renderReforgingWallet === 'function') {
+        renderReforgingWallet();
+    }
+    if (opts.save === true && typeof saveGame === 'function') {
+        saveGame();
+    }
+
+    return applied;
+}
+
+function grantCurrency(key, amount, options) {
+    const opts = options && typeof options === 'object' ? options : {};
+    if (opts.bypassDebugGate !== true && !isDebugCheatsEnabled()) {
+        return 0;
+    }
+    return _applyCurrencyDelta(key, amount, {
+        trackTotalGold: opts.trackTotalGold !== false,
+        refreshUI: opts.refreshUI !== false,
+        refreshWallet: opts.refreshWallet !== false,
+        save: opts.save !== false
+    });
+}
+
+function canAfford(costObj) {
+    if (!costObj || typeof costObj !== 'object' || Array.isArray(costObj)) return true;
+    const entries = Object.entries(costObj);
+    for (let i = 0; i < entries.length; i++) {
+        const [key, rawCost] = entries[i];
+        const cost = _normalizeCurrencyValue(rawCost, 0);
+        if (cost <= 0) continue;
+        if (getCurrency(key) < cost) return false;
+    }
+    return true;
+}
+
+function spendCost(costObj, options) {
+    if (!costObj || typeof costObj !== 'object' || Array.isArray(costObj)) return true;
+    if (!canAfford(costObj)) return false;
+    const opts = options && typeof options === 'object' ? options : {};
+    const entries = Object.entries(costObj);
+    for (let i = 0; i < entries.length; i++) {
+        const [key, rawCost] = entries[i];
+        const cost = _normalizeCurrencyValue(rawCost, 0);
+        if (cost <= 0) continue;
+        _applyCurrencyDelta(key, -cost, {
+            trackTotalGold: false,
+            refreshUI: false,
+            refreshWallet: false,
+            save: false
+        });
+    }
+    if (opts.refreshUI === true && typeof updateUI === 'function') {
+        updateUI();
+    }
+    if (opts.refreshWallet === true && typeof renderReforgingWallet === 'function') {
+        renderReforgingWallet();
+    }
+    if (opts.save === true && typeof saveGame === 'function') {
+        saveGame();
+    }
+    return true;
+}
+
+function ensureReforgingState() {
+    if (!reforgingState || typeof reforgingState !== 'object') {
+        return {
+            selectedInstanceId: null,
+            pickerOpen: false,
+            targetMode: REFORGING_TARGET_MODE_VALUES.chaos,
+            combatMatKey: REFORGING_COMBAT_MAT_KEYS[0],
+            pending: null,
+            isWorking: false,
+            actionMessage: ''
+        };
+    }
+    if (typeof reforgingState.selectedInstanceId !== 'string' || !reforgingState.selectedInstanceId) {
+        reforgingState.selectedInstanceId = null;
+    }
+    if (typeof reforgingState.pickerOpen !== 'boolean') {
+        reforgingState.pickerOpen = false;
+    }
+    if (!Object.prototype.hasOwnProperty.call(REFORGING_TARGET_MODE_VALUES, reforgingState.targetMode)) {
+        reforgingState.targetMode = REFORGING_TARGET_MODE_VALUES.chaos;
+    }
+    if (!REFORGING_COMBAT_MAT_KEYS.includes(reforgingState.combatMatKey)) {
+        reforgingState.combatMatKey = REFORGING_COMBAT_MAT_KEYS[0];
+    }
+    if (!reforgingState.pending || typeof reforgingState.pending !== 'object') {
+        reforgingState.pending = null;
+    } else {
+        const pending = reforgingState.pending;
+        const validGroup = pending.group === REFORGING_ACTION_GROUPS.prefix || pending.group === REFORGING_ACTION_GROUPS.suffix;
+        const validCandidates = Array.isArray(pending.candidates) && pending.candidates.length === 3;
+        const validInstance = typeof pending.instanceId === 'string' && pending.instanceId;
+        if (!validGroup || !validCandidates || !validInstance) {
+            reforgingState.pending = null;
+        }
+    }
+    if (typeof reforgingState.isWorking !== 'boolean') {
+        reforgingState.isWorking = false;
+    }
+    if (typeof reforgingState.actionMessage !== 'string') {
+        reforgingState.actionMessage = '';
+    }
+    if (typeof window !== 'undefined') {
+        window.reforgingState = reforgingState;
+    }
+    return reforgingState;
+}
+
 function isDevModeEnabled() {
     const settings = ensureSettingsDefaults();
     return !!(settings && settings.devMode === true && hasPrivilegedDevAccess());
@@ -332,6 +620,11 @@ function isDeveloperShopEnabled() {
     return hasPrivilegedDevAccess() && isDevModeEnabled();
 }
 window.isDeveloperShopEnabled = isDeveloperShopEnabled;
+
+function isDebugCheatsEnabled() {
+    if (typeof window === 'undefined') return false;
+    return window.DEBUG_CHEATS === true && hasPrivilegedDevAccess();
+}
 
 function _syncDevModeOptionToggle() {
     const checkbox = document.getElementById('option-dev-mode');
@@ -1310,20 +1603,14 @@ function awardCharacterXP(amount, gridKey = 'farmGrid') {
 }
 
 function addGold(amount, reason = 'unknown') {
-    const delta = Number.isFinite(amount) ? amount : 0;
+    const delta = Number.isFinite(amount) ? Math.trunc(amount) : 0;
     if (delta === 0) return 0;
-
-    const current = Number.isFinite(gameData.gold) ? gameData.gold : 0;
-    const next = Math.max(0, current + delta);
-    const applied = next - current;
-    gameData.gold = next;
-
-    if (applied > 0) {
-        const total = Number.isFinite(gameData.totalGold) ? gameData.totalGold : 0;
-        gameData.totalGold = total + applied;
-    }
-
-    return applied;
+    return _applyCurrencyDelta('gold', delta, {
+        trackTotalGold: true,
+        refreshUI: false,
+        refreshWallet: false,
+        save: false
+    });
 }
 
 function grantXP(amount, reason = 'unknown', gridKey = 'farmGrid') {
@@ -1345,6 +1632,14 @@ function grantXP(amount, reason = 'unknown', gridKey = 'farmGrid') {
 if (typeof window !== 'undefined') {
     window.addGold = addGold;
     window.grantXP = grantXP;
+    window.getCurrency = getCurrency;
+    window.canAfford = canAfford;
+    window.spendCost = spendCost;
+    window.grantCurrency = grantCurrency;
+    window.computeReforgeCost = computeReforgeCost;
+    window.getEligibleAffixPool = getEligibleAffixPool;
+    window.rollReforgeCandidates = rollReforgeCandidates;
+    window.applyReforgeChoice = applyReforgeChoice;
 }
 
 function getWorkshopGridKey(workshopType) {
@@ -1773,7 +2068,840 @@ function switchTab(tabId) {
     if (tabId === 'shop') {
         renderShop();
     }
+    if (tabId === 'reforging') {
+        renderReforgingTab();
+    }
     _syncAmbientLoopState();
+}
+
+function _escapeReforgingText(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function _formatReforgingRarityLabel(rarity) {
+    const normalized = String(rarity || 'common').toLowerCase();
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function _formatReforgingAffixName(affixId, affixDef) {
+    const def = affixDef && typeof affixDef === 'object' ? affixDef : null;
+    if (def && typeof def.displayName === 'string' && def.displayName.trim()) return def.displayName.trim();
+    if (def && typeof def.name === 'string' && def.name.trim()) return def.name.trim();
+    const raw = String(affixId || '');
+    if (!raw) return 'Affix';
+    return raw
+        .replace(/^(implicit_|prefix_|suffix_)/, '')
+        .replace(/^(weapon_|armor_|jewelry_)/, '')
+        .replace(/^of_/, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function _formatReforgingRollValue(affixDef, rollValue) {
+    const value = Number(rollValue);
+    if (!Number.isFinite(value)) return '0';
+    const def = affixDef && typeof affixDef === 'object' ? affixDef : null;
+    if (def && def.type === 'percent') {
+        const pct = value * 100;
+        const sign = pct > 0 ? '+' : '';
+        return `${sign}${pct.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%`;
+    }
+    const sign = value > 0 ? '+' : '';
+    const abs = Math.abs(value) <= 1 ? value.toFixed(4) : value.toFixed(2);
+    const normalized = Number(abs);
+    const text = Number.isInteger(normalized) ? String(normalized) : String(normalized);
+    return `${sign}${text}`;
+}
+
+function _parseReforgingCombatMatKey(matKey) {
+    const key = String(matKey || '');
+    const match = key.match(/^cm_(offense|defense)_(t[1-3])$/);
+    if (!match) return null;
+    return {
+        key,
+        type: match[1],
+        tierKey: match[2]
+    };
+}
+
+function _resolveReforgingTierBand(matKey) {
+    const parsed = _parseReforgingCombatMatKey(matKey);
+    if (!parsed) return null;
+    return REFORGING_SHARD_TIER_BANDS[parsed.tierKey] || null;
+}
+
+function _resolveReforgingItemLevel(cell, instanceId) {
+    if (instanceId && typeof getItemInstanceData === 'function') {
+        const record = getItemInstanceData(gameData, instanceId);
+        if (record && Number.isFinite(record.itemLevel)) {
+            return Math.max(1, Math.floor(record.itemLevel));
+        }
+    }
+    if (cell && Number.isFinite(cell.itemLevel)) {
+        return Math.max(1, Math.floor(cell.itemLevel));
+    }
+    return Math.max(1, Math.floor(Number.isFinite(gameData.level) ? gameData.level : 1));
+}
+
+function _collectReforgingCandidates() {
+    const candidates = [];
+    const seenInstanceIds = new Set();
+
+    if (typeof ensureBankPageData === 'function') {
+        ensureBankPageData(gameData);
+    }
+
+    REFORGING_ITEM_SOURCES.forEach((source) => {
+        const grid = gameData && gameData[source.key];
+        if (!grid || typeof grid !== 'object') return;
+
+        Object.keys(grid).forEach((slotKey) => {
+            const index = parseInt(slotKey, 10);
+            if (!Number.isFinite(index)) return;
+
+            const cell = grid[slotKey];
+            if (!cell || typeof cell !== 'object' || !cell.root || !cell.itemId) return;
+            const instanceId = (typeof cell.instanceId === 'string' && cell.instanceId) ? cell.instanceId : null;
+            if (!instanceId || seenInstanceIds.has(instanceId)) return;
+
+            const item = getItemDefinition(cell.itemId, cell);
+            if (!item) return;
+
+            seenInstanceIds.add(instanceId);
+            candidates.push({
+                instanceId,
+                itemId: item.id || cell.itemId,
+                name: item.name || cell.itemId,
+                rarity: String(item.rarity || 'common').toLowerCase(),
+                icon: item.icon || '?',
+                sprite: item.sprite || '',
+                itemLevel: _resolveReforgingItemLevel(cell, instanceId),
+                sourceKey: source.key,
+                sourceLabel: source.label,
+                sourcePriority: source.priority
+            });
+        });
+    });
+
+    const rarityRank = { common: 0, magic: 1, rare: 2, unique: 3, legendary: 4 };
+    candidates.sort((a, b) => {
+        const ap = Number.isFinite(a.sourcePriority) ? a.sourcePriority : 99;
+        const bp = Number.isFinite(b.sourcePriority) ? b.sourcePriority : 99;
+        if (ap !== bp) return ap - bp;
+        const ar = Object.prototype.hasOwnProperty.call(rarityRank, a.rarity) ? rarityRank[a.rarity] : 99;
+        const br = Object.prototype.hasOwnProperty.call(rarityRank, b.rarity) ? rarityRank[b.rarity] : 99;
+        if (br !== ar) return br - ar;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+    return candidates;
+}
+
+function _resolveSelectedReforgingCandidate(candidates, state) {
+    if (!Array.isArray(candidates) || candidates.length === 0) return null;
+    const selectedId = state && typeof state.selectedInstanceId === 'string' ? state.selectedInstanceId : null;
+    if (!selectedId) return null;
+    return candidates.find((entry) => entry.instanceId === selectedId) || null;
+}
+
+function _resolveReforgingSelectedContext(state, candidates) {
+    const selectedCandidate = _resolveSelectedReforgingCandidate(candidates, state);
+    if (!selectedCandidate) return null;
+
+    const instanceRecord = (typeof getItemInstanceData === 'function')
+        ? getItemInstanceData(gameData, selectedCandidate.instanceId)
+        : null;
+    if (!instanceRecord || typeof instanceRecord !== 'object') return null;
+
+    const baseItem = (typeof getItemDefById === 'function') ? getItemDefById(instanceRecord.itemId) : null;
+    const rarity = String((baseItem && baseItem.rarity) || selectedCandidate.rarity || 'common').toLowerCase();
+    const itemLevel = Number.isFinite(instanceRecord.itemLevel)
+        ? Math.max(1, Math.floor(instanceRecord.itemLevel))
+        : Math.max(1, Math.floor(selectedCandidate.itemLevel || 1));
+    const affixCapable = !!(typeof resolveAffixCategoryForItem === 'function' && resolveAffixCategoryForItem(baseItem || instanceRecord));
+    const openPrefix = (typeof getOpenPrefixSlots === 'function') ? getOpenPrefixSlots(instanceRecord, gameData) : 0;
+    const openSuffix = (typeof getOpenSuffixSlots === 'function') ? getOpenSuffixSlots(instanceRecord, gameData) : 0;
+
+    return {
+        selectedCandidate,
+        instanceRecord,
+        baseItem,
+        rarity,
+        itemLevel,
+        affixCapable,
+        openPrefix,
+        openSuffix
+    };
+}
+
+function _renderReforgingPicker(candidates, selected, state) {
+    const panel = document.getElementById('reforging-picker-panel');
+    if (!panel) return;
+
+    const isOpen = !!(state && state.pickerOpen);
+    panel.classList.toggle('open', isOpen);
+    if (!isOpen) {
+        panel.innerHTML = '';
+        return;
+    }
+
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+        panel.innerHTML = '<div class="reforging-picker-empty">No items available.</div>';
+        return;
+    }
+
+    panel.innerHTML = candidates.map((entry) => {
+        const isActive = !!(selected && selected.instanceId === entry.instanceId);
+        const icon = (typeof entry.sprite === 'string' && entry.sprite.trim())
+            ? `<img src="${_escapeReforgingText(entry.sprite)}" alt="${_escapeReforgingText(entry.name)}">`
+            : _escapeReforgingText(entry.icon || '?');
+        return (
+            `<div class="reforging-picker-entry${isActive ? ' active' : ''}" data-instance-id="${_escapeReforgingText(entry.instanceId)}">` +
+                `<div class="reforging-picker-icon">${icon}</div>` +
+                `<div class="reforging-picker-main">` +
+                    `<div class="reforging-picker-name">${_escapeReforgingText(entry.name)}</div>` +
+                    `<div class="reforging-picker-meta">${_escapeReforgingText(_formatReforgingRarityLabel(entry.rarity))} - ${_escapeReforgingText(entry.sourceLabel)}</div>` +
+                `</div>` +
+                `<div class="reforging-picker-ilvl">ilvl ${Math.max(1, Math.floor(entry.itemLevel || 1))}</div>` +
+            `</div>`
+        );
+    }).join('');
+
+    panel.querySelectorAll('.reforging-picker-entry').forEach((entryEl) => {
+        entryEl.addEventListener('click', () => {
+            const instanceId = entryEl.getAttribute('data-instance-id');
+            const runtime = ensureReforgingState();
+            if (runtime.pending || runtime.isWorking) {
+                runtime.actionMessage = runtime.isWorking
+                    ? 'Please wait...'
+                    : 'Resolve pending candidates first.';
+                renderReforgingTab();
+                return;
+            }
+            runtime.selectedInstanceId = (typeof instanceId === 'string' && instanceId) ? instanceId : null;
+            runtime.pickerOpen = false;
+            runtime.pending = null;
+            runtime.actionMessage = '';
+            renderReforgingTab();
+        });
+    });
+}
+
+function _renderReforgingSelectedDetails(context, state) {
+    const badge = document.getElementById('reforging-selected-badge');
+    const pickButton = document.getElementById('reforging-pick-item-btn');
+    const detailsHost = document.getElementById('reforging-selected-item-panel');
+    const hasPending = !!(state && state.pending);
+    const isWorking = !!(state && state.isWorking);
+
+    if (pickButton) {
+        pickButton.textContent = state && state.pickerOpen ? 'Close Picker' : 'Pick Item';
+        pickButton.disabled = hasPending || isWorking;
+        pickButton.title = isWorking
+            ? 'Please wait...'
+            : (hasPending ? 'Resolve pending candidates first.' : '');
+        pickButton.onclick = () => {
+            const runtime = ensureReforgingState();
+            if (runtime.pending || runtime.isWorking) return;
+            runtime.pickerOpen = !runtime.pickerOpen;
+            renderReforgingTab();
+        };
+    }
+
+    if (!badge || !detailsHost) return;
+    if (!context || !context.selectedCandidate) {
+        badge.textContent = 'No item selected';
+        detailsHost.innerHTML = '<p>Select an item to inspect slots.</p>';
+        return;
+    }
+
+    const instanceLike = context.instanceRecord;
+    const selectedCandidate = context.selectedCandidate;
+    const rarity = context.rarity;
+    const ilvl = context.itemLevel;
+    const prefixTotal = (typeof getTotalPrefixSlots === 'function') ? getTotalPrefixSlots(instanceLike, gameData) : 0;
+    const suffixTotal = (typeof getTotalSuffixSlots === 'function') ? getTotalSuffixSlots(instanceLike, gameData) : 0;
+    const prefixFilled = (typeof getFilledPrefixCount === 'function') ? getFilledPrefixCount(instanceLike, gameData) : 0;
+    const suffixFilled = (typeof getFilledSuffixCount === 'function') ? getFilledSuffixCount(instanceLike, gameData) : 0;
+    const openPrefix = context.openPrefix;
+    const openSuffix = context.openSuffix;
+    const implicitTotal = context.affixCapable ? 1 : 0;
+    const implicitFilled = (Array.isArray(instanceLike.implicits) && instanceLike.implicits.length > 0 && implicitTotal > 0) ? 1 : 0;
+
+    const guardLines = [];
+    if (rarity === 'unique') {
+        guardLines.push('Reforging disabled for Unique items (v0).');
+    }
+    if (openPrefix <= 0 && openSuffix <= 0) {
+        guardLines.push('No open slots.');
+    }
+
+    badge.textContent = `${selectedCandidate.name} (ilvl ${ilvl})`;
+    detailsHost.innerHTML =
+        `<h5 class="reforging-selected-title">${_escapeReforgingText(selectedCandidate.name)}</h5>` +
+        `<p class="reforging-selected-sub">${_escapeReforgingText(_formatReforgingRarityLabel(rarity))} - ilvl ${ilvl}</p>` +
+        `<div class="reforging-detail-row"><span>Prefixes</span><strong>${prefixFilled}/${prefixTotal}</strong></div>` +
+        `<div class="reforging-detail-row"><span>Suffixes</span><strong>${suffixFilled}/${suffixTotal}</strong></div>` +
+        `<div class="reforging-detail-row"><span>Implicits</span><strong>${implicitFilled}/${implicitTotal}</strong></div>` +
+        `<div class="reforging-detail-row"><span>Open Prefix Slots</span><strong>${openPrefix}</strong></div>` +
+        `<div class="reforging-detail-row"><span>Open Suffix Slots</span><strong>${openSuffix}</strong></div>` +
+        guardLines.map((line) => `<div class="reforging-guard">${_escapeReforgingText(line)}</div>`).join('');
+}
+
+function computeReforgeCost(context, mode, combatMatKey) {
+    const activeMode = Object.prototype.hasOwnProperty.call(REFORGING_TARGET_MODE_COST_MULT, mode)
+        ? mode
+        : REFORGING_TARGET_MODE_VALUES.chaos;
+    const parsedMat = _parseReforgingCombatMatKey(combatMatKey) || _parseReforgingCombatMatKey(REFORGING_COMBAT_MAT_KEYS[0]);
+    const rarity = context && context.rarity ? String(context.rarity).toLowerCase() : 'common';
+    const itemLevel = context && Number.isFinite(context.itemLevel) ? Math.max(1, Math.floor(context.itemLevel)) : 1;
+    const rarityMult = Object.prototype.hasOwnProperty.call(REFORGING_RARITY_MULT, rarity) ? REFORGING_RARITY_MULT[rarity] : 1.0;
+    const ilvlMult = 1 + (itemLevel / 50);
+    const modeMult = REFORGING_TARGET_MODE_COST_MULT[activeMode];
+    const gold = Math.round(200 * rarityMult * ilvlMult * modeMult);
+    const resEach = Math.round(10 * rarityMult * ilvlMult * modeMult);
+    const costObj = {
+        gold,
+        [parsedMat.key]: 1
+    };
+    REFORGING_CITY_RESOURCE_KEYS.forEach((key) => {
+        costObj[key] = resEach;
+    });
+    return {
+        rarity,
+        itemLevel,
+        mode: activeMode,
+        combatMatKey: parsedMat.key,
+        combatType: parsedMat.type,
+        shardTierKey: parsedMat.tierKey,
+        tierBand: _resolveReforgingTierBand(parsedMat.key),
+        gold,
+        resEach,
+        costObj
+    };
+}
+
+function _collectItemAffixIds(instanceRecord) {
+    const used = new Set();
+    const pushList = (list) => {
+        if (!Array.isArray(list)) return;
+        list.forEach((entry) => {
+            if (!entry || typeof entry !== 'object' || typeof entry.affixId !== 'string' || !entry.affixId) return;
+            used.add(entry.affixId);
+        });
+    };
+    pushList(instanceRecord && instanceRecord.implicits);
+    pushList(instanceRecord && instanceRecord.prefixes);
+    pushList(instanceRecord && instanceRecord.suffixes);
+    return used;
+}
+
+function getEligibleAffixPool(context, group) {
+    if (!context || !context.baseItem || !context.affixCapable) return [];
+    if (group !== REFORGING_ACTION_GROUPS.prefix && group !== REFORGING_ACTION_GROUPS.suffix) return [];
+    const category = (typeof resolveAffixCategoryForItem === 'function')
+        ? resolveAffixCategoryForItem(context.baseItem)
+        : null;
+    if (!category) return [];
+
+    const poolKey = `${group}Pool`;
+    let sourcePool = [];
+    if (Array.isArray(context.baseItem[poolKey]) && context.baseItem[poolKey].length > 0) {
+        sourcePool = context.baseItem[poolKey];
+    } else if (typeof getAffixPoolByCategoryGroup === 'function') {
+        sourcePool = getAffixPoolByCategoryGroup(category, group);
+    }
+
+    return (Array.isArray(sourcePool) ? sourcePool : [])
+        .map((entry) => {
+            const affixId = typeof entry === 'string' ? entry : (entry && entry.affixId);
+            if (typeof affixId !== 'string' || !affixId) return null;
+            const def = typeof getAffixDefById === 'function' ? getAffixDefById(affixId) : null;
+            if (!def || def.group !== group || def.category !== category) return null;
+            const weight = Number.isFinite(entry && entry.weight) && entry.weight > 0 ? entry.weight : 1;
+            const craftTag = (typeof getAffixCraftTag === 'function')
+                ? getAffixCraftTag(def)
+                : (def.craftTag || 'neutral');
+            return {
+                affixId,
+                weight,
+                craftTag: String(craftTag || 'neutral').toLowerCase(),
+                affixDef: def
+            };
+        })
+        .filter(Boolean);
+}
+
+function _pickWeightedAffixIdLocal(poolEntries) {
+    if (!Array.isArray(poolEntries) || poolEntries.length === 0) return null;
+    const normalized = poolEntries.map((entry) => {
+        const affixId = typeof entry === 'string' ? entry : (entry && entry.affixId);
+        const weight = Number.isFinite(entry && entry.weight) && entry.weight > 0 ? entry.weight : 1;
+        if (typeof affixId !== 'string' || !affixId) return null;
+        return { affixId, weight };
+    }).filter(Boolean);
+    if (normalized.length === 0) return null;
+    const total = normalized.reduce((sum, entry) => sum + entry.weight, 0);
+    let ticket = Math.random() * (total > 0 ? total : 1);
+    for (let i = 0; i < normalized.length; i += 1) {
+        ticket -= normalized[i].weight;
+        if (ticket <= 0) return normalized[i].affixId;
+    }
+    return normalized[normalized.length - 1].affixId;
+}
+
+function _pickReforgeAffixEntry(entries, excludedIds) {
+    const excluded = excludedIds instanceof Set ? excludedIds : new Set();
+    const filtered = (Array.isArray(entries) ? entries : [])
+        .filter((entry) => entry && typeof entry.affixId === 'string' && !excluded.has(entry.affixId));
+    if (filtered.length === 0) return null;
+
+    const weighted = filtered.map((entry) => ({
+        affixId: entry.affixId,
+        weight: Number.isFinite(entry.weight) && entry.weight > 0 ? entry.weight : 1
+    }));
+    const pickedId = (typeof pickWeightedAffixIdFromPool === 'function')
+        ? pickWeightedAffixIdFromPool(weighted, {})
+        : _pickWeightedAffixIdLocal(weighted);
+    if (!pickedId) return null;
+    return filtered.find((entry) => entry.affixId === pickedId) || null;
+}
+
+function rollReforgeCandidates(context, group, options) {
+    const opts = options && typeof options === 'object' ? options : {};
+    const mode = opts.mode === REFORGING_TARGET_MODE_VALUES.focus
+        ? REFORGING_TARGET_MODE_VALUES.focus
+        : REFORGING_TARGET_MODE_VALUES.chaos;
+    const combatType = opts.combatType === 'defense' ? 'defense' : 'offense';
+    const tierBand = opts.tierBand || null;
+    const count = Number.isFinite(opts.count) ? Math.max(1, Math.floor(opts.count)) : 3;
+    if (!context || !context.instanceRecord || !context.baseItem) return [];
+
+    const basePool = getEligibleAffixPool(context, group);
+    if (!Array.isArray(basePool) || basePool.length === 0) return [];
+
+    const existingIds = _collectItemAffixIds(context.instanceRecord);
+    const blockedIds = new Set(existingIds);
+    const chosen = [];
+    const maxAttempts = Math.max(24, count * 18);
+    let attempts = 0;
+
+    while (chosen.length < count && attempts < maxAttempts) {
+        attempts += 1;
+        const available = basePool.filter((entry) => !blockedIds.has(entry.affixId));
+        if (available.length === 0) break;
+
+        const typedPool = available.filter((entry) => entry.craftTag === combatType);
+        const neutralPool = available.filter((entry) => entry.craftTag === 'neutral');
+        let sourcePool = available;
+
+        if (mode === REFORGING_TARGET_MODE_VALUES.focus) {
+            const leaked = neutralPool.length > 0 && Math.random() < REFORGING_FOCUS_LEAK_CHANCE;
+            if (leaked) {
+                sourcePool = neutralPool;
+            } else if (typedPool.length > 0) {
+                sourcePool = typedPool;
+            }
+        } else {
+            sourcePool = available.map((entry) => ({
+                ...entry,
+                weight: entry.weight * (entry.craftTag === combatType ? REFORGING_CHAOS_TAG_BIAS_MULT : 1)
+            }));
+        }
+
+        const pickedEntry = _pickReforgeAffixEntry(sourcePool, blockedIds);
+        if (!pickedEntry) break;
+
+        const roll = (typeof rollAffixByIdForItemLevel === 'function')
+            ? rollAffixByIdForItemLevel(pickedEntry.affixId, context.itemLevel, { tierBand })
+            : null;
+        if (!roll) {
+            blockedIds.add(pickedEntry.affixId);
+            continue;
+        }
+
+        const def = pickedEntry.affixDef || (typeof getAffixDefById === 'function' ? getAffixDefById(pickedEntry.affixId) : null);
+        if (!def) {
+            blockedIds.add(pickedEntry.affixId);
+            continue;
+        }
+
+        blockedIds.add(pickedEntry.affixId);
+        chosen.push({
+            affixId: roll.affixId,
+            tier: roll.tier,
+            roll: roll.roll,
+            craftTag: pickedEntry.craftTag || 'neutral',
+            group,
+            name: _formatReforgingAffixName(roll.affixId, def),
+            statPath: def.statPath,
+            type: def.type,
+            effectText: `${def.statPath} ${_formatReforgingRollValue(def, roll.roll)}`
+        });
+    }
+
+    return chosen;
+}
+
+function applyReforgeChoice(context, group, candidate) {
+    if (!context || !context.instanceRecord || !context.selectedCandidate) return { ok: false, reason: 'No selected item.' };
+    if (!candidate || typeof candidate !== 'object' || typeof candidate.affixId !== 'string') return { ok: false, reason: 'Invalid candidate.' };
+    const instanceId = context.selectedCandidate.instanceId;
+    if (!instanceId || typeof setItemInstanceData !== 'function') return { ok: false, reason: 'Cannot persist item.' };
+
+    const latest = (typeof getItemInstanceData === 'function') ? getItemInstanceData(gameData, instanceId) : context.instanceRecord;
+    if (!latest) return { ok: false, reason: 'Item instance missing.' };
+
+    const allAffixIds = _collectItemAffixIds(latest);
+    if (allAffixIds.has(candidate.affixId)) {
+        return { ok: false, reason: 'Affix already exists on item.' };
+    }
+
+    const openSlots = group === REFORGING_ACTION_GROUPS.prefix
+        ? (typeof getOpenPrefixSlots === 'function' ? getOpenPrefixSlots(latest, gameData) : 0)
+        : (typeof getOpenSuffixSlots === 'function' ? getOpenSuffixSlots(latest, gameData) : 0);
+    if (openSlots <= 0) {
+        return { ok: false, reason: 'No open slots.' };
+    }
+
+    const updated = {
+        itemId: latest.itemId,
+        itemLevel: latest.itemLevel,
+        implicits: Array.isArray(latest.implicits) ? latest.implicits.slice() : [],
+        prefixes: Array.isArray(latest.prefixes) ? latest.prefixes.slice() : [],
+        suffixes: Array.isArray(latest.suffixes) ? latest.suffixes.slice() : []
+    };
+    const payload = {
+        affixId: candidate.affixId,
+        tier: Math.max(1, Math.floor(Number(candidate.tier) || 1)),
+        roll: Number(candidate.roll)
+    };
+    if (!Number.isFinite(payload.roll)) {
+        return { ok: false, reason: 'Invalid roll value.' };
+    }
+
+    if (group === REFORGING_ACTION_GROUPS.prefix) {
+        updated.prefixes.push(payload);
+    } else if (group === REFORGING_ACTION_GROUPS.suffix) {
+        updated.suffixes.push(payload);
+    } else {
+        return { ok: false, reason: 'Invalid affix group.' };
+    }
+
+    const stored = setItemInstanceData(gameData, instanceId, updated);
+    if (!stored) return { ok: false, reason: 'Failed to write item instance.' };
+
+    if (typeof markCharacterDirty === 'function') {
+        markCharacterDirty();
+    }
+    if (typeof getDerivedCharacterStats === 'function') {
+        getDerivedCharacterStats(getConfiguredActiveGridKey());
+    }
+    if (typeof refreshCharacterPanels === 'function') {
+        refreshCharacterPanels();
+    }
+    if (typeof updateUI === 'function') {
+        updateUI();
+    }
+    if (typeof saveGame === 'function') {
+        saveGame();
+    }
+    return { ok: true };
+}
+
+function _getReforgeActionBlockedReason(context, group, costData) {
+    if (!context || !context.instanceRecord || !context.selectedCandidate) {
+        return 'No selected item.';
+    }
+    if (!context.affixCapable) {
+        return 'Item has no affix capability.';
+    }
+    if (context.rarity === 'unique') {
+        return 'Reforging disabled for Unique items (v0).';
+    }
+
+    const openSlots = group === REFORGING_ACTION_GROUPS.prefix ? context.openPrefix : context.openSuffix;
+    if (!Number.isFinite(openSlots) || openSlots <= 0) {
+        return 'No open slots.';
+    }
+    if (!costData || !costData.costObj || typeof canAfford !== 'function' || !canAfford(costData.costObj)) {
+        return 'Cannot afford cost.';
+    }
+    return null;
+}
+
+function _renderReforgingActionCandidates(state, context) {
+    const host = document.getElementById('reforging-candidate-panel');
+    if (!host) return;
+    host.innerHTML = '';
+
+    const pending = state && state.pending && typeof state.pending === 'object'
+        ? state.pending
+        : null;
+    const group = pending ? pending.group : null;
+    const candidates = pending && Array.isArray(pending.candidates) ? pending.candidates : [];
+    if (!group || candidates.length === 0) return;
+
+    const title = document.createElement('div');
+    title.className = 'reforging-action-message';
+    title.textContent = `Choose 1 ${group} candidate:`;
+    host.appendChild(title);
+
+    candidates.forEach((candidate, idx) => {
+        const card = document.createElement('div');
+        card.className = 'reforging-candidate-card';
+        card.innerHTML =
+            `<div class="reforging-candidate-head">` +
+                `<strong>${_escapeReforgingText(candidate.name || candidate.affixId)}</strong>` +
+                `<span>T${Math.max(1, Math.floor(Number(candidate.tier) || 1))}</span>` +
+            `</div>` +
+            `<div class="reforging-candidate-meta">${_escapeReforgingText(candidate.effectText || '')}</div>`;
+
+        const chooseBtn = document.createElement('button');
+        chooseBtn.type = 'button';
+        chooseBtn.textContent = `Choose ${idx + 1}`;
+        chooseBtn.disabled = !!(state && state.isWorking);
+        chooseBtn.onclick = () => {
+            const runtime = ensureReforgingState();
+            if (runtime.isWorking) return;
+            if (!runtime.pending || !Array.isArray(runtime.pending.candidates) || runtime.pending.candidates.length === 0) {
+                runtime.actionMessage = 'No pending candidates.';
+                renderReforgingTab();
+                return;
+            }
+            runtime.isWorking = true;
+            try {
+                const pendingSelection = runtime.pending;
+                runtime.selectedInstanceId = pendingSelection.instanceId;
+                const latestCandidates = _collectReforgingCandidates();
+                const latestContext = _resolveReforgingSelectedContext(runtime, latestCandidates);
+                if (!latestContext || !latestContext.selectedCandidate || latestContext.selectedCandidate.instanceId !== pendingSelection.instanceId) {
+                    runtime.pending = null;
+                    runtime.actionMessage = 'Selected item is no longer available.';
+                    return;
+                }
+
+                const applyResult = applyReforgeChoice(latestContext, pendingSelection.group, candidate);
+                runtime.pending = null;
+                runtime.actionMessage = applyResult.ok
+                    ? `${candidate.name || candidate.affixId} applied.`
+                    : String(applyResult.reason || 'Failed to apply candidate.');
+            } finally {
+                runtime.isWorking = false;
+                renderReforgingTab();
+            }
+        };
+        card.appendChild(chooseBtn);
+        host.appendChild(card);
+    });
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Dismiss Choices (No Refund)';
+    cancelBtn.onclick = () => {
+        const runtime = ensureReforgingState();
+        if (runtime.isWorking) return;
+        runtime.pending = null;
+        runtime.actionMessage = 'Choices dismissed. Cost not refunded.';
+        renderReforgingTab();
+    };
+    host.appendChild(cancelBtn);
+}
+
+function _triggerReforgingFillAction(group) {
+    const state = ensureReforgingState();
+    if (state.pending) {
+        state.actionMessage = 'Resolve pending candidates first.';
+        renderReforgingTab();
+        return;
+    }
+    if (state.isWorking) return;
+
+    state.isWorking = true;
+    const candidates = _collectReforgingCandidates();
+    const context = _resolveReforgingSelectedContext(state, candidates);
+    const costData = computeReforgeCost(context, state.targetMode, state.combatMatKey);
+    try {
+        const blockedReason = _getReforgeActionBlockedReason(context, group, costData);
+        if (blockedReason) {
+            state.actionMessage = blockedReason;
+            return;
+        }
+
+        const candidatesRolled = rollReforgeCandidates(context, group, {
+            mode: state.targetMode,
+            combatType: costData.combatType,
+            tierBand: costData.tierBand,
+            count: 3
+        });
+        if (!Array.isArray(candidatesRolled) || candidatesRolled.length !== 3) {
+            state.actionMessage = 'No valid candidates found for this action.';
+            return;
+        }
+
+        const spent = spendCost(costData.costObj, {
+            refreshUI: false,
+            refreshWallet: false,
+            save: false
+        });
+        if (!spent) {
+            state.actionMessage = 'Cannot afford cost.';
+            return;
+        }
+
+        state.pending = {
+            instanceId: context.selectedCandidate.instanceId,
+            group,
+            costObj: { ...costData.costObj },
+            candidates: candidatesRolled,
+            mode: costData.mode,
+            cmKey: costData.combatMatKey
+        };
+        state.actionMessage = `Cost paid. Select one ${group} candidate.`;
+        if (typeof updateUI === 'function') {
+            updateUI();
+        }
+        if (typeof saveGame === 'function') {
+            saveGame();
+        }
+    } finally {
+        state.isWorking = false;
+        renderReforgingTab();
+    }
+}
+
+function _renderReforgingActions(state, context) {
+    const modeSelect = document.getElementById('reforging-target-mode');
+    const matSelect = document.getElementById('reforging-combat-mat');
+    const fillPrefixBtn = document.getElementById('reforging-fill-prefix-btn');
+    const fillSuffixBtn = document.getElementById('reforging-fill-suffix-btn');
+    const costPreview = document.getElementById('reforging-cost-preview');
+    const actionMessage = document.getElementById('reforging-action-message');
+    if (!modeSelect || !matSelect || !fillPrefixBtn || !fillSuffixBtn || !costPreview || !actionMessage) return;
+
+    modeSelect.value = state.targetMode;
+    matSelect.value = state.combatMatKey;
+    const hasPending = !!state.pending;
+    const isWorking = !!state.isWorking;
+
+    modeSelect.onchange = () => {
+        const runtime = ensureReforgingState();
+        if (runtime.pending || runtime.isWorking) return;
+        runtime.targetMode = Object.prototype.hasOwnProperty.call(REFORGING_TARGET_MODE_VALUES, modeSelect.value)
+            ? modeSelect.value
+            : REFORGING_TARGET_MODE_VALUES.chaos;
+        runtime.actionMessage = '';
+        renderReforgingTab();
+    };
+    matSelect.onchange = () => {
+        const runtime = ensureReforgingState();
+        if (runtime.pending || runtime.isWorking) return;
+        runtime.combatMatKey = REFORGING_COMBAT_MAT_KEYS.includes(matSelect.value)
+            ? matSelect.value
+            : REFORGING_COMBAT_MAT_KEYS[0];
+        runtime.actionMessage = '';
+        renderReforgingTab();
+    };
+
+    const costData = computeReforgeCost(context, state.targetMode, state.combatMatKey);
+    costPreview.textContent = `Cost: ${costData.gold} gold | ${costData.combatMatKey}: 1 | each res: ${costData.resEach}`;
+
+    const prefixReason = _getReforgeActionBlockedReason(context, REFORGING_ACTION_GROUPS.prefix, costData);
+    const suffixReason = _getReforgeActionBlockedReason(context, REFORGING_ACTION_GROUPS.suffix, costData);
+    const lockReason = isWorking
+        ? 'Please wait...'
+        : (hasPending ? 'Resolve pending candidates first.' : null);
+    const prefixBlockedReason = lockReason || prefixReason;
+    const suffixBlockedReason = lockReason || suffixReason;
+
+    modeSelect.disabled = !!lockReason;
+    matSelect.disabled = !!lockReason;
+
+    fillPrefixBtn.disabled = !!prefixBlockedReason;
+    fillPrefixBtn.title = prefixBlockedReason || '';
+    fillPrefixBtn.onclick = () => {
+        const runtime = ensureReforgingState();
+        if (runtime.pending || runtime.isWorking) return;
+        _triggerReforgingFillAction(REFORGING_ACTION_GROUPS.prefix);
+    };
+
+    fillSuffixBtn.disabled = !!suffixBlockedReason;
+    fillSuffixBtn.title = suffixBlockedReason || '';
+    fillSuffixBtn.onclick = () => {
+        const runtime = ensureReforgingState();
+        if (runtime.pending || runtime.isWorking) return;
+        _triggerReforgingFillAction(REFORGING_ACTION_GROUPS.suffix);
+    };
+
+    let statusMessage = state.actionMessage || '';
+    if (!statusMessage) {
+        if (prefixBlockedReason && suffixBlockedReason) {
+            statusMessage = (prefixBlockedReason === suffixBlockedReason)
+                ? prefixBlockedReason
+                : `Prefix: ${prefixBlockedReason} | Suffix: ${suffixBlockedReason}`;
+        } else if (prefixBlockedReason) {
+            statusMessage = `Prefix: ${prefixBlockedReason}`;
+        } else if (suffixBlockedReason) {
+            statusMessage = `Suffix: ${suffixBlockedReason}`;
+        }
+    }
+    actionMessage.textContent = statusMessage;
+    _renderReforgingActionCandidates(state, context);
+}
+
+function renderReforgingSelection() {
+    const state = ensureReforgingState();
+    const candidates = _collectReforgingCandidates();
+    const selected = _resolveSelectedReforgingCandidate(candidates, state);
+    if (!selected) {
+        state.selectedInstanceId = null;
+        state.pending = null;
+        state.actionMessage = '';
+    }
+    _renderReforgingPicker(candidates, selected, state);
+    const context = _resolveReforgingSelectedContext(state, candidates);
+    _renderReforgingSelectedDetails(context, state);
+    _renderReforgingActions(state, context);
+}
+
+function renderReforgingTab() {
+    renderReforgingWallet();
+    renderReforgingSelection();
+}
+
+function renderReforgingWallet() {
+    const walletHost = document.getElementById('reforging-wallet-list');
+    if (!walletHost) return;
+    ensureCurrencyState(gameData);
+
+    const groupsHtml = REFORGING_WALLET_GROUPS.map((group) => {
+        const rows = group.entries.map((entry) => {
+            const amount = getCurrency(entry.key).toLocaleString('de-DE');
+            return (
+                `<div class="reforging-wallet-row">` +
+                    `<span class="reforging-wallet-key">${entry.label}</span>` +
+                    `<span class="reforging-wallet-value">${amount}</span>` +
+                `</div>`
+            );
+        }).join('');
+        return (
+            `<div class="reforging-wallet-group">` +
+                `<h5>${group.title}</h5>` +
+                rows +
+            `</div>`
+        );
+    }).join('');
+    walletHost.innerHTML = groupsHtml;
+
+    const hint = document.getElementById('reforging-debug-hint');
+    if (!hint) return;
+    hint.textContent = isDebugCheatsEnabled()
+        ? 'Debug: window.grantCurrency(key, amount) aktiv.'
+        : 'Debug-Cheat deaktiviert. Fuer Tests: window.DEBUG_CHEATS = true';
 }
 
 let _worldViewBackup = null;
@@ -2943,6 +4071,14 @@ function _sellSelectedBattlefieldItems() {
     if (goldTotal > 0) {
         if (typeof addGold === 'function') {
             addGold(goldTotal, 'battlefield_sell');
+        } else if (typeof grantCurrency === 'function') {
+            grantCurrency('gold', goldTotal, {
+                bypassDebugGate: true,
+                trackTotalGold: true,
+                refreshUI: false,
+                refreshWallet: false,
+                save: false
+            });
         } else {
             gameData.gold = (Number.isFinite(gameData.gold) ? gameData.gold : 0) + goldTotal;
             gameData.totalGold = (Number.isFinite(gameData.totalGold) ? gameData.totalGold : 0) + goldTotal;
@@ -3706,8 +4842,9 @@ function buyItem(itemId) {
     const devShopEnabled = isDeveloperShopEnabled();
     const itemPrice = devShopEnabled ? 0 : Math.max(0, Math.floor(Number(item.price) || 0));
     const requiredLevel = Math.max(1, Math.floor(Number(item.req) || 1));
+    const currentGold = getCurrency('gold');
     if (!devShopEnabled && gameData.level < requiredLevel) return;
-    if (!devShopEnabled && gameData.gold < itemPrice) return;
+    if (!devShopEnabled && currentGold < itemPrice) return;
     if (typeof ensureBankPageData === 'function') {
         ensureBankPageData(gameData);
     }
@@ -3895,7 +5032,7 @@ function updateUI() {
     const setT = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
     const setW = (id, val) => { const el = document.getElementById(id); if (el) el.style.width = val + "%"; };
 
-    setT('gold-display', Math.floor(gameData.gold).toLocaleString());
+    setT('gold-display', Math.floor(getCurrency('gold')).toLocaleString());
     setT('level-display', gameData.level);
     setT('stat-gps', '-');
     setT('stat-total-gold', Math.floor(gameData.totalGold).toLocaleString());
@@ -4250,7 +5387,7 @@ function renderShop() {
         const itemPrice = devShopEnabled ? 0 : Math.max(0, Math.floor(Number(item.price) || 0));
         const requiredLevel = Math.max(1, Math.floor(Number(item.req) || 1));
         const hasLevel = devShopEnabled ? true : gameData.level >= requiredLevel;
-        const hasGold = devShopEnabled ? true : gameData.gold >= itemPrice;
+        const hasGold = devShopEnabled ? true : getCurrency('gold') >= itemPrice;
         const canBuy = hasLevel && hasGold;
         if (!canBuy) card.style.opacity = '0.6';
         
@@ -4583,6 +5720,7 @@ window.onload = () => {
         ensureBattlefieldData(gameData);
     }
     ensureSettingsDefaults();
+    ensureCurrencyState(gameData);
     _lastDerivedGridKey = null;
     audioRuntime.settingsReady = true;
     _syncAudioVolumeLabelsAndSliders();

@@ -127,6 +127,14 @@ function challengePlayer(opponentIndex) {
     if (result.won) {
         if (typeof addGold === 'function') {
             addGold(result.goldReward, 'pvp_win');
+        } else if (typeof grantCurrency === 'function') {
+            grantCurrency('gold', result.goldReward, {
+                bypassDebugGate: true,
+                trackTotalGold: true,
+                refreshUI: false,
+                refreshWallet: false,
+                save: false
+            });
         } else {
             gameData.gold += result.goldReward;
             gameData.totalGold += result.goldReward;

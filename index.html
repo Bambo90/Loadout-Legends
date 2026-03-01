@@ -20,6 +20,7 @@
                 <button class="nav-btn" onclick="switchTab('equipment')">🛡️ Ausrüstung</button>
                 <button class="nav-btn" onclick="switchTab('shop')">💰 Shop</button>
                 <button class="nav-btn" onclick="switchTab('character')">Charakter</button>
+                <button class="nav-btn" onclick="switchTab('reforging')">Reforging</button>
                 <button class="nav-btn" onclick="switchTab('stats')">📊 Stats</button>
                 <button class="nav-btn" onclick="switchTab('options')">⚙️ Optionen</button>
             </nav>
@@ -142,6 +143,61 @@
                             <div class="character-hub-grid-wrap">
                                 <div id="character-setup-grid" class="inventory-grid"></div>
                             </div>
+                        </section>
+                    </div>
+                </div>
+
+                <div id="tab-reforging" class="tab-content">
+                    <div class="hub-header">
+                        <h3>Reforging</h3>
+                        <p>Hier wirst du spaeter Items gezielt modifizieren koennen.</p>
+                    </div>
+                    <div class="reforging-layout">
+                        <section class="stat-card reforging-card">
+                            <h4>Wallet</h4>
+                            <div id="reforging-wallet-list" class="reforging-wallet-list"></div>
+                            <p id="reforging-debug-hint" class="reforging-debug-hint">Debug-Cheat deaktiviert.</p>
+                        </section>
+                        <section class="stat-card reforging-card">
+                            <h4>Select Item</h4>
+                            <div class="reforging-select-actions">
+                                <button id="reforging-pick-item-btn" class="options-keybind-bind reforging-pick-btn" type="button">Pick Item</button>
+                                <span id="reforging-selected-badge" class="reforging-selected-badge">No item selected</span>
+                            </div>
+                            <div id="reforging-picker-panel" class="reforging-picker-panel"></div>
+                            <div id="reforging-selected-item-panel" class="reforging-selected-item-panel">
+                                <p>Select an item to inspect slots.</p>
+                            </div>
+                        </section>
+                        <section class="stat-card reforging-card">
+                            <h4>Actions</h4>
+                            <div class="reforging-actions-grid">
+                                <label class="reforging-field">
+                                    <span>Target Mode</span>
+                                    <select id="reforging-target-mode">
+                                        <option value="chaos">CHAOS</option>
+                                        <option value="focus">FOCUS</option>
+                                    </select>
+                                </label>
+                                <label class="reforging-field">
+                                    <span>Combat Mat</span>
+                                    <select id="reforging-combat-mat">
+                                        <option value="cm_offense_t1">cm_offense_t1</option>
+                                        <option value="cm_offense_t2">cm_offense_t2</option>
+                                        <option value="cm_offense_t3">cm_offense_t3</option>
+                                        <option value="cm_defense_t1">cm_defense_t1</option>
+                                        <option value="cm_defense_t2">cm_defense_t2</option>
+                                        <option value="cm_defense_t3">cm_defense_t3</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div id="reforging-cost-preview" class="reforging-cost-preview">Cost: -</div>
+                            <div class="reforging-action-buttons">
+                                <button id="reforging-fill-prefix-btn" type="button">Fill Prefix Slot</button>
+                                <button id="reforging-fill-suffix-btn" type="button">Fill Suffix Slot</button>
+                            </div>
+                            <div id="reforging-action-message" class="reforging-action-message"></div>
+                            <div id="reforging-candidate-panel" class="reforging-candidate-panel"></div>
                         </section>
                     </div>
                 </div>

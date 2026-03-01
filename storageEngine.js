@@ -191,12 +191,19 @@ function unlockStoragePage(pageIndex) {
     }
 
     const unlockCost = getStoragePageUnlockCost(idx);
-    if (!_isFiniteNumber(gameData.gold) || gameData.gold < unlockCost) {
+    const currentGold = (typeof getCurrency === "function")
+        ? getCurrency("gold")
+        : (_isFiniteNumber(gameData.gold) ? gameData.gold : 0);
+    if (!_isFiniteNumber(currentGold) || currentGold < unlockCost) {
         _showStorageToast(`Need ${unlockCost} gold to unlock`);
         return false;
     }
 
-    gameData.gold -= unlockCost;
+    if (typeof addGold === "function") {
+        addGold(-unlockCost, "storage_unlock_page");
+    } else {
+        gameData.gold = Math.max(0, currentGold - unlockCost);
+    }
     meta.unlocked = true;
     setActiveBankPage(idx);
     updateUI();
@@ -675,7 +682,11 @@ function executeBulkSell() {
         }
     });
 
-    gameData.gold += totalGold;
+    if (typeof addGold === "function") {
+        addGold(totalGold, "storage_bulk_sell");
+    } else {
+        gameData.gold = (_isFiniteNumber(gameData.gold) ? gameData.gold : 0) + totalGold;
+    }
     storageState.selectedItems.clear();
 
     if (typeof saveGame === "function") saveGame();

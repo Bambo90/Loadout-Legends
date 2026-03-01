@@ -714,6 +714,107 @@ function registerItemInstance(gameData, instanceId, baseItemId, itemLevel, optio
     return setItemInstanceData(gameData, instanceId, generated);
 }
 
+function _resolveItemSlotContext(instanceLike, dataContext) {
+    const source = (instanceLike && typeof instanceLike === "object") ? instanceLike : null;
+    if (!source) {
+        return {
+            instanceRecord: null,
+            baseItem: null,
+            source,
+            affixCapable: false
+        };
+    }
+
+    const state = (dataContext && typeof dataContext === "object")
+        ? dataContext
+        : ((typeof gameData !== "undefined" && gameData && typeof gameData === "object") ? gameData : null);
+    let instanceRecord = null;
+
+    if (source.instanceId && state && typeof getItemInstanceData === "function") {
+        instanceRecord = getItemInstanceData(state, source.instanceId);
+    }
+
+    if (!instanceRecord &&
+        typeof source.itemId === "string" &&
+        (Array.isArray(source.implicits) || Array.isArray(source.prefixes) || Array.isArray(source.suffixes))) {
+        instanceRecord = source;
+    }
+
+    const itemId = (instanceRecord && typeof instanceRecord.itemId === "string" && instanceRecord.itemId)
+        ? instanceRecord.itemId
+        : ((typeof source.itemId === "string" && source.itemId)
+            ? source.itemId
+            : ((typeof source.id === "string" && source.id) ? source.id : null));
+    const baseItem = itemId ? getItemDefById(itemId) : null;
+    const affixCapable = !!resolveAffixCategoryForItem(baseItem || source);
+
+    return {
+        instanceRecord,
+        baseItem,
+        source,
+        affixCapable
+    };
+}
+
+function _resolveSlotTotalFromContext(slotContext, slotKey) {
+    if (!slotContext || !slotKey || !slotContext.affixCapable) return 0;
+    const sourceValue = Number(slotContext.source && slotContext.source[slotKey]);
+    if (_isFiniteNumber(sourceValue)) return Math.max(0, Math.floor(sourceValue));
+
+    const baseValue = Number(slotContext.baseItem && slotContext.baseItem[slotKey]);
+    if (_isFiniteNumber(baseValue)) return Math.max(0, Math.floor(baseValue));
+
+    const rarity = String(
+        (slotContext.baseItem && slotContext.baseItem.rarity) ||
+        (slotContext.source && slotContext.source.rarity) ||
+        "common"
+    ).toLowerCase();
+    return _normalizeSlotValue(undefined, rarity, slotKey);
+}
+
+function _resolveFilledAffixCountFromContext(slotContext, listKey) {
+    if (!slotContext || !listKey) return 0;
+    if (Array.isArray(slotContext.instanceRecord && slotContext.instanceRecord[listKey])) {
+        return slotContext.instanceRecord[listKey].length;
+    }
+    if (Array.isArray(slotContext.source && slotContext.source[listKey])) {
+        return slotContext.source[listKey].length;
+    }
+    return 0;
+}
+
+function getTotalPrefixSlots(instanceLike, dataContext) {
+    const ctx = _resolveItemSlotContext(instanceLike, dataContext);
+    return _resolveSlotTotalFromContext(ctx, "prefixSlots");
+}
+
+function getTotalSuffixSlots(instanceLike, dataContext) {
+    const ctx = _resolveItemSlotContext(instanceLike, dataContext);
+    return _resolveSlotTotalFromContext(ctx, "suffixSlots");
+}
+
+function getFilledPrefixCount(instanceLike, dataContext) {
+    const ctx = _resolveItemSlotContext(instanceLike, dataContext);
+    return _resolveFilledAffixCountFromContext(ctx, "prefixes");
+}
+
+function getFilledSuffixCount(instanceLike, dataContext) {
+    const ctx = _resolveItemSlotContext(instanceLike, dataContext);
+    return _resolveFilledAffixCountFromContext(ctx, "suffixes");
+}
+
+function getOpenPrefixSlots(instanceLike, dataContext) {
+    const total = getTotalPrefixSlots(instanceLike, dataContext);
+    const filled = getFilledPrefixCount(instanceLike, dataContext);
+    return Math.max(0, total - filled);
+}
+
+function getOpenSuffixSlots(instanceLike, dataContext) {
+    const total = getTotalSuffixSlots(instanceLike, dataContext);
+    const filled = getFilledSuffixCount(instanceLike, dataContext);
+    return Math.max(0, total - filled);
+}
+
 function _inferInstanceItemLevel(gameData, cell) {
     const charLevel = gameData &&
         gameData.character &&
@@ -1048,6 +1149,12 @@ if (typeof window !== "undefined") {
     window.ensureItemInstanceIntegrity = ensureItemInstanceIntegrity;
     window.resolveRuntimeItemFromCell = resolveRuntimeItemFromCell;
     window.getRuntimeItemDefinition = getRuntimeItemDefinition;
+    window.getTotalPrefixSlots = getTotalPrefixSlots;
+    window.getTotalSuffixSlots = getTotalSuffixSlots;
+    window.getFilledPrefixCount = getFilledPrefixCount;
+    window.getFilledSuffixCount = getFilledSuffixCount;
+    window.getOpenPrefixSlots = getOpenPrefixSlots;
+    window.getOpenSuffixSlots = getOpenSuffixSlots;
 }
 
 if (typeof module !== "undefined" && module.exports) {
@@ -1069,6 +1176,12 @@ if (typeof module !== "undefined" && module.exports) {
         registerItemInstance,
         ensureItemInstanceIntegrity,
         resolveRuntimeItemFromCell,
-        getRuntimeItemDefinition
+        getRuntimeItemDefinition,
+        getTotalPrefixSlots,
+        getTotalSuffixSlots,
+        getFilledPrefixCount,
+        getFilledSuffixCount,
+        getOpenPrefixSlots,
+        getOpenSuffixSlots
     };
 }

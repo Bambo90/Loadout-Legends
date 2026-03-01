@@ -104,12 +104,30 @@ function _resolveTierRollWeight(entry, index, orderedEligibleTiers, itemLevel) {
     return Math.max(1, blended);
 }
 
-function _pickTierAndRoll(affixDef, itemLevel, rng) {
+function _normalizeTierBand(tierBand) {
+    if (!tierBand || typeof tierBand !== "object") return null;
+    const minTier = Number(tierBand.minTier);
+    const maxTier = Number(tierBand.maxTier);
+    if (!Number.isFinite(minTier) || !Number.isFinite(maxTier)) return null;
+    const lo = Math.max(1, Math.floor(Math.min(minTier, maxTier)));
+    const hi = Math.max(lo, Math.floor(Math.max(minTier, maxTier)));
+    return { minTier: lo, maxTier: hi };
+}
+
+function _filterEligibleTiersByBand(eligibleTiers, tierBand) {
+    const band = _normalizeTierBand(tierBand);
+    if (!band) return Array.isArray(eligibleTiers) ? eligibleTiers : [];
+    return (Array.isArray(eligibleTiers) ? eligibleTiers : [])
+        .filter((tier) => tier && Number.isFinite(tier.tier) && tier.tier >= band.minTier && tier.tier <= band.maxTier);
+}
+
+function _pickTierAndRoll(affixDef, itemLevel, rng, options) {
+    const opts = options && typeof options === "object" ? options : {};
     if (!affixDef) return null;
     const eligibleTiers = (typeof getEligibleAffixTiers === "function")
         ? getEligibleAffixTiers(affixDef, itemLevel)
         : [];
-    const tierPool = Array.isArray(eligibleTiers) ? eligibleTiers : [];
+    const tierPool = _filterEligibleTiersByBand(eligibleTiers, opts.tierBand);
     if (tierPool.length === 0) return null;
 
     const orderedEligibleTiers = tierPool
@@ -148,6 +166,33 @@ function _pickTierAndRoll(affixDef, itemLevel, rng) {
         affixId: affixDef.id,
         tier: chosenTier.tier,
         roll: roundedRoll
+    };
+}
+
+function pickWeightedAffixIdFromPool(pool, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const exclude = opts.excludeAffixIds instanceof Set ? opts.excludeAffixIds : null;
+    const filteredPool = (Array.isArray(pool) ? pool : []).filter((entry) => {
+        const affixId = (typeof entry === "string") ? entry : (entry && entry.affixId);
+        if (typeof affixId !== "string" || !affixId) return false;
+        if (exclude && exclude.has(affixId)) return false;
+        return true;
+    });
+    if (filteredPool.length === 0) return null;
+    return _pickWeighted(filteredPool, opts.rng);
+}
+
+function rollAffixByIdForItemLevel(affixId, itemLevel, options) {
+    if (typeof affixId !== "string" || !affixId) return null;
+    const affixDef = typeof getAffixDefById === "function" ? getAffixDefById(affixId) : null;
+    if (!affixDef) return null;
+    const opts = options && typeof options === "object" ? options : {};
+    const roll = _pickTierAndRoll(affixDef, itemLevel, opts.rng, { tierBand: opts.tierBand });
+    if (!roll) return null;
+    return {
+        affixId: roll.affixId,
+        tier: roll.tier,
+        roll: roll.roll
     };
 }
 
@@ -258,10 +303,14 @@ function generateItem(baseItemId, itemLevel, options) {
 
 if (typeof window !== "undefined") {
     window.generateItem = generateItem;
+    window.rollAffixByIdForItemLevel = rollAffixByIdForItemLevel;
+    window.pickWeightedAffixIdFromPool = pickWeightedAffixIdFromPool;
 }
 
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
-        generateItem
+        generateItem,
+        rollAffixByIdForItemLevel,
+        pickWeightedAffixIdFromPool
     };
 }

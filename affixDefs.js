@@ -441,6 +441,21 @@ const _AFFIX_TIER_TARGET_COUNT = 12;
 const _AFFIX_TIER_REQUIRED_ILVL_BY_TIER = Object.freeze([60, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1]);
 const _AFFIX_TIER_GAMMA_PERCENT = 1.35;
 const _AFFIX_TIER_GAMMA_FLAT = 1.6;
+const _AFFIX_CRAFT_TAG_BY_STAT_PATH = Object.freeze({
+    physicalDamageMin: "offense",
+    physicalDamageMax: "offense",
+    critChance: "offense",
+    attacksPerSecond: "offense",
+    armour: "defense",
+    evasion: "defense",
+    auraShield: "defense",
+    life: "defense",
+    mana: "neutral",
+    stamina: "neutral",
+    staminaRegen: "neutral",
+    staminaCost: "neutral",
+    weightLimit: "neutral"
+});
 
 function _roundTierBound(value) {
     if (!Number.isFinite(value)) return 0;
@@ -509,11 +524,26 @@ function _buildExpandedTiersFromSeed(seedTiers) {
     return Object.freeze(output);
 }
 
+function _normalizeCraftTag(value) {
+    const tag = String(value || "").trim().toLowerCase();
+    if (tag === "offense" || tag === "defense" || tag === "neutral") return tag;
+    return null;
+}
+
+function _resolveAffixCraftTag(def) {
+    if (!def || typeof def !== "object") return "neutral";
+    const explicit = _normalizeCraftTag(def.craftTag);
+    if (explicit) return explicit;
+    const byStat = _AFFIX_CRAFT_TAG_BY_STAT_PATH[def.statPath];
+    return _normalizeCraftTag(byStat) || "neutral";
+}
+
 const AFFIX_DEFS = Object.freeze(
     _AFFIX_DEFS_SEED.map((def) => {
         if (!def || typeof def !== "object") return def;
         return Object.freeze({
             ...def,
+            craftTag: _resolveAffixCraftTag(def),
             tiers: _buildExpandedTiersFromSeed(def.tiers)
         });
     })
@@ -644,6 +674,15 @@ function getEligibleAffixTiers(affixDef, itemLevel) {
         .sort((a, b) => a.tier - b.tier);
 }
 
+function getAffixCraftTag(affixOrId) {
+    if (!affixOrId) return "neutral";
+    if (typeof affixOrId === "string") {
+        const def = getAffixDefById(affixOrId);
+        return _resolveAffixCraftTag(def);
+    }
+    return _resolveAffixCraftTag(affixOrId);
+}
+
 if (typeof window !== "undefined") {
     window.AFFIX_DEFS = AFFIX_DEFS;
     window.AFFIX_CATEGORY_POOLS = AFFIX_CATEGORY_POOLS;
@@ -655,6 +694,7 @@ if (typeof window !== "undefined") {
     window.getAffixPoolByCategoryGroup = getAffixPoolByCategoryGroup;
     window.getAffixCategoryPools = getAffixCategoryPools;
     window.getEligibleAffixTiers = getEligibleAffixTiers;
+    window.getAffixCraftTag = getAffixCraftTag;
 }
 
 if (typeof module !== "undefined" && module.exports) {
@@ -668,6 +708,7 @@ if (typeof module !== "undefined" && module.exports) {
         getAffixDefsByCategoryGroup,
         getAffixPoolByCategoryGroup,
         getAffixCategoryPools,
-        getEligibleAffixTiers
+        getEligibleAffixTiers,
+        getAffixCraftTag
     };
 }
